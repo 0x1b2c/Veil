@@ -11,7 +11,7 @@ final class NvimView: NSView {
     }
     var cellSize: CGSize
     var defaultFg: Int = 0x000000
-    var defaultBg: Int = 0xFFFFFF
+    var defaultBg: Int
     var flatCharIndices: [[Int]] = []
     var modeInfoList: [ModeInfo] = []
     var currentCursorShape: ModeInfo.CursorShape = .block
@@ -38,6 +38,7 @@ final class NvimView: NSView {
         self.gridFont = defaultFont
         let size = NvimView.computeCellSize(for: defaultFont)
         self.cellSize = size
+        self.defaultBg = NSColor.windowBackgroundColor.intValue
         self.glyphCache = GlyphCache(font: defaultFont, cellSize: size)
         self.rowRenderer = RowRenderer(cellSize: size, glyphCache: glyphCache)
         super.init(frame: frame)
@@ -49,6 +50,7 @@ final class NvimView: NSView {
         self.gridFont = defaultFont
         let size = NvimView.computeCellSize(for: defaultFont)
         self.cellSize = size
+        self.defaultBg = NSColor.windowBackgroundColor.intValue
         self.glyphCache = GlyphCache(font: defaultFont, cellSize: size)
         self.rowRenderer = RowRenderer(cellSize: size, glyphCache: glyphCache)
         super.init(coder: coder)
@@ -57,7 +59,7 @@ final class NvimView: NSView {
 
     private func setupLayers() {
         wantsLayer = true
-        layer?.backgroundColor = NSColor(rgb: defaultBg).cgColor
+        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
         cursorLayer.zPosition = 100
         cursorLayer.backgroundColor = NSColor(rgb: defaultFg).cgColor
