@@ -61,7 +61,7 @@ class WindowDocument: NSDocument {
                     nvimView?.render(grid: grid)
                     grid.clearDirty()
                 case .setTitle(let title):
-                    windowControllers.first?.window?.title = title
+                    windowController?.updateTitle(title)
                 case .defaultColorsSet(let fg, let bg, _, _, _):
                     nvimView?.setDefaultColors(fg: fg, bg: bg)
                 case .modeInfoSet(_, let modes):
@@ -73,9 +73,8 @@ class WindowDocument: NSDocument {
                 case .optionSet(let name, let value):
                     if name == "guifont", let fontStr = value.stringValue, !fontStr.isEmpty {
                         nvimView?.parseAndSetGuifont(fontStr)
-                        if let contentSize = windowControllers.first?.window?.contentView?.bounds.size,
-                           let nvimView {
-                            let newGridSize = nvimView.gridSizeForViewSize(contentSize)
+                        if let nvimView {
+                            let newGridSize = nvimView.gridSizeForViewSize(nvimView.bounds.size)
                             Task {
                                 await channel.uiTryResize(width: newGridSize.cols, height: newGridSize.rows)
                             }

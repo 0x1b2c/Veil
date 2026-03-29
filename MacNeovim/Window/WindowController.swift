@@ -3,14 +3,15 @@ import AppKit
 class WindowController: NSWindowController, NSWindowDelegate {
     let nvimView = NvimView(frame: .zero)
     let tablineView = TablineView(frame: .zero)
+    private(set) var customTitleLabel: NSTextField?
 
     convenience init() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered, defer: false
         )
-        window.title = "MacNeovim"
+        window.title = "Veil"
         window.center()
         if let frameString = UserDefaults.standard.string(forKey: "MacNeovimWindowFrame") {
             window.setFrame(NSRectFromString(frameString), display: false)
@@ -18,19 +19,49 @@ class WindowController: NSWindowController, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.restorationClass = nil
         window.isRestorable = false
-        let toolbar = NSToolbar()
-        toolbar.showsBaselineSeparator = false
-        window.toolbar = toolbar
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+
         self.init(window: window)
         window.delegate = self
 
-        window.contentView = nvimView
+        let titleLabel = NSTextField(labelWithString: "Veil")
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .titleBarFont(ofSize: 0)
+        titleLabel.textColor = .labelColor
+        titleLabel.lineBreakMode = .byTruncatingTail
+
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        nvimView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(titleLabel)
+        container.addSubview(nvimView)
+        window.contentView = container
+
+        let titleBarHeight: CGFloat = 28
+        NSLayoutConstraint.activate([
+            titleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            titleLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
+            titleLabel.widthAnchor.constraint(lessThanOrEqualTo: container.widthAnchor, constant: -160),
+
+            nvimView.topAnchor.constraint(equalTo: container.topAnchor, constant: titleBarHeight),
+            nvimView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            nvimView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            nvimView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+
+        customTitleLabel = titleLabel
         window.makeFirstResponder(nvimView)
+    }
+
+    func updateTitle(_ title: String) {
+        customTitleLabel?.stringValue = title
+        window?.title = title
     }
 
     func windowDidResize(_ notification: Notification) {
         saveWindowFrame()
-        guard let contentSize = window?.contentView?.bounds.size else { return }
+        let contentSize = nvimView.bounds.size
         (document as? WindowDocument)?.windowDidResize(to: contentSize)
     }
 
