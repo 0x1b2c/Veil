@@ -21,6 +21,10 @@ final class NvimView: NSView {
 
     let cursorLayer = CALayer()
     var rowLayers: [CALayer] = []
+    var markedText: String?
+    var markedPosition: Position = .zero
+    let markedTextLayer = CATextLayer()
+    var keyDownDone = true
 
     // MARK: - Private
 
@@ -58,6 +62,14 @@ final class NvimView: NSView {
         cursorLayer.zPosition = 100
         cursorLayer.backgroundColor = NSColor(rgb: defaultFg).cgColor
         layer?.addSublayer(cursorLayer)
+
+        markedTextLayer.contentsScale = 2.0
+        markedTextLayer.fontSize = 14
+        markedTextLayer.foregroundColor = NSColor.white.cgColor
+        markedTextLayer.backgroundColor = NSColor.darkGray.cgColor
+        markedTextLayer.isHidden = true
+        markedTextLayer.zPosition = 200
+        layer?.addSublayer(markedTextLayer)
     }
 
     // MARK: - First responder

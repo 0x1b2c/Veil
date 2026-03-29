@@ -7,14 +7,62 @@ extension NvimView {
         let modifiers = event.modifierFlags.intersection([.control, .option, .command])
         if !modifiers.isEmpty {
             // Meta modifiers present: bypass IME, send directly
-            guard let characters = event.characters else { return }
-            let nvimKey = KeyUtils.nvimKey(characters: characters, modifiers: event.modifierFlags)
-            guard !nvimKey.isEmpty else { return }
-            Task { await channel?.send(key: nvimKey) }
+            sendKeyDirectly(event)
         } else {
             // Let the input context handle it (IME path)
+            keyDownDone = false
             inputContext?.handleEvent(event)
+            if !keyDownDone {
+                // IME did not consume the event; send it directly
+                sendKeyDirectly(event)
+                keyDownDone = true
+            }
         }
+    }
+
+    private func sendKeyDirectly(_ event: NSEvent) {
+        guard let characters = event.characters else { return }
+        let nvimKey = KeyUtils.nvimKey(characters: characters, modifiers: event.modifierFlags)
+        guard !nvimKey.isEmpty else { return }
+        Task { await channel?.send(key: nvimKey) }
+    }
+
+    func updateMarkedTextDisplay() {
+        guard let text = markedText, !text.isEmpty else {
+            clearMarkedText()
+            return
+        }
+
+        let cursorFrame = cursorLayer.frame
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+
+        markedTextLayer.string = text
+        markedTextLayer.font = gridFont
+        markedTextLayer.fontSize = gridFont.pointSize
+
+        // Size the layer to fit the text
+        let width = CGFloat(text.count) * cellSize.width + 4
+        let height = cellSize.height + 2
+        markedTextLayer.frame = CGRect(
+            x: cursorFrame.origin.x,
+            y: cursorFrame.origin.y,
+            width: width,
+            height: height
+        )
+        markedTextLayer.isHidden = false
+
+        CATransaction.commit()
+    }
+
+    func clearMarkedText() {
+        markedText = nil
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        markedTextLayer.isHidden = true
+        markedTextLayer.string = nil
+        CATransaction.commit()
     }
 }
 
@@ -22,6 +70,9 @@ extension NvimView {
 
 extension NvimView: NSTextInputClient {
     func insertText(_ string: Any, replacementRange: NSRange) {
+        keyDownDone = true
+        clearMarkedText()
+
         let text: String
         if let attrString = string as? NSAttributedString {
             text = attrString.string
@@ -39,11 +90,31 @@ extension NvimView: NSTextInputClient {
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
-        // Stub for Task 11 (full IME support)
+        let text: String
+        if let attrString = string as? NSAttributedString {
+            text = attrString.string
+        } else if let str = string as? String {
+            text = str
+        } else {
+            return
+        }
+
+        if text.isEmpty {
+            clearMarkedText()
+        } else {
+            markedText = text
+            // Capture cursor position when composition begins
+            markedPosition = gridPosition(for: NSPoint(
+                x: cursorLayer.frame.origin.x,
+                y: cursorLayer.frame.origin.y + cellSize.height / 2
+            ))
+            updateMarkedTextDisplay()
+        }
     }
 
     func unmarkText() {
-        // Stub for Task 11
+        clearMarkedText()
+        inputContext?.discardMarkedText()
     }
 
     func selectedRange() -> NSRange {
@@ -51,11 +122,14 @@ extension NvimView: NSTextInputClient {
     }
 
     func markedRange() -> NSRange {
-        NSRange(location: NSNotFound, length: 0)
+        guard let text = markedText else {
+            return NSRange(location: NSNotFound, length: 0)
+        }
+        return NSRange(location: 0, length: text.utf16.count)
     }
 
     func hasMarkedText() -> Bool {
-        false
+        markedText != nil
     }
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
@@ -75,10 +149,21 @@ extension NvimView: NSTextInputClient {
     }
 
     func characterIndex(for point: NSPoint) -> Int {
-        NSNotFound
+        let viewPoint = convert(point, from: nil)
+        let pos = gridPosition(for: viewPoint)
+
+        guard pos.row >= 0, pos.row < flatCharIndices.count else {
+            return NSNotFound
+        }
+        let rowIndices = flatCharIndices[pos.row]
+        guard pos.col >= 0, pos.col < rowIndices.count else {
+            return NSNotFound
+        }
+        return rowIndices[pos.col]
     }
 
     override func doCommand(by selector: Selector) {
-        // Stub: most commands are handled by Neovim
+        keyDownDone = true
+        // Most commands are handled by Neovim
     }
 }
