@@ -4187,92 +4187,47 @@ git commit -m "Override displayName to prevent Untitled flash in title bar"
 
 ---
 
-### Task 29: Window Title via Autocmd (VimR Hybrid Strategy)
+### Task 29: Window Title — `titleReady` Gate + `set_title` Events
 
 **Files:**
 - Modify: `MacNeovim/Window/WindowDocument.swift`
 - Modify: `MacNeovim/Nvim/NvimChannel.swift`
+- Modify: `MacNeovim/Nvim/NvimEvent.swift`
 
-**Problem:** Current title approach has multiple issues:
-- `set title` causes nvim to immediately show ugly titles (e.g. Startify's file:// URL)
-- No automatic title update on buffer/tab switch without `set title`
+**Problem:** Window title needs to show nvim's titlestring output (e.g. `init.lua (~/.config/nvim/lua/plugins) - Nvim`) when editing files, but show "MacNeovim" on startup (Startify etc). Enabling nvim's `set title` immediately produces an ugly title from whatever buffer is current at startup.
 
-VimR's proven strategy: register `BufEnter` + `TabEnter` autocmds via `rpcnotify`, query buffer name on each notification, fall back to app name when no file is open. Also still handle `set_title` events (hybrid).
+**Strategy:**
 
-**Fix:**
+Use nvim's `set_title` events for all title updates, but suppress the initial one fired at startup.
 
-1. Change `displayName` to return `"Veil"` (project renamed from MacNeovim)
-2. Remove the `set title` command and `hasReceivedFirstFlush` flag
-3. After `uiAttach`, register autocmds using `rpcnotify` with a `VeilBufChanged` notification
-4. In NvimChannel, handle incoming `VeilBufChanged` requests and forward as events
-5. In WindowDocument event loop, on receiving the notification, query `expand("%:t")` via RPC and update title (fall back to "Veil" if empty)
+1. Register `BufEnter`/`TabEnter` autocmds that send `rpcnotify` with `VeilAppBufChanged`
+2. Enable `set title` AFTER registering autocmds
+3. Use a `titleReady` flag (initially `false`) as a one-time startup gate:
+   - `set_title` events are ignored while `titleReady` is `false`
+   - First `VeilAppBufChanged` sets `titleReady = true` (this only fires when the user actually switches buffers, not for the initial buffer)
+   - After that, all `set_title` events are displayed normally
 
-- [ ] **Step 1: Read WindowDocument.swift, NvimChannel.swift, MsgpackRpc.swift**
+This works because autocmds don't fire retroactively — the initial buffer (Startify) was loaded before our autocmd was registered, so no `VeilAppBufChanged` fires for it. The initial `set_title` from `set title` is suppressed by the gate. When the user opens a file, `BufEnter` fires → gate opens → `set_title` with proper titlestring is displayed.
 
-Understand how notifications flow: nvim → MsgpackRpc (as RpcMessage.notification) → NvimChannel (forwarded via eventContinuation) → WindowDocument event loop.
+**Implementation:**
 
-Currently NvimChannel only forwards `redraw` notifications. Need to also forward `VeilBufChanged` (or handle it separately).
+- `NvimEvent`: add `case veilBufChanged`
+- `NvimChannel`: forward `VeilAppBufChanged` rpcnotify as `.veilBufChanged` event
+- `WindowDocument`:
+  - `private var titleReady = false`
+  - `startNvim()`: register autocmds (augroup `VeilApp`), then `set title`
+  - Event loop: `.setTitle` → only update if `titleReady`; `.veilBufChanged` → set `titleReady = true`
+  - `displayName` returns `"MacNeovim"` (default title before nvim sends anything)
 
-- [ ] **Step 2: In NvimChannel, forward non-redraw notifications or add a separate handler**
-
-Option A: Add a new NvimEvent case for custom notifications.
-Option B: Handle `VeilBufChanged` directly in NvimChannel's notification loop and update a title stream.
-
-Simplest: Add `case veilBufChanged` to NvimEvent, forward it from NvimChannel when the notification method matches.
-
-In NvimChannel's task group where it processes notifications:
-```swift
-if case .notification(let method, let params) = message {
-    if method == "redraw" {
-        guard let args = params.arrayValue else { continue }
-        let events = NvimEvent.parse(redrawArgs: args)
-        for event in events {
-            await self.yieldEvent(event)
-        }
-    } else if method == "VeilBufChanged" {
-        await self.yieldEvent(.veilBufChanged)
-    }
-}
-```
-
-- [ ] **Step 3: Add `case veilBufChanged` to NvimEvent**
-
-- [ ] **Step 4: In WindowDocument, register autocmds after uiAttach**
-
-After `channel.uiAttach()` and `startEventLoop()`, register autocmds:
-```swift
-let channelId = await channel.request("nvim_get_api_info", params: [])
-if let info = channelId.result.arrayValue, let chId = info.first?.intValue {
-    try? await channel.command("""
-        augroup Veil
-            autocmd!
-            autocmd BufEnter * call rpcnotify(\(chId), 'VeilBufChanged')
-            autocmd TabEnter * call rpcnotify(\(chId), 'VeilBufChanged')
-        augroup END
-    """)
-}
-```
-
-- [ ] **Step 5: In WindowDocument event loop, handle veilBufChanged**
-
-```swift
-case .veilBufChanged:
-    Task {
-        let (_, result) = await channel.request("nvim_eval", params: [.string("expand('%:t')")])
-        let name = result.stringValue ?? ""
-        windowControllers.first?.window?.title = name.isEmpty ? "Veil" : name
-    }
-```
-
-- [ ] **Step 6: Remove `set title` command and `hasReceivedFirstFlush` from startNvim/event loop**
-
-- [ ] **Step 7: Build and verify**
-
-- [ ] **Step 8: Commit**
+**Result:**
+- Startup with Startify → title stays "MacNeovim" (gate closed)
+- Open a file → BufEnter → gate opens → set_title shows titlestring ✓
+- Switch buffers/tabs → set_title updates automatically ✓
+- No RPC queries needed for title — purely event-driven
 
 ```bash
 git add MacNeovim/Window/WindowDocument.swift MacNeovim/Nvim/NvimChannel.swift MacNeovim/Nvim/NvimEvent.swift
-git commit -m "Show buffer name in title via BufEnter/TabEnter autocmd (VimR hybrid strategy)"
+git commit -m "Window title via set_title events with titleReady startup gate"
 ```
 
 ---

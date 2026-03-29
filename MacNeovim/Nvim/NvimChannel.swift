@@ -35,12 +35,15 @@ actor NvimChannel {
                 group.addTask { await rpc.start() }
                 group.addTask {
                     for await message in notifications {
-                        if case .notification(let method, let params) = message, method == "redraw" {
+                        guard case .notification(let method, let params) = message else { continue }
+                        if method == "redraw" {
                             guard let args = params.arrayValue else { continue }
                             let events = NvimEvent.parse(redrawArgs: args)
                             for event in events {
                                 await self.yieldEvent(event)
                             }
+                        } else if method == "VeilAppBufChanged" {
+                            await self.yieldEvent(.veilBufChanged)
                         }
                     }
                 }

@@ -47,6 +47,7 @@ enum NvimEvent: Sendable {
     case mouseOff
     case busyStart
     case busyStop
+    case veilBufChanged
 
     // MARK: - Parse
 
