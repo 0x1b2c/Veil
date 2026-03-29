@@ -12,7 +12,9 @@ class WindowController: NSWindowController, NSWindowDelegate {
         )
         window.title = "MacNeovim"
         window.center()
-        window.setFrameAutosaveName("MacNeovimWindow")
+        if let frameString = UserDefaults.standard.string(forKey: "MacNeovimWindowFrame") {
+            window.setFrame(NSRectFromString(frameString), display: false)
+        }
         window.isReleasedWhenClosed = false
         window.restorationClass = nil
         window.isRestorable = false
@@ -24,11 +26,21 @@ class WindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowDidResize(_ notification: Notification) {
+        saveWindowFrame()
         guard let contentSize = window?.contentView?.bounds.size else { return }
         (document as? WindowDocument)?.windowDidResize(to: contentSize)
     }
 
+    func windowDidMove(_ notification: Notification) {
+        saveWindowFrame()
+    }
+
     func windowDidBecomeKey(_ notification: Notification) {
         window?.makeFirstResponder(nvimView)
+    }
+
+    private func saveWindowFrame() {
+        guard let frame = window?.frame else { return }
+        UserDefaults.standard.set(NSStringFromRect(frame), forKey: "MacNeovimWindowFrame")
     }
 }
