@@ -122,6 +122,16 @@ actor MsgpackRpc {
     }
 }
 
+extension MessagePackValue {
+    nonisolated var intValue: Int {
+        switch self {
+        case .int(let v): return Int(v)
+        case .uint(let v): return Int(v)
+        default: return 0
+        }
+    }
+}
+
 extension FileHandle {
     nonisolated var asyncBytes: AsyncThrowingStream<UInt8, Error> {
         AsyncThrowingStream { continuation in
