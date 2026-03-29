@@ -4053,3 +4053,134 @@ Keep `tablineView` property declaration but don't add it to the view hierarchy. 
 git add MacNeovim/Nvim/NvimChannel.swift MacNeovim/Window/WindowController.swift MacNeovim/Window/WindowDocument.swift
 git commit -m "Disable ext_tabline — let neovim render its own tab bar in the grid"
 ```
+
+---
+
+### Task 25: Enable Window Title from Neovim
+
+**Files:**
+- Modify: `MacNeovim/Window/WindowDocument.swift`
+
+**Problem:** Window title bar is empty. Neovim doesn't send `set_title` events by default — the `title` option must be enabled first.
+
+**Fix:** Two changes needed:
+
+1. After `nvim_ui_attach`, send `set title` to neovim so it sends `set_title` events on buffer/tab changes. The event loop already handles this event.
+
+2. Add an empty NSToolbar to the window to center the title. Modern macOS shows title next to traffic lights when there's no toolbar.
+
+- [ ] **Step 1: Read WindowDocument.swift and WindowController.swift**
+
+- [ ] **Step 2: In WindowDocument `startNvim()`, after `channel.uiAttach()` and before `startEventLoop()`, add:**
+
+```swift
+try? await channel.command("set title")
+```
+
+- [ ] **Step 3: In WindowController convenience init, after creating the window, add an empty toolbar:**
+
+```swift
+let toolbar = NSToolbar()
+toolbar.showsBaselineSeparator = false
+window.toolbar = toolbar
+```
+
+- [ ] **Step 4: Build and verify**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add MacNeovim/Window/WindowDocument.swift MacNeovim/Window/WindowController.swift
+git commit -m "Enable neovim title and center it with empty toolbar"
+```
+
+---
+
+### Task 26: Use System Background Color to Reduce Startup Flash
+
+**Files:**
+- Modify: `MacNeovim/Rendering/NvimView.swift`
+
+**Problem:** Window shows a white flash on startup before nvim sends `default_colors_set`. The initial `defaultBg` is hardcoded to `0xFFFFFF` (white).
+
+**Fix:** Use `NSColor.windowBackgroundColor` as the initial background instead of hardcoded white. This matches the system appearance (dark in dark mode, light in light mode), so the brief flash before nvim renders is much less noticeable.
+
+- [ ] **Step 1: Read NvimView.swift**
+
+- [ ] **Step 2: Change `defaultBg` initial value and `setupLayers()` background**
+
+Replace the hardcoded `0xFFFFFF` default for `defaultBg` with the system color. In `setupLayers()`, use `NSColor.windowBackgroundColor.cgColor` for the layer background:
+
+```swift
+// Change initial value:
+var defaultBg: Int = NSColor.windowBackgroundColor.intValue
+
+// In setupLayers():
+layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+```
+
+- [ ] **Step 3: Build and verify**
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add MacNeovim/Rendering/NvimView.swift
+git commit -m "Use system background color to reduce startup white flash"
+```
+
+---
+
+### Task 27: Fix Cmd+Q — Should Quit App Immediately
+
+**Files:**
+- Modify: `MacNeovim/AppDelegate.swift`
+
+**Problem:** Cmd+Q sends `:confirm qa` to all windows and returns `.terminateCancel`. Windows close but app stays running (since `applicationShouldTerminateAfterLastWindowClosed` is `false`). User has to press Cmd+Q again to actually quit.
+
+**Fix:** Change `applicationShouldTerminate` to return `.terminateNow`. NSApplication will call `close()` on each document, which stops the nvim processes. No need for manual `:confirm qa` iteration.
+
+- [ ] **Step 1: Read AppDelegate.swift**
+
+- [ ] **Step 2: Simplify `applicationShouldTerminate` to just return `.terminateNow`**
+
+- [ ] **Step 3: Build and verify**
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add MacNeovim/AppDelegate.swift
+git commit -m "Fix Cmd+Q to quit app immediately instead of just closing windows"
+```
+
+---
+
+### Task 28: Prevent "Untitled" Flash in Window Title
+
+**Files:**
+- Modify: `MacNeovim/Window/WindowDocument.swift`
+
+**Problem:** New windows briefly flash "Untitled" in the title bar before nvim's `set_title` event arrives. NSDocument sets the default `displayName` to "Untitled".
+
+**Fix:** Override `displayName` in WindowDocument to return an empty string:
+
+```swift
+override var displayName: String! {
+    get { "" }
+    set { }
+}
+```
+
+This prevents NSDocument from setting "Untitled". The title will be updated when nvim sends `set_title`.
+
+- [ ] **Step 1: Read WindowDocument.swift**
+
+- [ ] **Step 2: Add the `displayName` override**
+
+- [ ] **Step 3: Build and verify**
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add MacNeovim/Window/WindowDocument.swift
+git commit -m "Override displayName to prevent Untitled flash in title bar"
+```
