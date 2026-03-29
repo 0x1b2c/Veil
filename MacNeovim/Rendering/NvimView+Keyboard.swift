@@ -6,17 +6,26 @@ extension NvimView {
     override func keyDown(with event: NSEvent) {
         let modifiers = event.modifierFlags.intersection([.control, .option, .command])
         if !modifiers.isEmpty {
-            // Meta modifiers present: bypass IME, send directly
             sendKeyDirectly(event)
-        } else {
-            // Let the input context handle it (IME path)
-            keyDownDone = false
-            inputContext?.handleEvent(event)
-            if !keyDownDone {
-                // IME did not consume the event; send it directly
+            return
+        }
+
+        // Special keys bypass IME — they would otherwise be consumed by doCommand(by:)
+        if let chars = event.characters, let scalar = chars.unicodeScalars.first {
+            let code = Int(scalar.value)
+            if code == 0x1B || code == 0x0D || code == 0x09 || code == 0x7F
+                || code == 0x19 || (code >= 0xF700 && code <= 0xF8FF) {
                 sendKeyDirectly(event)
-                keyDownDone = true
+                return
             }
+        }
+
+        // Normal text goes through IME
+        keyDownDone = false
+        inputContext?.handleEvent(event)
+        if !keyDownDone && markedText == nil {
+            sendKeyDirectly(event)
+            keyDownDone = true
         }
     }
 
