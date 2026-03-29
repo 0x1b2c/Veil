@@ -72,6 +72,17 @@ class WindowDocument: NSDocument {
                     windowController?.tablineView.update(current: current, tabInfos: tabs)
                 case .bell:
                     NSSound.beep()
+                case .optionSet(let name, let value):
+                    if name == "guifont", let fontStr = value.stringValue, !fontStr.isEmpty {
+                        nvimView?.parseAndSetGuifont(fontStr)
+                        if let contentSize = windowControllers.first?.window?.contentView?.bounds.size,
+                           let nvimView {
+                            let newGridSize = nvimView.gridSizeForViewSize(contentSize)
+                            Task {
+                                await channel.uiTryResize(width: newGridSize.cols, height: newGridSize.rows)
+                            }
+                        }
+                    }
                 default:
                     break
                 }

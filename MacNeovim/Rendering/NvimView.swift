@@ -170,6 +170,24 @@ final class NvimView: NSView {
 
     // MARK: - Font
 
+    func parseAndSetGuifont(_ guifont: String) {
+        let parts = guifont.split(separator: ":")
+        guard let fontName = parts.first.map(String.init) else { return }
+        var size: CGFloat = 14
+        for part in parts.dropFirst() {
+            if part.hasPrefix("h"), let s = Double(part.dropFirst()) {
+                size = CGFloat(s)
+            }
+        }
+        let cleanName = fontName.replacingOccurrences(of: "\\ ", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+        if let font = NSFont(name: cleanName, size: size) {
+            updateFont(font)
+        } else {
+            updateFont(NSFont.monospacedSystemFont(ofSize: size, weight: .regular))
+        }
+    }
+
     func updateFont(_ newFont: NSFont) {
         let newCellSize = NvimView.computeCellSize(for: newFont)
         cellSize = newCellSize
