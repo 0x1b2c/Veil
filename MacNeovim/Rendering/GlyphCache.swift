@@ -32,8 +32,10 @@ nonisolated final class GlyphCache: @unchecked Sendable {
         var italic: Bool
         var foreground: Int
         var background: Int
+        var cellCount: Int
     }
 
+    var scale: CGFloat = 2.0
     private var cache: [Key: CGImage] = [:]
     private var font: NSFont
     private var cellSize: CGSize
@@ -43,7 +45,7 @@ nonisolated final class GlyphCache: @unchecked Sendable {
         self.cellSize = cellSize
     }
 
-    func get(text: String, attrs: CellAttributes, defaultFg: Int, defaultBg: Int) -> CGImage {
+    func get(text: String, attrs: CellAttributes, defaultFg: Int, defaultBg: Int, cellCount: Int = 1) -> CGImage {
         let fg = attrs.effectiveForeground(defaultFg: defaultFg, defaultBg: defaultBg)
         let bg = attrs.effectiveBackground(defaultFg: defaultFg, defaultBg: defaultBg)
         let key = Key(
@@ -53,10 +55,11 @@ nonisolated final class GlyphCache: @unchecked Sendable {
             bold: attrs.bold,
             italic: attrs.italic,
             foreground: fg,
-            background: bg
+            background: bg,
+            cellCount: cellCount
         )
         if let cached = cache[key] { return cached }
-        let image = render(text: text, bold: attrs.bold, italic: attrs.italic, fg: fg, bg: bg)
+        let image = render(text: text, bold: attrs.bold, italic: attrs.italic, fg: fg, bg: bg, cellCount: cellCount)
         cache[key] = image
         return image
     }
@@ -73,24 +76,27 @@ nonisolated final class GlyphCache: @unchecked Sendable {
 
     // MARK: - Private
 
-    private func render(text: String, bold: Bool, italic: Bool, fg: Int, bg: Int) -> CGImage {
-        let width = Int(ceil(cellSize.width))
-        let height = Int(ceil(cellSize.height))
+    private func render(text: String, bold: Bool, italic: Bool, fg: Int, bg: Int, cellCount: Int = 1) -> CGImage {
+        let drawWidth = cellSize.width * CGFloat(cellCount)
+        let pixelWidth = Int(ceil(drawWidth * scale))
+        let pixelHeight = Int(ceil(cellSize.height * scale))
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         let ctx = CGContext(
             data: nil,
-            width: max(width, 1),
-            height: max(height, 1),
+            width: max(pixelWidth, 1),
+            height: max(pixelHeight, 1),
             bitsPerComponent: 8,
             bytesPerRow: 0,
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         )!
 
+        ctx.scaleBy(x: scale, y: scale)
+
         // Fill background
         let bgColor = NSColor(rgb: bg)
         ctx.setFillColor(bgColor.cgColor)
-        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        ctx.fill(CGRect(x: 0, y: 0, width: drawWidth, height: cellSize.height))
 
         // Resolve font variant
         var drawFont = font

@@ -98,6 +98,10 @@ final class NvimView: NSView {
             rowLayers.removeLast().removeFromSuperlayer()
         }
 
+        // Configure scale for Retina rendering
+        let screenScale = window?.backingScaleFactor ?? 2.0
+        glyphCache.scale = screenScale
+
         // Render dirty rows
         for rowIdx in grid.dirtyRows {
             guard rowIdx < rows else { continue }
@@ -106,7 +110,8 @@ final class NvimView: NSView {
                 row: rowCells,
                 attributes: grid.attributes,
                 defaultFg: grid.defaultForeground,
-                defaultBg: grid.defaultBackground
+                defaultBg: grid.defaultBackground,
+                scale: screenScale
             ) {
                 let rowLayer = rowLayers[rowIdx]
                 // Flip Y: row 0 is at the top of the view

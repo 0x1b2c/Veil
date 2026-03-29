@@ -21,36 +21,49 @@ nonisolated final class RowRenderer: @unchecked Sendable {
         row: [Cell],
         attributes: [Int: CellAttributes],
         defaultFg: Int,
-        defaultBg: Int
+        defaultBg: Int,
+        scale: CGFloat = 2.0
     ) -> CGImage? {
         let cols = row.count
         guard cols > 0 else { return nil }
 
-        let width = Int(ceil(cellSize.width * CGFloat(cols)))
-        let height = Int(ceil(cellSize.height))
-        guard width > 0 && height > 0 else { return nil }
+        let pointWidth = cellSize.width * CGFloat(cols)
+        let pointHeight = cellSize.height
+        let pixelWidth = Int(ceil(pointWidth * scale))
+        let pixelHeight = Int(ceil(pointHeight * scale))
+        guard pixelWidth > 0 && pixelHeight > 0 else { return nil }
 
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         guard let ctx = CGContext(
             data: nil,
-            width: width,
-            height: height,
+            width: pixelWidth,
+            height: pixelHeight,
             bitsPerComponent: 8,
             bytesPerRow: 0,
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else { return nil }
 
+        ctx.scaleBy(x: scale, y: scale)
+
         // Fill entire row with default background
         let defaultBgColor = NSColor(rgb: defaultBg)
         ctx.setFillColor(defaultBgColor.cgColor)
-        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        ctx.fill(CGRect(x: 0, y: 0, width: pointWidth, height: pointHeight))
 
-        for col in 0..<cols {
+        var col = 0
+        while col < cols {
             let cell = row[col]
-            let x = CGFloat(col) * cellSize.width
-            let cellRect = CGRect(x: x, y: 0, width: cellSize.width, height: cellSize.height)
+            let text = cell.text
             let attrs = attributes[cell.hlId] ?? defaultAttrs
+
+            // Detect double-width character
+            let isDoubleWidth = !text.isEmpty && text != " " && col + 1 < cols && row[col + 1].text.isEmpty
+            let cellCount = isDoubleWidth ? 2 : 1
+            let drawWidth = cellSize.width * CGFloat(cellCount)
+
+            let x = CGFloat(col) * cellSize.width
+            let cellRect = CGRect(x: x, y: 0, width: drawWidth, height: cellSize.height)
 
             let bg = attrs.effectiveBackground(defaultFg: defaultFg, defaultBg: defaultBg)
 
@@ -62,12 +75,16 @@ nonisolated final class RowRenderer: @unchecked Sendable {
             }
 
             // Skip rendering for spaces and empty text
-            let text = cell.text
-            if text == " " || text.isEmpty { continue }
+            if text == " " || text.isEmpty {
+                col += 1
+                continue
+            }
 
             // Get glyph image from cache and composite
-            let glyphImage = glyphCache.get(text: text, attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
+            let glyphImage = glyphCache.get(text: text, attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg, cellCount: cellCount)
             ctx.draw(glyphImage, in: cellRect)
+
+            col += cellCount
         }
 
         return ctx.makeImage()
