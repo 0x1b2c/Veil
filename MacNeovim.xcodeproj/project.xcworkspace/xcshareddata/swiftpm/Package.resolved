@@ -1,0 +1,15 @@
+{
+  "originHash" : "806276858f9dd769e7880931998a8082da3acda346a039fd5c7ffe0a897fc0c9",
+  "pins" : [
+    {
+      "identity" : "messagepack.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/qvacua/MessagePack.swift",
+      "state" : {
+        "revision" : "e5e7708911a1032f0fa120c38292797734f4160c",
+        "version" : "4.1.0"
+      }
+    }
+  ],
+  "version" : 3
+}
