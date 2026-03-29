@@ -4277,24 +4277,128 @@ git commit -m "Show buffer name in title via BufEnter/TabEnter autocmd (VimR hyb
 
 ---
 
-### Task 30: Remove Toolbar — Fix Title Bar Height
+### Task 30: Custom Centered Title (VimR-style)
 
 **Files:**
 - Modify: `MacNeovim/Window/WindowController.swift`
 
-**Problem:** The empty NSToolbar makes the title bar taller than normal. It was added to center the title but may not be needed.
+**Problem:** macOS Big Sur+ left-aligns window titles by design. No simple API to center them. Need a custom NSTextField as the title, centered in the title bar area.
 
-**Fix:** Remove the toolbar creation entirely — delete the `NSToolbar()`, `showsBaselineSeparator`, `window.toolbar = toolbar`, and `window.toolbarStyle` lines. Test whether the title is still centered without it.
+**Fix:** Use VimR's proven approach (simplified):
+1. Remove the existing toolbar
+2. `window.titleVisibility = .hidden` — hide the system title
+3. `window.styleMask.insert(.fullSizeContentView)` — extend content into title bar area
+4. Create a centered NSTextField as custom title label
+5. Add the NvimView with a top inset (~28pt) so it doesn't overlap the title bar
+6. Store the custom title label so it can be updated by WindowDocument
 
 - [ ] **Step 1: Read WindowController.swift**
 
-- [ ] **Step 2: Remove all toolbar-related code**
+- [ ] **Step 2: Rewrite the convenience init with custom title**
 
-- [ ] **Step 3: Build and verify**
+```swift
+convenience init() {
+    let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+        styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+        backing: .buffered, defer: false
+    )
+    window.title = "Veil"
+    window.center()
+    if let frameString = UserDefaults.standard.string(forKey: "MacNeovimWindowFrame") {
+        window.setFrame(NSRectFromString(frameString), display: false)
+    }
+    window.isReleasedWhenClosed = false
+    window.restorationClass = nil
+    window.isRestorable = false
+    window.titleVisibility = .hidden
+    window.titlebarAppearsTransparent = false
 
-- [ ] **Step 4: Commit**
+    self.init(window: window)
+    window.delegate = self
+
+    // Custom centered title label in the title bar area
+    let titleLabel = NSTextField(labelWithString: "Veil")
+    titleLabel.translatesAutoresizingMaskIntoConstraints = false
+    titleLabel.isEditable = false
+    titleLabel.isBordered = false
+    titleLabel.drawsBackground = false
+    titleLabel.font = .titleBarFont(ofSize: 0)  // system title bar font at default size
+    titleLabel.textColor = .labelColor
+    titleLabel.lineBreakMode = .byTruncatingTail
+    titleLabel.alignment = .center
+
+    // Container view holds the title label and NvimView
+    let container = NSView()
+    container.translatesAutoresizingMaskIntoConstraints = false
+    window.contentView = container
+
+    container.addSubview(titleLabel)
+    nvimView.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(nvimView)
+
+    let titleBarHeight: CGFloat = 28
+    NSLayoutConstraint.activate([
+        titleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+        titleLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
+        titleLabel.widthAnchor.constraint(lessThanOrEqualTo: container.widthAnchor, constant: -160),
+
+        nvimView.topAnchor.constraint(equalTo: container.topAnchor, constant: titleBarHeight),
+        nvimView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+        nvimView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+        nvimView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+    ])
+
+    self.customTitleLabel = titleLabel
+    window.makeFirstResponder(nvimView)
+}
+```
+
+Add a property:
+```swift
+private(set) var customTitleLabel: NSTextField?
+```
+
+Add a method for updating the title:
+```swift
+func updateTitle(_ title: String) {
+    customTitleLabel?.stringValue = title
+    window?.title = title  // keep system title in sync for accessibility/Expose
+}
+```
+
+- [ ] **Step 3: Update windowDidResize to use NvimView's actual bounds for grid sizing**
+
+Since NvimView is now inset from the top by titleBarHeight, the existing `window?.contentView?.bounds.size` won't match NvimView's size. Use `nvimView.bounds.size` instead:
+
+```swift
+func windowDidResize(_ notification: Notification) {
+    saveWindowFrame()
+    let contentSize = nvimView.bounds.size
+    (document as? WindowDocument)?.windowDidResize(to: contentSize)
+}
+```
+
+- [ ] **Step 4: Update WindowDocument to use updateTitle instead of window.title**
+
+In the event loop, change:
+```swift
+case .setTitle(let title):
+    windowControllers.first?.window?.title = title
+```
+to:
+```swift
+case .setTitle(let title):
+    windowController?.updateTitle(title)
+```
+
+And in the veilBufChanged handler (from Task 29), also use `windowController?.updateTitle(name)`.
+
+- [ ] **Step 5: Build and verify**
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add MacNeovim/Window/WindowController.swift
-git commit -m "Remove empty toolbar to fix title bar height"
+git add MacNeovim/Window/WindowController.swift MacNeovim/Window/WindowDocument.swift
+git commit -m "Custom centered title label in title bar (VimR-style)"
 ```
