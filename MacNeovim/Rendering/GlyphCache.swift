@@ -1,0 +1,125 @@
+import AppKit
+import CoreText
+
+// MARK: - NSColor extensions
+
+extension NSColor {
+    nonisolated var intValue: Int {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
+        let color = usingColorSpace(.sRGB) ?? self
+        color.getRed(&r, green: &g, blue: &b, alpha: nil)
+        return (Int(r * 255) << 16) | (Int(g * 255) << 8) | Int(b * 255)
+    }
+
+    nonisolated convenience init(rgb: Int) {
+        self.init(
+            srgbRed: CGFloat((rgb >> 16) & 0xFF) / 255.0,
+            green: CGFloat((rgb >> 8) & 0xFF) / 255.0,
+            blue: CGFloat(rgb & 0xFF) / 255.0,
+            alpha: 1.0
+        )
+    }
+}
+
+// MARK: - GlyphCache
+
+nonisolated final class GlyphCache: @unchecked Sendable {
+    struct Key: Hashable {
+        var text: String
+        var fontName: String
+        var fontSize: CGFloat
+        var bold: Bool
+        var italic: Bool
+        var foreground: Int
+        var background: Int
+    }
+
+    private var cache: [Key: CGImage] = [:]
+    private var font: NSFont
+    private var cellSize: CGSize
+
+    init(font: NSFont, cellSize: CGSize) {
+        self.font = font
+        self.cellSize = cellSize
+    }
+
+    func get(text: String, attrs: CellAttributes, defaultFg: Int, defaultBg: Int) -> CGImage {
+        let fg = attrs.effectiveForeground(defaultFg: defaultFg, defaultBg: defaultBg)
+        let bg = attrs.effectiveBackground(defaultFg: defaultFg, defaultBg: defaultBg)
+        let key = Key(
+            text: text,
+            fontName: font.fontName,
+            fontSize: font.pointSize,
+            bold: attrs.bold,
+            italic: attrs.italic,
+            foreground: fg,
+            background: bg
+        )
+        if let cached = cache[key] { return cached }
+        let image = render(text: text, bold: attrs.bold, italic: attrs.italic, fg: fg, bg: bg)
+        cache[key] = image
+        return image
+    }
+
+    func invalidate() {
+        cache.removeAll()
+    }
+
+    func updateFont(_ newFont: NSFont, cellSize newCellSize: CGSize) {
+        self.font = newFont
+        self.cellSize = newCellSize
+        invalidate()
+    }
+
+    // MARK: - Private
+
+    private func render(text: String, bold: Bool, italic: Bool, fg: Int, bg: Int) -> CGImage {
+        let width = Int(ceil(cellSize.width))
+        let height = Int(ceil(cellSize.height))
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        let ctx = CGContext(
+            data: nil,
+            width: max(width, 1),
+            height: max(height, 1),
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+
+        // Fill background
+        let bgColor = NSColor(rgb: bg)
+        ctx.setFillColor(bgColor.cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+        // Resolve font variant
+        var drawFont = font
+        if bold {
+            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.bold)
+            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
+        }
+        if italic {
+            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.italic)
+            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
+        }
+
+        // Draw text via CoreText
+        let fgColor = NSColor(rgb: fg)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: drawFont,
+            .foregroundColor: fgColor,
+        ]
+        let attrString = NSAttributedString(string: text, attributes: attributes)
+        let line = CTLineCreateWithAttributedString(attrString)
+
+        // Position baseline
+        let descent = CTFontGetDescent(drawFont)
+        let leading = CTFontGetLeading(drawFont)
+        let baselineY = descent + leading
+
+        ctx.textPosition = CGPoint(x: 0, y: baselineY)
+        CTLineDraw(line, ctx)
+
+        return ctx.makeImage()!
+    }
+}
