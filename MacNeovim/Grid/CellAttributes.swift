@@ -110,4 +110,16 @@ struct CellAttributes: Equatable, Sendable {
         self.reverse = reverse
         self.blend = blend
     }
+
+    nonisolated func effectiveForeground(defaultFg: Int, defaultBg: Int) -> Int {
+        let fg = foreground >= 0 ? foreground : defaultFg
+        let bg = background >= 0 ? background : defaultBg
+        return reverse ? bg : fg
+    }
+
+    nonisolated func effectiveBackground(defaultFg: Int, defaultBg: Int) -> Int {
+        let fg = foreground >= 0 ? foreground : defaultFg
+        let bg = background >= 0 ? background : defaultBg
+        return reverse ? fg : bg
+    }
 }
