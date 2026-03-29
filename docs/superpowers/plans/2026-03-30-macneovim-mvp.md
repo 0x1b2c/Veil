@@ -3677,3 +3677,142 @@ Task 1 (Setup)
 ```
 
 Tasks 10-15 are independent of each other and can be worked on in parallel after Task 9.
+
+---
+
+### Task 17: Fix Slow Startup
+
+**Files:**
+- Modify: `MacNeovim/Nvim/NvimProcess.swift`
+
+**Problem:** `start()` calls `loginShellEnvironment()` which synchronously launches a login shell with `-l -i`, loads `.zshrc` with all plugins, and calls `waitUntilExit()`. This blocks for seconds on every window creation.
+
+**Fix:** Remove `loginShellEnvironment()` entirely. Use `ProcessInfo.processInfo.environment` directly. The `resolveNvimBinary()` method already has Homebrew fallback paths (`/opt/homebrew/bin/nvim`, `/usr/local/bin/nvim`), so we don't need the login shell's PATH.
+
+- [ ] **Step 1: Read NvimProcess.swift**
+
+- [ ] **Step 2: In `start()`, replace `Self.loginShellEnvironment()` with `ProcessInfo.processInfo.environment`**
+
+- [ ] **Step 3: Delete the entire `loginShellEnvironment()` static method**
+
+Keep `findInPath()` — it's used by `resolveNvimBinary()`.
+
+- [ ] **Step 4: Build and verify**
+
+Run: `xcodebuild build -project MacNeovim.xcodeproj -scheme MacNeovim -destination 'platform=macOS' 2>&1 | tail -3`
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add MacNeovim/Nvim/NvimProcess.swift
+git commit -m "Remove login shell env capture — use ProcessInfo.environment directly"
+```
+
+---
+
+### Task 18: Fix Enter/Esc Keys Not Working
+
+**Files:**
+- Modify: `MacNeovim/Rendering/NvimView+Keyboard.swift`
+
+**Problem:** Keys without meta modifiers go through `inputContext?.handleEvent(event)`. For Enter, macOS calls `doCommand(by: insertNewline:)`. For Esc, macOS calls `doCommand(by: cancelOperation:)`. But `doCommand(by:)` only sets `keyDownDone = true` and never sends the key to neovim.
+
+**Fix:** In `keyDown`, before going through the IME path, check if the key is a special key (Esc `0x1B`, Enter `0x0D`, Tab `0x09`, Backspace `0x7F`, Backtab `0x19`, arrow/function keys `0xF700-0xF8FF`) and send it directly to nvim, bypassing IME.
+
+- [ ] **Step 1: Read NvimView+Keyboard.swift**
+
+- [ ] **Step 2: Replace the `keyDown` method**
+
+```swift
+override func keyDown(with event: NSEvent) {
+    let modifiers = event.modifierFlags.intersection([.control, .option, .command])
+    if !modifiers.isEmpty {
+        sendKeyDirectly(event)
+        return
+    }
+
+    // Special keys bypass IME — they would otherwise be consumed by doCommand(by:)
+    if let chars = event.characters, let scalar = chars.unicodeScalars.first {
+        let code = Int(scalar.value)
+        if code == 0x1B || code == 0x0D || code == 0x09 || code == 0x7F
+            || code == 0x19 || (code >= 0xF700 && code <= 0xF8FF) {
+            sendKeyDirectly(event)
+            return
+        }
+    }
+
+    // Normal text goes through IME
+    keyDownDone = false
+    inputContext?.handleEvent(event)
+    if !keyDownDone && markedText == nil {
+        sendKeyDirectly(event)
+        keyDownDone = true
+    }
+}
+```
+
+- [ ] **Step 3: Build and verify**
+
+- [ ] **Step 4: Run unit tests (MacNeovimTests only)**
+
+Run: `xcodebuild test -project MacNeovim.xcodeproj -scheme MacNeovim -destination 'platform=macOS' -only-testing:MacNeovimTests 2>&1 | grep -E 'passed|failed|Executed'`
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add MacNeovim/Rendering/NvimView+Keyboard.swift
+git commit -m "Route special keys (Esc, Enter, Tab, etc.) directly to nvim bypassing IME"
+```
+
+---
+
+### Task 19: Fix Blurry Text and CJK Double-Width Rendering
+
+**Files:**
+- Modify: `MacNeovim/Rendering/GlyphCache.swift`
+- Modify: `MacNeovim/Rendering/RowRenderer.swift`
+- Modify: `MacNeovim/Rendering/NvimView.swift`
+
+**Problem 1 — Blurry text:** GlyphCache creates a CGContext at 1x point size (e.g., 8×16 pixels for an 8×16pt cell). On Retina (2x), this image gets stretched to 16×32 display pixels, causing blur.
+
+**Problem 2 — CJK half-rendered:** CJK characters are double-width (occupy 2 grid cells). Neovim sends the character in the first cell and an empty string `""` in the second. But GlyphCache renders into a single cell width, clipping the right half of the character.
+
+**Fix for GlyphCache:**
+1. Add `var scale: CGFloat = 2.0` public property
+2. Add `cellCount: Int` parameter to `get()` and to the `Key` struct
+3. In `render()`, create context at pixel dimensions: `width * cellCount * scale`, `height * scale`
+4. Call `ctx.scaleBy(x: scale, y: scale)` so CoreText renders at full Retina resolution
+5. Draw into a rect of `cellSize.width * cellCount` points wide
+
+**Fix for RowRenderer:**
+1. Add `scale: CGFloat = 2.0` parameter to `render()`
+2. Create context at pixel dimensions, call `ctx.scaleBy(x: scale, y: scale)`
+3. Detect double-width chars: current cell has text AND next cell text is `""` (empty)
+4. For double-width chars, call `glyphCache.get(..., cellCount: 2)` and draw into 2 cells width
+5. Use `while` loop instead of `for` to skip the placeholder cell after a double-width char
+
+**Fix for NvimView:**
+1. In `render(grid:)`, get `window?.backingScaleFactor ?? 2.0`
+2. Set `glyphCache.scale = screenScale`
+3. Pass `scale: screenScale` to `rowRenderer.render()`
+
+- [ ] **Step 1: Read GlyphCache.swift, RowRenderer.swift, NvimView.swift**
+
+- [ ] **Step 2: Update GlyphCache — add scale, cellCount, render at pixel resolution**
+
+- [ ] **Step 3: Update RowRenderer — scale parameter, double-width detection, while loop**
+
+- [ ] **Step 4: Update NvimView — pass scale to renderer and cache**
+
+- [ ] **Step 5: Build and verify**
+
+- [ ] **Step 6: Run GlyphCache tests**
+
+Run: `xcodebuild test -project MacNeovim.xcodeproj -scheme MacNeovim -destination 'platform=macOS' -only-testing:MacNeovimTests 2>&1 | grep -E 'GlyphCache|passed|failed'`
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add MacNeovim/Rendering/GlyphCache.swift MacNeovim/Rendering/RowRenderer.swift MacNeovim/Rendering/NvimView.swift
+git commit -m "Fix Retina rendering at 2x scale and handle double-width CJK characters"
+```
