@@ -4,12 +4,16 @@ import MessagePack
 class WindowDocument: NSDocument {
     var profile = Profile.default
 
-    private var channel: NvimChannel!
+    var channel: NvimChannel!
     private let grid = Grid()
     private var eventLoopTask: Task<Void, Never>?
 
+    private var windowController: WindowController? {
+        windowControllers.first as? WindowController
+    }
+
     private var nvimView: NvimView? {
-        (windowControllers.first as? WindowController)?.nvimView
+        windowController?.nvimView
     }
 
     override init() {
@@ -20,6 +24,12 @@ class WindowDocument: NSDocument {
     override func makeWindowControllers() {
         let controller = WindowController()
         controller.nvimView.channel = channel
+        controller.tablineView.onSelectTab = { [weak self] index in
+            guard let self else { return }
+            Task {
+                try? await self.channel.command("tabnext \(index + 1)")
+            }
+        }
         addWindowController(controller)
         Task { await startNvim() }
     }
@@ -58,6 +68,8 @@ class WindowDocument: NSDocument {
                     nvimView?.updateModeInfo(modes)
                 case .modeChange(_, let index):
                     nvimView?.updateCursorMode(index)
+                case .tablineUpdate(let current, let tabs):
+                    windowController?.tablineView.update(current: current, tabInfos: tabs)
                 case .bell:
                     NSSound.beep()
                 default:

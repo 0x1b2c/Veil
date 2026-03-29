@@ -2,6 +2,7 @@ import AppKit
 
 class WindowController: NSWindowController, NSWindowDelegate {
     let nvimView = NvimView(frame: .zero)
+    let tablineView = TablineView(frame: .zero)
 
     convenience init() {
         let window = NSWindow(
@@ -14,8 +15,58 @@ class WindowController: NSWindowController, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         self.init(window: window)
         window.delegate = self
-        window.contentView = nvimView
+
+        let container = NSView(frame: window.contentView!.bounds)
+        container.autoresizingMask = [.width, .height]
+        nvimView.translatesAutoresizingMaskIntoConstraints = false
+        tablineView.translatesAutoresizingMaskIntoConstraints = false
+
+        container.addSubview(tablineView)
+        container.addSubview(nvimView)
+
+        NSLayoutConstraint.activate([
+            tablineView.topAnchor.constraint(equalTo: container.topAnchor),
+            tablineView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            tablineView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+
+            nvimView.topAnchor.constraint(equalTo: tablineView.bottomAnchor),
+            nvimView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            nvimView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            nvimView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+
+        window.contentView = container
         window.makeFirstResponder(nvimView)
+
+        setupTabKeyEquivalents()
+    }
+
+    private func setupTabKeyEquivalents() {
+        let tabMenu = NSMenu(title: "Tabs")
+        for i in 1...9 {
+            let item = NSMenuItem(
+                title: "Tab \(i)",
+                action: #selector(switchToTab(_:)),
+                keyEquivalent: "\(i)"
+            )
+            item.keyEquivalentModifierMask = .command
+            item.tag = i
+            item.target = nil // responder chain
+            tabMenu.addItem(item)
+        }
+        let tabMenuItem = NSMenuItem(title: "Tabs", action: nil, keyEquivalent: "")
+        tabMenuItem.submenu = tabMenu
+        if let mainMenu = NSApp.mainMenu {
+            mainMenu.addItem(tabMenuItem)
+        }
+    }
+
+    @objc func switchToTab(_ sender: NSMenuItem) {
+        let index = sender.tag
+        guard let doc = document as? WindowDocument else { return }
+        Task {
+            try? await doc.channel.command("tabnext \(index)")
+        }
     }
 
     func windowDidResize(_ notification: Notification) {
