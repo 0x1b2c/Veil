@@ -4187,71 +4187,108 @@ git commit -m "Override displayName to prevent Untitled flash in title bar"
 
 ---
 
-### Task 29: Fix Default Title and Title Timing
+### Task 29: Window Title via Autocmd (VimR Hybrid Strategy)
 
 **Files:**
 - Modify: `MacNeovim/Window/WindowDocument.swift`
+- Modify: `MacNeovim/Nvim/NvimChannel.swift`
 
-**Problem:** Default window title is empty (from Task 28's displayName override). Should be "MacNeovim". Also `set title` is sent immediately after `ui_attach`, before nvim finishes initial rendering.
+**Problem:** Current title approach has multiple issues:
+- `set title` causes nvim to immediately show ugly titles (e.g. Startify's file:// URL)
+- No automatic title update on buffer/tab switch without `set title`
+
+VimR's proven strategy: register `BufEnter` + `TabEnter` autocmds via `rpcnotify`, query buffer name on each notification, fall back to app name when no file is open. Also still handle `set_title` events (hybrid).
 
 **Fix:**
-1. Change `displayName` override to return `"MacNeovim"` instead of `""`
-2. Move `set title` from `startNvim()` into the event loop — send it on the first `flush` event (which means nvim has completed initial rendering)
 
-- [ ] **Step 1: Read WindowDocument.swift**
+1. Change `displayName` to return `"Veil"` (project renamed from MacNeovim)
+2. Remove the `set title` command and `hasReceivedFirstFlush` flag
+3. After `uiAttach`, register autocmds using `rpcnotify` with a `VeilBufChanged` notification
+4. In NvimChannel, handle incoming `VeilBufChanged` requests and forward as events
+5. In WindowDocument event loop, on receiving the notification, query `expand("%:t")` via RPC and update title (fall back to "Veil" if empty)
 
-- [ ] **Step 2: Change displayName to return "MacNeovim"**
+- [ ] **Step 1: Read WindowDocument.swift, NvimChannel.swift, MsgpackRpc.swift**
 
+Understand how notifications flow: nvim → MsgpackRpc (as RpcMessage.notification) → NvimChannel (forwarded via eventContinuation) → WindowDocument event loop.
+
+Currently NvimChannel only forwards `redraw` notifications. Need to also forward `VeilBufChanged` (or handle it separately).
+
+- [ ] **Step 2: In NvimChannel, forward non-redraw notifications or add a separate handler**
+
+Option A: Add a new NvimEvent case for custom notifications.
+Option B: Handle `VeilBufChanged` directly in NvimChannel's notification loop and update a title stream.
+
+Simplest: Add `case veilBufChanged` to NvimEvent, forward it from NvimChannel when the notification method matches.
+
+In NvimChannel's task group where it processes notifications:
 ```swift
-override var displayName: String! {
-    get { "MacNeovim" }
-    set { }
+if case .notification(let method, let params) = message {
+    if method == "redraw" {
+        guard let args = params.arrayValue else { continue }
+        let events = NvimEvent.parse(redrawArgs: args)
+        for event in events {
+            await self.yieldEvent(event)
+        }
+    } else if method == "VeilBufChanged" {
+        await self.yieldEvent(.veilBufChanged)
+    }
 }
 ```
 
-- [ ] **Step 3: Move `set title` — remove from startNvim(), add to event loop on first flush**
+- [ ] **Step 3: Add `case veilBufChanged` to NvimEvent**
 
-Add a `private var hasReceivedFirstFlush = false` flag. In the event loop's `.flush` case, check the flag and send `set title` once:
+- [ ] **Step 4: In WindowDocument, register autocmds after uiAttach**
+
+After `channel.uiAttach()` and `startEventLoop()`, register autocmds:
+```swift
+let channelId = await channel.request("nvim_get_api_info", params: [])
+if let info = channelId.result.arrayValue, let chId = info.first?.intValue {
+    try? await channel.command("""
+        augroup Veil
+            autocmd!
+            autocmd BufEnter * call rpcnotify(\(chId), 'VeilBufChanged')
+            autocmd TabEnter * call rpcnotify(\(chId), 'VeilBufChanged')
+        augroup END
+    """)
+}
+```
+
+- [ ] **Step 5: In WindowDocument event loop, handle veilBufChanged**
 
 ```swift
-case .flush:
-    nvimView?.render(grid: grid)
-    grid.clearDirty()
-    if !hasReceivedFirstFlush {
-        hasReceivedFirstFlush = true
-        Task { try? await channel.command("set title") }
+case .veilBufChanged:
+    Task {
+        let (_, result) = await channel.request("nvim_eval", params: [.string("expand('%:t')")])
+        let name = result.stringValue ?? ""
+        windowControllers.first?.window?.title = name.isEmpty ? "Veil" : name
     }
 ```
 
-Remove the `try? await channel.command("set title")` line from `startNvim()`.
+- [ ] **Step 6: Remove `set title` command and `hasReceivedFirstFlush` from startNvim/event loop**
 
-- [ ] **Step 4: Build and verify**
+- [ ] **Step 7: Build and verify**
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add MacNeovim/Window/WindowDocument.swift
-git commit -m "Default title to MacNeovim, send set title after first flush"
+git add MacNeovim/Window/WindowDocument.swift MacNeovim/Nvim/NvimChannel.swift MacNeovim/Nvim/NvimEvent.swift
+git commit -m "Show buffer name in title via BufEnter/TabEnter autocmd (VimR hybrid strategy)"
 ```
 
 ---
 
-### Task 30: Fix Title Bar Height — Use Compact Toolbar Style
+### Task 30: Remove Toolbar — Fix Title Bar Height
 
 **Files:**
 - Modify: `MacNeovim/Window/WindowController.swift`
 
-**Problem:** The empty NSToolbar (added for centering the title) makes the title bar much taller than normal.
+**Problem:** The empty NSToolbar makes the title bar taller than normal. It was added to center the title but may not be needed.
 
-**Fix:** Set `window.toolbarStyle = .unifiedCompact` to merge the toolbar into the title bar without extra height.
+**Fix:** Remove the toolbar creation entirely — delete the `NSToolbar()`, `showsBaselineSeparator`, `window.toolbar = toolbar`, and `window.toolbarStyle` lines. Test whether the title is still centered without it.
 
 - [ ] **Step 1: Read WindowController.swift**
 
-- [ ] **Step 2: After creating the toolbar, add:**
-
-```swift
-window.toolbarStyle = .unifiedCompact
-```
+- [ ] **Step 2: Remove all toolbar-related code**
 
 - [ ] **Step 3: Build and verify**
 
@@ -4259,5 +4296,5 @@ window.toolbarStyle = .unifiedCompact
 
 ```bash
 git add MacNeovim/Window/WindowController.swift
-git commit -m "Use unifiedCompact toolbar style to fix title bar height"
+git commit -m "Remove empty toolbar to fix title bar height"
 ```
