@@ -1,5 +1,9 @@
 import Cocoa
 
+extension NSNotification.Name {
+    static let veilOpenFiles = NSNotification.Name("com.veil.openFiles")
+}
+
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
     // CLI args to pass to nvim. Filter out macOS/Xcode injected arguments
@@ -25,6 +29,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // :qa closes the nvim process). Ignoring the signal lets the write
         // fail with EPIPE instead, which MsgpackRpc.request catches gracefully.
         signal(SIGPIPE, SIG_IGN)
+
+        // Enforce single instance. A second instance can be spawned by running
+        // the binary directly from Terminal, `open -n`, or Spotlight. When that
+        // happens, forward any file arguments to the existing instance via
+        // DistributedNotificationCenter (not NSWorkspace, which validates file
+        // existence and shows a Finder alert for non-existent files — but nvim
+        // handles those gracefully as [New File] buffers).
+        //
+        // File paths are JSON-encoded in the notification's `object` parameter
+        // because macOS 10.15+ strips `userInfo` from cross-process distributed
+        // notifications for security reasons.
+        let bundleId = Bundle.main.bundleIdentifier!
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+            .filter { $0 != .current }
+        if let existing = others.first {
+            // Resolve relative paths before forwarding — the existing instance
+            // has a different cwd, so "Makefile" would resolve to the wrong file.
+            let absolutePaths = initialCliArgs.map { URL(fileURLWithPath: $0).path }
+            if !absolutePaths.isEmpty,
+               let data = try? JSONSerialization.data(withJSONObject: absolutePaths),
+               let json = String(data: data, encoding: .utf8) {
+                DistributedNotificationCenter.default().post(
+                    name: .veilOpenFiles, object: json
+                )
+            }
+            existing.activate()
+            // Terminate immediately — no resources to clean up, notification
+            // already delivered, just get out of the way.
+            exit(0)
+        }
+
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(handleOpenFilesNotification(_:)),
+            name: .veilOpenFiles, object: nil
+        )
+
         Task.detached { NvimProcess.warmUpEnvironment() }
         addProfilePickerMenuItem()
         NSApp.activate(ignoringOtherApps: true)
@@ -125,6 +165,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             doc.nvimArgs = initialCliArgs
             initialCliArgs = []
         }
+        NSDocumentController.shared.addDocument(doc)
+        doc.makeWindowControllers()
+        doc.showWindows()
+    }
+
+    @objc private func handleOpenFilesNotification(_ notification: Notification) {
+        guard let json = notification.object as? String,
+              let data = json.data(using: .utf8),
+              let files = try? JSONSerialization.jsonObject(with: data) as? [String],
+              !files.isEmpty else { return }
+        let doc = WindowDocument()
+        doc.profile = Profile.default
+        doc.nvimArgs = files
         NSDocumentController.shared.addDocument(doc)
         doc.makeWindowControllers()
         doc.showWindows()

@@ -8,7 +8,7 @@ class WindowDocument: NSDocument {
     var channel: NvimChannel!
     private let grid = Grid()
     private var eventLoopTask: Task<Void, Never>?
-    // Window title strategy (similar to VimR):
+    // Window title strategy:
     //
     // We enable `set title` so nvim sends `set_title` events with its titlestring
     // (e.g. "init.lua (~/.config/nvim/lua/plugins) - Nvim"). However, `set title`
@@ -21,6 +21,11 @@ class WindowDocument: NSDocument {
     // We use `titleReady` as a one-time gate: false at startup to suppress the
     // initial ugly set_title, flipped to true on first BufEnter, then stays true
     // forever — all subsequent set_title events are displayed normally.
+    //
+    // Exception: when nvimArgs is non-empty (files passed via CLI or Finder Open
+    // With), nvim opens the file directly without Startify, so the initial
+    // set_title is already the correct filename. In this case titleReady starts
+    // as true to avoid suppressing it.
     private var titleReady = false
 
     private var windowController: WindowController? {
@@ -53,6 +58,7 @@ class WindowDocument: NSDocument {
     nonisolated override func read(from data: Data, ofType typeName: String) throws {}
 
     private func startNvim() async {
+        if !nvimArgs.isEmpty { titleReady = true }
         do {
             let cwd = ProcessInfo.processInfo.environment["VEIL_CWD"] ?? NSHomeDirectory()
             try await channel.start(nvimPath: "", cwd: cwd, appName: profile.name, extraArgs: nvimArgs)
