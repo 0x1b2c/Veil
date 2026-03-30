@@ -72,15 +72,19 @@ vim.keymap.set('n', '<D-p>', Snacks.picker.files)
 
 Veil ships a `veil` command inside the app bundle. Symlink it to your PATH:
 
-    ln -s /Applications/Veil.app/Contents/bin/veil ~/.local/bin/veil
-    ln -s /Applications/Veil.app/Contents/bin/gvim ~/.local/bin/gvim
-    ln -s /Applications/Veil.app/Contents/bin/gvimdiff ~/.local/bin/gvimdiff
+```bash
+ln -s /Applications/Veil.app/Contents/bin/veil ~/.local/bin/veil
+ln -s /Applications/Veil.app/Contents/bin/gvim ~/.local/bin/gvim
+ln -s /Applications/Veil.app/Contents/bin/gvimdiff ~/.local/bin/gvimdiff
+```
 
 Then use it like nvim:
 
-    veil file.txt
-    veil -d file1.txt file2.txt
-    gvimdiff file1.txt file2.txt    # same as veil -d
+```bash
+veil file.txt
+veil -d file1.txt file2.txt
+gvimdiff file1.txt file2.txt    # same as veil -d
+```
 
 If Veil is already running, the CLI forwards files to the existing instance (opens a new window) instead of launching a second copy.
 
@@ -88,13 +92,17 @@ If Veil is already running, the CLI forwards files to the existing instance (ope
 
 Each window can run a different neovim configuration. Use `NVIM_APPNAME` from the CLI or Cmd+Shift+N from the GUI to select which config directory under `~/.config/` nvim uses:
 
-    NVIM_APPNAME=astronvim veil              # launch Veil with astronvim config
-    NVIM_APPNAME=nvim-nvchad gvim file.txt   # open file with NvChad config
+```bash
+NVIM_APPNAME=astronvim veil              # launch Veil with astronvim config
+NVIM_APPNAME=nvim-nvchad gvim file.txt   # open file with NvChad config
+```
 
 Create shell aliases for configs you use often:
 
-    alias gvi='NVIM_APPNAME=nvim-nvchad gvim'
-    gvi file.txt                             # just works — fresh launch or new window
+```bash
+alias gvi='NVIM_APPNAME=nvim-nvchad gvim'
+gvi file.txt                             # just works — fresh launch or new window
+```
 
 ## Acknowledgments
 
