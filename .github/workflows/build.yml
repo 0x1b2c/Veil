@@ -39,8 +39,16 @@ jobs:
           APP_PATH="build/Build/Products/Release/Veil.app"
           ditto -c -k --keepParent "$APP_PATH" Veil.zip
 
+      - name: Extract tag annotation
+        id: tag_msg
+        run: |
+          TAG_MSG=$(git tag -l --format='%(contents)' ${GITHUB_REF_NAME})
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$TAG_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: Veil.zip
-          generate_release_notes: true
+          body: ${{ steps.tag_msg.outputs.body }}
