@@ -116,8 +116,8 @@ final class NvimView: NSView {
                 scale: screenScale
             ) {
                 let rowLayer = rowLayers[rowIdx]
-                // Flip Y: row 0 is at the top of the view
-                let y = bounds.height - CGFloat(rowIdx + 1) * cellSize.height
+                // Flip Y: row 0 is at the top of the view, offset by gridTopPadding
+                let y = bounds.height - CGFloat(rowIdx + 1) * cellSize.height - Self.gridTopPadding
                 CATransaction.begin()
                 CATransaction.setDisableActions(true)
                 rowLayer.frame = CGRect(
@@ -141,7 +141,7 @@ final class NvimView: NSView {
 
     private func updateCursorPosition(_ pos: Position) {
         let x: CGFloat
-        let y = bounds.height - CGFloat(pos.row + 1) * cellSize.height
+        let y = bounds.height - CGFloat(pos.row + 1) * cellSize.height - Self.gridTopPadding
         let width: CGFloat
         let height: CGFloat
 
@@ -171,7 +171,7 @@ final class NvimView: NSView {
 
     func gridSizeForViewSize(_ viewSize: CGSize) -> GridSize {
         let cols = max(1, Int(floor(viewSize.width / cellSize.width)))
-        let rows = max(1, Int(floor(viewSize.height / cellSize.height)))
+        let rows = max(1, Int(floor((viewSize.height - Self.gridTopPadding) / cellSize.height)))
         return GridSize(rows: rows, cols: cols)
     }
 
@@ -203,6 +203,7 @@ final class NvimView: NSView {
     }
 
     private static let lineHeightMultiplier: CGFloat = 1.2
+    static let gridTopPadding: CGFloat = 8
 
     private static func computeCellSize(for font: NSFont) -> CGSize {
         let glyph = font.glyph(withName: "M")

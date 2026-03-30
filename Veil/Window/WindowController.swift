@@ -21,6 +21,7 @@ class WindowController: NSWindowController, NSWindowDelegate {
         window.isRestorable = false
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
+        window.backgroundColor = NSColor(rgb: 0x1e1e1e)
 
         self.init(window: window)
         window.delegate = self
@@ -32,6 +33,7 @@ class WindowController: NSWindowController, NSWindowDelegate {
         titleLabel.lineBreakMode = .byTruncatingTail
 
         let container = NSView()
+        container.wantsLayer = true
         container.translatesAutoresizingMaskIntoConstraints = false
         nvimView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(titleLabel)
@@ -41,7 +43,7 @@ class WindowController: NSWindowController, NSWindowDelegate {
         let titleBarHeight: CGFloat = 28
         NSLayoutConstraint.activate([
             titleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            titleLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
+            titleLabel.centerYAnchor.constraint(equalTo: container.topAnchor, constant: titleBarHeight / 2),
             titleLabel.widthAnchor.constraint(lessThanOrEqualTo: container.widthAnchor, constant: -160),
 
             nvimView.topAnchor.constraint(equalTo: container.topAnchor, constant: titleBarHeight),
