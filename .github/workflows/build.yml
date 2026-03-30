@@ -14,10 +14,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build
-        run: xcodebuild build -project Veil.xcodeproj -scheme Veil -destination 'platform=macOS' -configuration Release
+        run: xcodebuild build -project Veil.xcodeproj -scheme Veil -destination 'platform=macOS' -configuration Release CODE_SIGNING_ALLOWED=NO
 
       - name: Test
-        run: xcodebuild test -project Veil.xcodeproj -scheme Veil -destination 'platform=macOS' -only-testing:VeilTests
+        run: xcodebuild test -project Veil.xcodeproj -scheme Veil -destination 'platform=macOS' -only-testing:VeilTests CODE_SIGNING_ALLOWED=NO
 
   release:
     needs: build
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build Release
-        run: xcodebuild build -project Veil.xcodeproj -scheme Veil -destination 'platform=macOS' -configuration Release -derivedDataPath build
+        run: xcodebuild build -project Veil.xcodeproj -scheme Veil -destination 'platform=macOS' -configuration Release -derivedDataPath build CODE_SIGNING_ALLOWED=NO
 
       - name: Package app
         run: |
