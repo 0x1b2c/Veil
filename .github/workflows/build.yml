@@ -13,6 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install neovim
+        run: brew install neovim
+
       - name: Build
         run: xcodebuild build -project Veil.xcodeproj -scheme Veil -destination 'platform=macOS' -configuration Release CODE_SIGNING_ALLOWED=NO
 
