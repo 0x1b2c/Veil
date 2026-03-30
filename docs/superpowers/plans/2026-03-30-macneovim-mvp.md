@@ -5589,3 +5589,138 @@ git add Veil/Rendering/Metal/ Veil/Rendering/NvimView.swift
 git commit -m "Switch to Metal rendering: one draw call for entire grid"
 ```
 
+---
+
+### Task 46: Register File Types and Handle Open From Finder
+
+**Files:**
+- Modify: `Veil.xcodeproj/project.pbxproj` (add document type registration via Info.plist keys)
+- Modify: `Veil/AppDelegate.swift` (handle file open events)
+
+**Problem:** Users can't right-click a file in Finder and open it with Veil. The app doesn't register itself as a file handler.
+
+**Fix:**
+
+#### Part A: Register document type
+
+Add Info.plist keys to the app target's build settings (both Debug and Release). The key is `CFBundleDocumentTypes`:
+
+In project.pbxproj, add to the app target's Debug and Release build configurations:
+```
+INFOPLIST_KEY_CFBundleDocumentTypes = "({CFBundleTypeName = \"All Files\"; CFBundleTypeRole = Viewer; LSHandlerRank = Alternate; LSItemContentTypes = (\"public.item\",);})";
+```
+
+- `public.item` = all file types
+- `LSHandlerRank = Alternate` = show in "Open With" but don't be the default handler
+- `CFBundleTypeRole = Viewer`
+
+#### Part B: Handle file open events
+
+When Finder opens a file with Veil, macOS sends the file path via `application(_:openFiles:)` (or `application(_:openFile:)` for single file).
+
+Add to AppDelegate:
+```swift
+func application(_ sender: NSApplication, openFiles filenames: [String]) {
+    // If there's a current window with no file open (e.g. Startify),
+    // open the files in that window. Otherwise create a new window.
+    let args = filenames  // file paths to pass to nvim
+    let doc = WindowDocument()
+    doc.profile = Profile.default
+    doc.nvimArgs = args
+    NSDocumentController.shared.addDocument(doc)
+    doc.makeWindowControllers()
+    doc.showWindows()
+    NSApp.reply(toOpenOrPrint: .success)
+}
+```
+
+Note: `nvimArgs` is already supported — it passes extra args to nvim via `["--embed"] + extraArgs`. File paths as args cause nvim to open those files.
+
+Also handle the case where the app is launched by double-clicking a file (not already running):
+- `applicationDidFinishLaunching` creates a default empty window
+- Then `application(_:openFiles:)` is called with the file
+- This creates another window, resulting in an empty window + file window
+- Fix: in `applicationDidFinishLaunching`, check if the app was launched with files and skip creating the default window
+
+Check `NSAppleEventManager` or `UserDefaults` for launch context, or use a flag:
+```swift
+private var hasOpenedFilesFromFinder = false
+
+func application(_ sender: NSApplication, openFiles filenames: [String]) {
+    hasOpenedFilesFromFinder = true
+    // ... open files ...
+}
+```
+
+And in `applicationDidFinishLaunching`, defer the default window creation:
+```swift
+func applicationDidFinishLaunching(_ aNotification: Notification) {
+    Task.detached { NvimProcess.warmUpEnvironment() }
+    addProfilePickerMenuItem()
+
+    // Defer creating default window — if openFiles: is called, skip it
+    DispatchQueue.main.async {
+        if !self.hasOpenedFilesFromFinder && self.initialCliArgs.isEmpty {
+            self.createWindow(profile: Profile.default)
+        }
+    }
+
+    NSApp.activate(ignoringOtherApps: true)
+}
+```
+
+Wait, `application(_:openFiles:)` is called BEFORE `applicationDidFinishLaunching` when the app is launched by opening a file. Actually no — `applicationDidFinishLaunching` is called first, then `openFiles:`. So the defer approach with `DispatchQueue.main.async` works: by the time the async block runs, `openFiles:` will have been called and `hasOpenedFilesFromFinder` will be set.
+
+Actually, macOS calls `application(_:openFile:)` / `openFiles:` after `applicationDidFinishLaunching`. So defer the default window:
+
+```swift
+func applicationDidFinishLaunching(_ aNotification: Notification) {
+    Task.detached { NvimProcess.warmUpEnvironment() }
+    addProfilePickerMenuItem()
+    NSApp.activate(ignoringOtherApps: true)
+
+    // Create default window after a tick — gives openFiles: a chance to fire first
+    DispatchQueue.main.async {
+        if NSDocumentController.shared.documents.isEmpty {
+            self.createWindow(profile: Profile.default)
+        }
+    }
+}
+```
+
+This is simpler: if `openFiles:` already created a window, `documents` won't be empty, so no default window. If app launched normally, no `openFiles:` happens, documents is empty, default window created.
+
+But CLI launch also creates a window in the current sync flow... we need to check:
+- CLI launch: `initialCliArgs` is non-empty → createWindow is called with args in applicationDidFinishLaunching → should still work
+- Finder launch: openFiles called → window created → async check sees documents non-empty → skip default
+
+Actually, move ALL window creation to the async block:
+
+```swift
+func applicationDidFinishLaunching(_ aNotification: Notification) {
+    Task.detached { NvimProcess.warmUpEnvironment() }
+    addProfilePickerMenuItem()
+    NSApp.activate(ignoringOtherApps: true)
+
+    DispatchQueue.main.async {
+        // Don't create default window if files were opened from Finder
+        if NSDocumentController.shared.documents.isEmpty {
+            self.createWindow(profile: Profile.default)
+        }
+    }
+}
+```
+
+- [ ] **Step 1: Read AppDelegate.swift and project.pbxproj**
+- [ ] **Step 2: Add document type registration to project.pbxproj**
+- [ ] **Step 3: Add `application(_:openFiles:)` to AppDelegate**
+- [ ] **Step 4: Defer default window creation to avoid double windows on Finder launch**
+- [ ] **Step 5: Build and verify**
+- [ ] **Step 6: Test: right-click a file in Finder → Open With → Veil**
+- [ ] **Step 7: Commit**
+
+```bash
+git add Veil.xcodeproj/project.pbxproj Veil/AppDelegate.swift
+git commit -m "Register as file handler so Finder Open With works"
+```
+
