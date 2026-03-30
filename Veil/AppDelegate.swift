@@ -21,8 +21,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         Task.detached { NvimProcess.warmUpEnvironment() }
         addProfilePickerMenuItem()
-        createWindow(profile: Profile.default)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Defer default window creation — if openFiles: is called (Finder launch),
+        // a window will already exist, so we skip the default one.
+        DispatchQueue.main.async {
+            if NSDocumentController.shared.documents.isEmpty {
+                self.createWindow(profile: Profile.default)
+            }
+        }
+    }
+
+    func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        let doc = WindowDocument()
+        doc.profile = Profile.default
+        doc.nvimArgs = filenames
+        NSDocumentController.shared.addDocument(doc)
+        doc.makeWindowControllers()
+        doc.showWindows()
+        NSApp.reply(toOpenOrPrint: .success)
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {}
