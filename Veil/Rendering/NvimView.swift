@@ -1,4 +1,5 @@
 import AppKit
+import Metal
 import QuartzCore
 
 @MainActor
@@ -30,6 +31,11 @@ final class NvimView: NSView {
     var markedPosition: Position = .zero
     let markedLayer = CALayer()
     var keyDownDone = true
+
+    // MARK: - Metal (hidden for now)
+
+    var metalRenderer: MetalRenderer?
+    var metalLayer: CAMetalLayer?
 
     // MARK: - Private
 
@@ -73,6 +79,21 @@ final class NvimView: NSView {
         markedLayer.isHidden = true
         markedLayer.zPosition = 200
         layer?.addSublayer(markedLayer)
+
+        // Metal layer (hidden for now — will replace CALayer rendering later)
+        do {
+            let renderer = try MetalRenderer()
+            let metal = CAMetalLayer()
+            metal.device = renderer.device
+            metal.pixelFormat = .bgra8Unorm
+            metal.framebufferOnly = true
+            metal.isHidden = true
+            layer?.addSublayer(metal)
+            self.metalRenderer = renderer
+            self.metalLayer = metal
+        } catch {
+            // Metal not available — fall back to CoreText rendering
+        }
     }
 
     // MARK: - First responder
