@@ -27,8 +27,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ aNotification: Notification) {}
 
+    var isQuitting = false
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        return .terminateNow
+        let documents = NSDocumentController.shared.documents.compactMap { $0 as? WindowDocument }
+        if documents.isEmpty { return .terminateNow }
+
+        isQuitting = true
+        for doc in documents {
+            Task { @MainActor in
+                try? await doc.channel.command("confirm qa")
+            }
+        }
+        return .terminateCancel
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

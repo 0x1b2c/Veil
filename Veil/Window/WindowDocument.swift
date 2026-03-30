@@ -142,6 +142,13 @@ class WindowDocument: NSDocument {
         eventLoopTask?.cancel()
         Task { await channel.stop() }
         super.close()
+
+        // If app is quitting and this was the last window, finish termination
+        if let appDelegate = NSApp.delegate as? AppDelegate,
+           appDelegate.isQuitting,
+           NSDocumentController.shared.documents.isEmpty {
+            NSApp.terminate(nil)
+        }
     }
 
     func windowDidResize(to size: NSSize) {
