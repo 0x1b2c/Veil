@@ -11,11 +11,15 @@ struct Profile: Codable, Hashable, Sendable {
 
     // MARK: - Profile Discovery
 
-    /// Scans ~/.config/ for directories containing an nvim config.
+    /// Scans $XDG_CONFIG_HOME (or ~/.config/) for directories containing an nvim config.
     static func availableProfiles() -> [Profile] {
         let fm = FileManager.default
-        let configURL = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent(".config")
+        let configURL: URL
+        if let xdg = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"], !xdg.isEmpty {
+            configURL = URL(fileURLWithPath: xdg)
+        } else {
+            configURL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".config")
+        }
 
         guard let entries = try? fm.contentsOfDirectory(
             at: configURL,
