@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<!-- Catch-all for "Other..." dialog -->
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Document</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.data</string>
+			</array>
+		</dict>
+		<!-- Text and source code (system UTIs) -->
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Text File</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.plain-text</string>
+				<string>public.source-code</string>
+				<string>public.script</string>
+				<string>public.shell-script</string>
+				<string>public.python-script</string>
+				<string>public.ruby-script</string>
+				<string>public.perl-script</string>
+				<string>public.php-script</string>
+				<string>public.c-source</string>
+				<string>public.c-header</string>
+				<string>public.c-plus-plus-source</string>
+				<string>public.c-plus-plus-header</string>
+				<string>public.precompiled-c-header</string>
+				<string>public.precompiled-c-plus-plus-header</string>
+				<string>public.objective-c-source</string>
+				<string>public.objective-c-plus-plus-source</string>
+				<string>public.swift-source</string>
+				<string>public.assembly-source</string>
+				<string>public.fortran-source</string>
+				<string>public.pascal-source</string>
+				<string>public.ada-source</string>
+				<string>public.lex-source</string>
+				<string>public.yacc-source</string>
+				<string>public.rez-source</string>
+				<string>public.symbol-export</string>
+				<string>public.strings-text</string>
+				<string>public.html</string>
+				<string>public.xml</string>
+				<string>public.json</string>
+				<string>public.yaml</string>
+				<string>public.css</string>
+				<string>com.netscape.javascript-source</string>
+				<string>com.sun.java-source</string>
+				<string>com.sun.java-class</string>
+				<string>com.apple.applescript.text</string>
+				<string>net.daringfireball.markdown</string>
+			</array>
+		</dict>
+		<!-- File extensions without system UTIs -->
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Source File</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<!-- Text and documentation -->
+				<string>txt</string>
+				<string>text</string>
+				<string>utf8</string>
+				<string>md</string>
+				<string>markdown</string>
+				<string>mdown</string>
+				<string>markd</string>
+				<string>rst</string>
+				<string>org</string>
+				<string>adoc</string>
+				<string>textile</string>
+				<string>wiki</string>
+				<string>mediawiki</string>
+				<!-- Web -->
+				<string>htm</string>
+				<string>xhtml</string>
+				<string>xht</string>
+				<string>xhtm</string>
+				<string>shtml</string>
+				<string>shtm</string>
+				<string>sht</string>
+				<string>css</string>
+				<string>scss</string>
+				<string>less</string>
+				<string>js</string>
+				<string>jsx</string>
+				<string>ts</string>
+				<string>tsx</string>
+				<string>vue</string>
+				<string>svelte</string>
+				<string>json</string>
+				<string>json5</string>
+				<string>jsonc</string>
+				<string>graphql</string>
+				<string>asp</string>
+				<string>aspx</string>
+				<string>jsp</string>
+				<!-- Config -->
+				<string>yaml</string>
+				<string>yml</string>
+				<string>toml</string>
+				<string>ini</string>
+				<string>cfg</string>
+				<string>conf</string>
+				<string>config</string>
+				<string>htaccess</string>
+				<string>env</string>
+				<string>properties</string>
+				<string>plist</string>
+				<string>strings</string>
+				<string>editorconfig</string>
+				<string>gitignore</string>
+				<string>gitconfig</string>
+				<string>gitmodules</string>
+				<string>dockerignore</string>
+				<string>bashrc</string>
+				<string>bash_profile</string>
+				<string>bash_login</string>
+				<string>bash_logout</string>
+				<string>zshrc</string>
+				<string>zprofile</string>
+				<string>zshenv</string>
+				<string>profile</string>
+				<!-- Systems languages -->
+				<string>rs</string>
+				<string>go</string>
+				<string>zig</string>
+				<string>nim</string>
+				<string>v</string>
+				<!-- JVM -->
+				<string>kt</string>
+				<string>kts</string>
+				<string>scala</string>
+				<string>groovy</string>
+				<string>gradle</string>
+				<string>clj</string>
+				<string>cljs</string>
+				<!-- .NET -->
+				<string>cs</string>
+				<string>fs</string>
+				<string>fsx</string>
+				<string>vb</string>
+				<!-- Scripting -->
+				<string>lua</string>
+				<string>vim</string>
+				<string>ex</string>
+				<string>exs</string>
+				<string>erl</string>
+				<string>hrl</string>
+				<string>hs</string>
+				<string>lhs</string>
+				<string>ml</string>
+				<string>mli</string>
+				<string>dart</string>
+				<string>r</string>
+				<string>R</string>
+				<string>jl</string>
+				<string>tcl</string>
+				<string>io</string>
+				<string>fscript</string>
+				<!-- Lisp family -->
+				<string>lisp</string>
+				<string>cl</string>
+				<string>el</string>
+				<string>lsp</string>
+				<string>scm</string>
+				<string>sch</string>
+				<string>ss</string>
+				<!-- Data -->
+				<string>xml</string>
+				<string>dtd</string>
+				<string>xsl</string>
+				<string>xslt</string>
+				<string>rss</string>
+				<string>csv</string>
+				<string>tsv</string>
+				<string>sql</string>
+				<string>ics</string>
+				<string>vcf</string>
+				<string>vcard</string>
+				<!-- Build and CI -->
+				<string>makefile</string>
+				<string>cmake</string>
+				<string>dockerfile</string>
+				<string>proto</string>
+				<!-- TeX -->
+				<string>tex</string>
+				<string>sty</string>
+				<string>cls</string>
+				<string>ltx</string>
+				<string>ins</string>
+				<string>dtx</string>
+				<string>bib</string>
+				<!-- Vim -->
+				<string>vba</string>
+				<!-- HDL -->
+				<string>vhd</string>
+				<string>vhdl</string>
+				<string>vh</string>
+				<!-- Misc -->
+				<string>diff</string>
+				<string>patch</string>
+				<string>log</string>
+				<string>as</string>
+				<string>bsh</string>
+				<string>cfdg</string>
+				<string>cgi</string>
+				<string>fcgi</string>
+				<string>defs</string>
+				<string>inc</string>
+				<string>gtd</string>
+				<string>gtdlog</string>
+				<string>ps</string>
+				<string>eps</string>
+				<string>*</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
