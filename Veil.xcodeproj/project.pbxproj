@@ -109,6 +109,7 @@
 				D8BEFDEA2F7999A900CDE7C3 /* Sources */,
 				D8BEFDEB2F7999A900CDE7C3 /* Frameworks */,
 				D8BEFDEC2F7999A900CDE7C3 /* Resources */,
+				D8FC685F2F7A33780067D7EA /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -242,6 +243,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		D8FC685F2F7A33780067D7EA /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin\"\ncp \"${SRCROOT}/bin/veil\" \"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/veil\"\nchmod +x \"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/veil\"\ncd \"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin\"\nln -sf veil gvim\nln -sf veil gvimdiff\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		D8BEFDEA2F7999A900CDE7C3 /* Sources */ = {
@@ -412,6 +434,7 @@
 				DEVELOPMENT_TEAM = SAU5W824JN;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -446,6 +469,7 @@
 				DEVELOPMENT_TEAM = SAU5W824JN;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";

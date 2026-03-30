@@ -8,6 +8,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Task.detached { NvimProcess.warmUpEnvironment() }
         addProfilePickerMenuItem()
         createWindow(profile: Profile.default)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {}

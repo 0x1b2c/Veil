@@ -54,7 +54,8 @@ class WindowDocument: NSDocument {
 
     private func startNvim() async {
         do {
-            try await channel.start(nvimPath: "", cwd: NSHomeDirectory(), appName: profile.name, extraArgs: nvimArgs)
+            let cwd = ProcessInfo.processInfo.environment["VEIL_CWD"] ?? NSHomeDirectory()
+            try await channel.start(nvimPath: "", cwd: cwd, appName: profile.name, extraArgs: nvimArgs)
             guard let nvimView else { return }
             let gridSize = nvimView.gridSizeForViewSize(nvimView.bounds.size)
             try await channel.uiAttach(width: gridSize.cols, height: gridSize.rows)
