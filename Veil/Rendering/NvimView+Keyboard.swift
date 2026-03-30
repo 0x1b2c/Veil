@@ -35,6 +35,13 @@ extension NvimView {
     }
 
     override func keyDown(with event: NSEvent) {
+        // When composing (marked text active), all keys go through IME
+        // so backspace shortens the pinyin, Enter confirms, Esc cancels, etc.
+        if markedText != nil {
+            inputContext?.handleEvent(event)
+            return
+        }
+
         let modifiers = event.modifierFlags.intersection([.control, .option, .command])
         if !modifiers.isEmpty {
             sendKeyDirectly(event)
@@ -81,25 +88,63 @@ extension NvimView {
         }
 
         let cursorFrame = cursorLayer.frame
+        let screenScale = window?.backingScaleFactor ?? 2.0
+
+        let charCount = text.count
+        let width = cellSize.width * CGFloat(charCount)
+        let height = cellSize.height
+
+        let pixelWidth = Int(ceil(width * screenScale))
+        let pixelHeight = Int(ceil(height * screenScale))
+        guard pixelWidth > 0, pixelHeight > 0 else { return }
+
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(
+            data: nil, width: pixelWidth, height: pixelHeight,
+            bitsPerComponent: 8, bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return }
+
+        ctx.scaleBy(x: screenScale, y: screenScale)
+
+        // Fill background
+        ctx.setFillColor(NSColor(rgb: defaultBg).cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+        // Render each character using GlyphCache (same pipeline as grid)
+        let attrs = CellAttributes()
+        for (i, char) in text.enumerated() {
+            let x = CGFloat(i) * cellSize.width
+            let cellRect = CGRect(x: x, y: 0, width: cellSize.width, height: height)
+            let glyphImage = glyphCache.get(
+                text: String(char), attrs: attrs,
+                defaultFg: defaultFg, defaultBg: defaultBg, cellCount: 1
+            )
+            ctx.draw(glyphImage, in: cellRect)
+        }
+
+        // Draw underline at bottom
+        let underlineY: CGFloat = 1.5
+        ctx.setStrokeColor(NSColor(rgb: defaultFg).cgColor)
+        ctx.setLineWidth(1.0)
+        ctx.move(to: CGPoint(x: 0, y: underlineY))
+        ctx.addLine(to: CGPoint(x: width, y: underlineY))
+        ctx.strokePath()
+
+        guard let image = ctx.makeImage() else { return }
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-
-        markedTextLayer.string = text
-        markedTextLayer.font = gridFont
-        markedTextLayer.fontSize = gridFont.pointSize
-
-        // Size the layer to fit the text
-        let width = CGFloat(text.count) * cellSize.width + 4
-        let height = cellSize.height + 2
-        markedTextLayer.frame = CGRect(
+        markedLayer.contents = image
+        markedLayer.contentsScale = screenScale
+        markedLayer.frame = CGRect(
             x: cursorFrame.origin.x,
             y: cursorFrame.origin.y,
             width: width,
             height: height
         )
-        markedTextLayer.isHidden = false
-
+        markedLayer.isHidden = false
         CATransaction.commit()
     }
 
@@ -107,8 +152,8 @@ extension NvimView {
         markedText = nil
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        markedTextLayer.isHidden = true
-        markedTextLayer.string = nil
+        markedLayer.isHidden = true
+        markedLayer.contents = nil
         CATransaction.commit()
     }
     // MARK: - Standard File actions

@@ -28,12 +28,12 @@ final class NvimView: NSView {
     var rowLayers: [CALayer] = []
     var markedText: String?
     var markedPosition: Position = .zero
-    let markedTextLayer = CATextLayer()
+    let markedLayer = CALayer()
     var keyDownDone = true
 
     // MARK: - Private
 
-    private let glyphCache: GlyphCache
+    let glyphCache: GlyphCache
     private let rowRenderer: RowRenderer
 
     // MARK: - Init
@@ -70,13 +70,9 @@ final class NvimView: NSView {
         cursorLayer.backgroundColor = NSColor(rgb: defaultFg).cgColor
         layer?.addSublayer(cursorLayer)
 
-        markedTextLayer.contentsScale = 2.0
-        markedTextLayer.fontSize = 14
-        markedTextLayer.foregroundColor = NSColor.white.cgColor
-        markedTextLayer.backgroundColor = NSColor.darkGray.cgColor
-        markedTextLayer.isHidden = true
-        markedTextLayer.zPosition = 200
-        layer?.addSublayer(markedTextLayer)
+        markedLayer.isHidden = true
+        markedLayer.zPosition = 200
+        layer?.addSublayer(markedLayer)
     }
 
     // MARK: - First responder
