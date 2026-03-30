@@ -25,7 +25,6 @@ struct Profile: Codable, Hashable, Sendable {
             return [.default]
         }
 
-        let nvimIndicators = ["init.lua", "init.vim", "lua"]
         var profiles: [Profile] = []
 
         for entry in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
@@ -34,9 +33,8 @@ struct Profile: Codable, Hashable, Sendable {
                 continue
             }
             let dirName = entry.lastPathComponent
-            let hasNvimConfig = nvimIndicators.contains { indicator in
-                fm.fileExists(atPath: entry.appendingPathComponent(indicator).path)
-            }
+            let hasNvimConfig = fm.fileExists(atPath: entry.appendingPathComponent("init.lua").path)
+                || fm.fileExists(atPath: entry.appendingPathComponent("init.vim").path)
             if hasNvimConfig {
                 let displayName = dirName == "nvim" ? "Default" : dirName
                 profiles.append(Profile(name: dirName, displayName: displayName))

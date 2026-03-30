@@ -33,8 +33,16 @@ final class ProfilePicker {
         // Retain handler until menu is dismissed
         objc_setAssociatedObject(menu, &ProfilePicker.handlerKey, handler, .OBJC_ASSOCIATION_RETAIN)
 
-        let location = NSPoint(x: 0, y: view.bounds.height)
-        menu.popUp(positioning: nil, at: location, in: view)
+        // Pop up at upper-left area of screen
+        if let screen = NSScreen.main {
+            let point = NSPoint(
+                x: screen.frame.width * 0.3,
+                y: screen.frame.height * 0.75
+            )
+            menu.popUp(positioning: nil, at: point, in: nil)
+        } else {
+            menu.popUp(positioning: nil, at: .zero, in: view)
+        }
     }
 
     private static var handlerKey: UInt8 = 0
