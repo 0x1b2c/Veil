@@ -18,7 +18,7 @@ extension NvimView {
         }
 
         // Let system handle these Cmd+key combos
-        let systemKeys: Set<String> = ["q", "n", "h", "m", ",", "z", "x", "c", "v", "a", "`"]
+        let systemKeys: Set<String> = ["q", "n", "h", "m", ",", "z", "x", "c", "v", "a", "`", "s", "w"]
         if systemKeys.contains(chars.lowercased()) {
             return super.performKeyEquivalent(with: event)
         }
@@ -106,6 +106,31 @@ extension NvimView {
         markedTextLayer.string = nil
         CATransaction.commit()
     }
+    // MARK: - Standard File actions
+
+    @objc func saveDocument(_ sender: Any?) {
+        Task { try? await channel?.command("w") }
+    }
+
+    @objc func closeTabOrWindow(_ sender: Any?) {
+        Task {
+            guard let channel else { return }
+            let (_, result) = await channel.request("nvim_eval", params: [.string("tabpagenr('$')")])
+            let tabCount = result.intValue
+            if tabCount > 1 {
+                try? await channel.command("tabclose")
+            } else {
+                await MainActor.run {
+                    self.window?.performClose(nil)
+                }
+            }
+        }
+    }
+
+    @objc func closeWindow(_ sender: Any?) {
+        window?.performClose(nil)
+    }
+
     // MARK: - Standard Edit actions
 
     @objc func undo(_ sender: Any?) {
