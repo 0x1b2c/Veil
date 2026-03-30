@@ -74,6 +74,7 @@ nonisolated final class MetalRenderer {
                 cursorCellPercentage: Int,
                 in metalLayer: CAMetalLayer) {
         guard let drawable = metalLayer.nextDrawable() else { return }
+        guard rows > 0, cols > 0, cells.count >= rows else { return }
 
         var vertices: [Vertex] = []
         vertices.reserveCapacity(rows * cols * 6)
@@ -86,7 +87,9 @@ nonisolated final class MetalRenderer {
         let emptyRegion = GlyphAtlas.Region(u: 0, v: 0, uMax: 0, vMax: 0)
 
         for row in 0..<rows {
-            for col in 0..<cols {
+            guard cells[row].count >= cols else { continue }
+            var col = 0
+            while col < cols {
                 let cell = cells[row][col]
                 let attrs = attributes[cell.hlId] ?? CellAttributes()
 
@@ -98,14 +101,17 @@ nonisolated final class MetalRenderer {
                 let y = topPad + Float(row) * cellH
 
                 let text = cell.text
-                if text == " " || text.isEmpty {
-                    // Empty or space: only draw if bg differs from default
+                if text.isEmpty {
+                    // Empty cell = double-width placeholder, skip.
+                    col += 1
+                } else if text == " " {
                     if bg != defaultBg {
                         addQuad(to: &vertices, x: x, y: y, w: cellW, h: cellH,
                                 region: emptyRegion, bgColor: bgColor)
                     }
+                    col += 1
                 } else {
-                    // Check for double-width character
+                    // Check for double-width character (next cell is empty placeholder)
                     let isDoubleWidth = col + 1 < cols && cells[row][col + 1].text.isEmpty
                     let cellCount = isDoubleWidth ? 2 : 1
                     let quadW = cellW * Float(cellCount)
@@ -116,6 +122,7 @@ nonisolated final class MetalRenderer {
                                               cellSize: cellSize, cellCount: cellCount)
                     addQuad(to: &vertices, x: x, y: y, w: quadW, h: cellH,
                             region: region, bgColor: bgColor)
+                    col += cellCount  // Skip placeholder cell for double-width
                 }
             }
         }
