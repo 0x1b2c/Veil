@@ -86,7 +86,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
         let doc = WindowDocument()
-        doc.profile = Profile.default
+        doc.profile = profileFromEnvironment()
         doc.nvimArgs = filenames
         doc.deferDisplay = true
         NSDocumentController.shared.addDocument(doc)

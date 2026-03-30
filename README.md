@@ -82,6 +82,20 @@ Then use it like nvim:
     veil -d file1.txt file2.txt
     gvimdiff file1.txt file2.txt    # same as veil -d
 
+If Veil is already running, the CLI forwards files to the existing instance (opens a new window) instead of launching a second copy.
+
+### Multiple nvim configs
+
+Each window can run a different neovim configuration. Use `NVIM_APPNAME` from the CLI or Cmd+Shift+N from the GUI to select which config directory under `~/.config/` nvim uses:
+
+    NVIM_APPNAME=astronvim veil              # launch Veil with astronvim config
+    NVIM_APPNAME=nvim-nvchad gvim file.txt   # open file with NvChad config
+
+Create shell aliases for configs you use often:
+
+    alias gvi='NVIM_APPNAME=nvim-nvchad gvim'
+    gvi file.txt                             # just works — fresh launch or new window
+
 ## Acknowledgments
 
 Thanks to [VimR](https://github.com/qvacua/vimr) by Tae Won Ha — Veil learned a great deal from its implementation of the Neovim UI protocol, input handling, and macOS integration.
