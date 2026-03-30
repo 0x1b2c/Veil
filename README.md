@@ -2,7 +2,7 @@
 
 A boring, vanilla Neovim GUI client for macOS — just like MacVim did for Vim.
 
-Your Neovim config, rendered natively with AppKit, in proper macOS windows. Nothing more, nothing less.
+Your Neovim config, rendered natively with AppKit, in proper macOS windows. Nothing more, nothing less. Fast startup, fast multi-tab session loading.
 
 ## Features
 
