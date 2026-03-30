@@ -4,13 +4,14 @@ DEST = platform=macOS
 DERIVED = .build
 APP = $(DERIVED)/Build/Products/Release/Veil.app
 INSTALL_DIR = /Applications
+UNIVERSAL = ONLY_ACTIVE_ARCH=NO
 
 XCODEBUILD = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST)'
 
-.PHONY: build debug test clean install release
+.PHONY: build debug test clean install zip release
 
 build:
-	$(XCODEBUILD) -configuration Release -derivedDataPath $(DERIVED) -quiet
+	$(XCODEBUILD) -configuration Release -derivedDataPath $(DERIVED) $(UNIVERSAL) -quiet
 	@echo "Built: $(APP)"
 
 debug:
@@ -26,6 +27,10 @@ clean:
 install: build
 	rsync -a "$(APP)/" "$(INSTALL_DIR)/Veil.app/"
 	@echo "Installed to $(INSTALL_DIR)/Veil.app"
+
+zip: build
+	ditto -c -k --keepParent "$(APP)" Veil.zip
+	@echo "Packaged: Veil.zip"
 
 # Usage: make release V=0.2
 release:
