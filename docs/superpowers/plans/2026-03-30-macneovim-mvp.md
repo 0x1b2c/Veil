@@ -4873,3 +4873,159 @@ var scrollDeltaY: CGFloat = 0
 git add Veil/Rendering/NvimView+Mouse.swift Veil/Rendering/NvimView.swift
 git commit -m "Support trackpad smooth scrolling with delta accumulation"
 ```
+
+---
+
+### Task 39: Fix Marked Text (IME Composition) Rendering and Input
+
+**Files:**
+- Modify: `Veil/Rendering/NvimView.swift`
+- Modify: `Veil/Rendering/NvimView+Keyboard.swift`
+
+**Two problems to fix:**
+
+**Problem 1: Backspace deletes buffer text instead of marked text**
+When composing (marked text active), all keys should go through IME. Currently backspace/Enter/Esc bypass IME and go directly to nvim.
+
+**Problem 2: Marked text font is wrong, no underline**
+CATextLayer renders at wrong size. Should use the same rendering pipeline as grid (GlyphCache) for consistent font.
+
+**Fix:**
+
+#### Part A: Route keys through IME during composition
+
+In `keyDown`, add a check at the very top — when `markedText != nil`, all keys go through `inputContext?.handleEvent(event)`:
+
+```swift
+override func keyDown(with event: NSEvent) {
+    // When composing (marked text active), all keys go through IME
+    if markedText != nil {
+        inputContext?.handleEvent(event)
+        return
+    }
+    // ... rest of existing keyDown
+}
+```
+
+#### Part B: Render marked text with GlyphCache
+
+Replace the CATextLayer (`markedTextLayer`) with a plain CALayer (`markedLayer`). Render the marked text string into a CGImage using the same GlyphCache pipeline, with an underline drawn underneath.
+
+**In NvimView.swift:**
+
+1. Replace `let markedTextLayer = CATextLayer()` with `let markedLayer = CALayer()`
+2. In `setupLayers()`, replace the CATextLayer setup:
+```swift
+markedLayer.isHidden = true
+markedLayer.zPosition = 200
+layer?.addSublayer(markedLayer)
+```
+3. No need to set font/fontSize/foregroundColor/backgroundColor on CATextLayer anymore.
+
+**In NvimView+Keyboard.swift:**
+
+Rewrite `updateMarkedTextDisplay()`:
+```swift
+func updateMarkedTextDisplay() {
+    guard let text = markedText, !text.isEmpty else {
+        clearMarkedText()
+        return
+    }
+
+    let cursorFrame = cursorLayer.frame
+    let screenScale = window?.backingScaleFactor ?? 2.0
+
+    // Determine width: each character occupies cellSize.width
+    // (CJK characters may need 2x width but for composition they're typically half-width pinyin)
+    let charCount = text.count
+    let width = cellSize.width * CGFloat(charCount)
+    let height = cellSize.height
+
+    // Render marked text using GlyphCache — same pipeline as grid
+    let pixelWidth = Int(ceil(width * screenScale))
+    let pixelHeight = Int(ceil(height * screenScale))
+    guard pixelWidth > 0, pixelHeight > 0 else { return }
+
+    let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+    guard let ctx = CGContext(
+        data: nil, width: pixelWidth, height: pixelHeight,
+        bitsPerComponent: 8, bytesPerRow: 0,
+        space: colorSpace,
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else { return }
+
+    ctx.scaleBy(x: screenScale, y: screenScale)
+
+    // Fill background with buffer background color
+    ctx.setFillColor(NSColor(rgb: defaultBg).cgColor)
+    ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+    // Render each character using GlyphCache
+    let attrs = CellAttributes()  // default attributes (no bold/italic)
+    for (i, char) in text.enumerated() {
+        let charStr = String(char)
+        let x = CGFloat(i) * cellSize.width
+        let cellRect = CGRect(x: x, y: 0, width: cellSize.width, height: height)
+        let glyphImage = glyphCache.get(
+            text: charStr, attrs: attrs,
+            defaultFg: defaultFg, defaultBg: defaultBg, cellCount: 1
+        )
+        ctx.draw(glyphImage, in: cellRect)
+    }
+
+    // Draw underline
+    let underlineY: CGFloat = 1.5
+    ctx.setStrokeColor(NSColor(rgb: defaultFg).cgColor)
+    ctx.setLineWidth(1.0)
+    ctx.move(to: CGPoint(x: 0, y: underlineY))
+    ctx.addLine(to: CGPoint(x: width, y: underlineY))
+    ctx.strokePath()
+
+    guard let image = ctx.makeImage() else { return }
+
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    markedLayer.contents = image
+    markedLayer.contentsScale = screenScale
+    markedLayer.frame = CGRect(
+        x: cursorFrame.origin.x,
+        y: cursorFrame.origin.y,
+        width: width,
+        height: height
+    )
+    markedLayer.isHidden = false
+    CATransaction.commit()
+}
+```
+
+Rewrite `clearMarkedText()`:
+```swift
+func clearMarkedText() {
+    markedText = nil
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    markedLayer.isHidden = true
+    markedLayer.contents = nil
+    CATransaction.commit()
+}
+```
+
+Also update `setDefaultColors` in NvimView.swift — remove the old `markedTextLayer.backgroundColor` line if present (the new approach renders background into the CGImage directly).
+
+And update `updateFont` — remove `markedTextLayer.font` / `markedTextLayer.fontSize` lines (no longer needed since GlyphCache uses gridFont).
+
+**Also update all other references from `markedTextLayer` to `markedLayer`** — search for `markedTextLayer` across both files and replace.
+
+- [ ] **Step 1: Read NvimView.swift and NvimView+Keyboard.swift**
+- [ ] **Step 2: Add marked text IME routing in keyDown (Part A)**
+- [ ] **Step 3: Replace markedTextLayer with markedLayer in NvimView.swift**
+- [ ] **Step 4: Rewrite updateMarkedTextDisplay and clearMarkedText (Part B)**
+- [ ] **Step 5: Remove stale markedTextLayer references (font, backgroundColor updates)**
+- [ ] **Step 6: Verify no remaining markedTextLayer references: grep for markedTextLayer**
+- [ ] **Step 7: Build and verify**
+- [ ] **Step 8: Commit**
+
+```bash
+git add Veil/Rendering/NvimView.swift Veil/Rendering/NvimView+Keyboard.swift
+git commit -m "Fix IME marked text: route keys through IME during composition, render with GlyphCache"
+```
