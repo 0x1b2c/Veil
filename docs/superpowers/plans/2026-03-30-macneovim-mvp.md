@@ -4357,3 +4357,51 @@ And in the veilBufChanged handler (from Task 29), also use `windowController?.up
 git add MacNeovim/Window/WindowController.swift MacNeovim/Window/WindowDocument.swift
 git commit -m "Custom centered title label in title bar (VimR-style)"
 ```
+
+---
+
+### Task 31: Fix All Build Warnings
+
+**Files:**
+- Modify: `Veil/Grid/Cell.swift`
+- Modify: `Veil/Nvim/MsgpackRpc.swift`
+- Modify: `Veil/Nvim/NvimProcess.swift`
+- Modify: `Veil/Nvim/NvimChannel.swift`
+- Modify: `Veil/Grid/CellAttributes.swift`
+- Modify: `Veil/Rendering/RowRenderer.swift`
+
+**Warning 1: Cell.swift:3** — `nonisolated(unsafe)` unnecessary for `let` constant with Sendable type `Cell`.
+Fix: Remove `nonisolated(unsafe)` from `_emptyCell`.
+
+**Warning 2: MsgpackRpc.swift:98,103,108** — `unsignedIntegerValue` is deprecated.
+Fix: Replace 3 occurrences of `unsignedIntegerValue` with `uint64Value`. Same return type `UInt64?`, no behavior change.
+
+**Warning 3: NvimProcess.swift:4,5,6** — `nonisolated(unsafe)` unnecessary for `let` constants with Sendable type `Pipe`.
+Fix: Remove `nonisolated(unsafe)` from the three Pipe constants.
+
+**Warning 4: NvimChannel.swift:19,20** — NvimProcess init/start are MainActor-isolated but called from NvimChannel actor.
+Fix: NvimProcess doesn't need MainActor — it uses NSLock for thread safety. Add `nonisolated` to the class declaration. The `init`, `start()`, `stop()`, and helper methods all become nonisolated. Keep `@unchecked Sendable`. Keep `nonisolated(unsafe)` on `_process` var (it's mutable, needs the annotation).
+
+**Warning 5: NvimChannel.swift:52** — No async operations in `await self.finishEvents()`.
+Fix: Remove `await` — `finishEvents()` is called from within the actor's Task, no await needed.
+
+**Warning 6: NvimChannel.swift:107** — `process?.stop()` calls MainActor-isolated method from actor context.
+Fix: Resolved by Warning 4 fix — once NvimProcess is nonisolated, `stop()` is callable from anywhere.
+
+**Warning 7: RowRenderer.swift:4** — `private let defaultAttrs = CellAttributes()` is MainActor-isolated because CellAttributes init is MainActor by default.
+Fix: Add `nonisolated` to CellAttributes's default `init()` in CellAttributes.swift. This is safe — CellAttributes is a pure value type Sendable struct with no MainActor dependencies.
+
+- [ ] **Step 1: Read all 6 files**
+- [ ] **Step 2: Cell.swift — remove `nonisolated(unsafe)` from `_emptyCell`**
+- [ ] **Step 3: MsgpackRpc.swift — replace `unsignedIntegerValue` with `uint64Value` (3 places)**
+- [ ] **Step 4: NvimProcess.swift — add `nonisolated` to class, remove `nonisolated(unsafe)` from Pipe lets**
+- [ ] **Step 5: NvimChannel.swift — remove `await` from `self.finishEvents()`**
+- [ ] **Step 6: CellAttributes.swift — add `nonisolated` to default `init()`**
+- [ ] **Step 7: Build — verify zero warnings (ignore system AppIntents warning)**
+- [ ] **Step 8: Run tests**
+- [ ] **Step 9: Commit**
+
+```bash
+git add Veil/Grid/Cell.swift Veil/Nvim/MsgpackRpc.swift Veil/Nvim/NvimProcess.swift Veil/Nvim/NvimChannel.swift Veil/Grid/CellAttributes.swift Veil/Rendering/RowRenderer.swift
+git commit -m "Fix all build warnings: deprecated API, unnecessary annotations, actor isolation"
+```
