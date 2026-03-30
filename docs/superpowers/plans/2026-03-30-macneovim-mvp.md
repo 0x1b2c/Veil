@@ -5465,24 +5465,3 @@ git add Veil/Rendering/Metal/ Veil/Rendering/NvimView.swift
 git commit -m "Switch to Metal rendering: one draw call for entire grid"
 ```
 
----
-
-### Task 45: Clean Up — Remove Old Rendering Code
-
-**Files:**
-- Delete or archive: `Veil/Rendering/RowRenderer.swift`
-- Modify: `Veil/Rendering/GlyphCache.swift` (keep for marked text, or migrate)
-- Modify: `Veil/Rendering/NvimView.swift` (remove old rendering references)
-
-**Goal:** Remove the CoreText→CGImage→CALayer pipeline code that Metal replaced. Keep GlyphCache only if still needed for marked text rendering.
-
-- [ ] **Step 1: Remove RowRenderer**
-- [ ] **Step 2: Clean up NvimView**
-- [ ] **Step 3: Build and verify**
-- [ ] **Step 4: Run tests**
-- [ ] **Step 5: Commit**
-
-```bash
-git add -u Veil/Rendering/
-git commit -m "Remove old CoreText row rendering pipeline, replaced by Metal"
-```
