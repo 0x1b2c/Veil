@@ -22,7 +22,6 @@ final class NvimView: NSView {
 
     var scrollDeltaY: CGFloat = 0
     var lastScrollLines: Int = 0
-    private var metalRendererActive = false
 
     // MARK: - Internal (accessed by keyboard extension)
 
@@ -117,10 +116,6 @@ final class NvimView: NSView {
         flatCharIndices = grid.flatCharIndices
 
         if let metalRenderer, let metalLayer, let glyphAtlas {
-            if !metalRendererActive {
-                metalRendererActive = true
-                NSLog("Veil: using Metal renderer (device: %@)", metalRenderer.device.name)
-            }
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             metalLayer.isHidden = false
