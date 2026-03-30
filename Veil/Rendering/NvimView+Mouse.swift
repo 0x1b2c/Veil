@@ -21,22 +21,35 @@ extension NvimView {
     }
     override func scrollWheel(with event: NSEvent) {
         let position = gridPosition(for: convert(event.locationInWindow, from: nil))
-        let deltaY = event.scrollingDeltaY
-        let deltaX = event.scrollingDeltaX
-        if abs(deltaY) > abs(deltaX) {
-            let button = deltaY > 0 ? "wheel_up" : "wheel_down"
-            let count = max(1, Int(abs(deltaY) / cellSize.height))
-            let modifier = modifierString(event.modifierFlags)
-            for _ in 0..<count {
+        let modifier = modifierString(event.modifierFlags)
+
+        if event.hasPreciseScrollingDeltas {
+            // Trackpad: accumulate pixel deltas, send when exceeding one cell height
+            scrollDeltaY += event.scrollingDeltaY
+            while abs(scrollDeltaY) >= cellSize.height {
+                let button = scrollDeltaY > 0 ? "wheel_up" : "wheel_down"
+                scrollDeltaY -= (scrollDeltaY > 0 ? 1 : -1) * cellSize.height
                 Task {
                     await channel?.inputMouse(button: button, action: "press", modifier: modifier, grid: 0, row: position.row, col: position.col)
                 }
             }
-        } else if abs(deltaX) > 0 {
-            let button = deltaX > 0 ? "wheel_left" : "wheel_right"
-            let modifier = modifierString(event.modifierFlags)
-            Task {
-                await channel?.inputMouse(button: button, action: "press", modifier: modifier, grid: 0, row: position.row, col: position.col)
+        } else {
+            // Mouse wheel: discrete line-level events
+            let deltaY = event.scrollingDeltaY
+            let deltaX = event.scrollingDeltaX
+            if abs(deltaY) > abs(deltaX) {
+                let button = deltaY > 0 ? "wheel_up" : "wheel_down"
+                let count = max(1, Int(abs(deltaY)))
+                for _ in 0..<count {
+                    Task {
+                        await channel?.inputMouse(button: button, action: "press", modifier: modifier, grid: 0, row: position.row, col: position.col)
+                    }
+                }
+            } else if abs(deltaX) > 0 {
+                let button = deltaX > 0 ? "wheel_left" : "wheel_right"
+                Task {
+                    await channel?.inputMouse(button: button, action: "press", modifier: modifier, grid: 0, row: position.row, col: position.col)
+                }
             }
         }
     }

@@ -17,6 +17,10 @@ final class NvimView: NSView {
     var currentCursorShape: ModeInfo.CursorShape = .block
     var currentCursorCellPercentage: Int = 100
 
+    // MARK: - Scroll state
+
+    var scrollDeltaY: CGFloat = 0
+
     // MARK: - Internal (accessed by keyboard extension)
 
     let cursorLayer = CALayer()
