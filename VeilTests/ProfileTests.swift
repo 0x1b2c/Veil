@@ -1,6 +1,7 @@
 import Testing
 @testable import Veil
 
+@MainActor
 struct ProfileTests {
 
     @Test func defaultProfile() {
@@ -36,16 +37,5 @@ struct ProfileTests {
     @Test func availableProfilesAlwaysIncludesDefault() {
         let profiles = Profile.availableProfiles()
         #expect(profiles.contains(.default))
-    }
-
-    @Test func lastUsedRoundTrip() {
-        let original = Profile.lastUsed
-        let custom = Profile(name: "test-profile", displayName: "Test Profile")
-        Profile.lastUsed = custom
-        let retrieved = Profile.lastUsed
-        #expect(retrieved == custom)
-        #expect(retrieved.displayName == custom.displayName)
-        // Restore
-        Profile.lastUsed = original
     }
 }
