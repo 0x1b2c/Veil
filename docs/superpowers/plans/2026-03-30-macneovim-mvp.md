@@ -4499,3 +4499,138 @@ Remove any shellEnvObserver, applyShellEnv, notification observer code if presen
 git add Veil/Nvim/NvimProcess.swift Veil/AppDelegate.swift Veil/Window/WindowDocument.swift
 git commit -m "Capture login shell env synchronously with background warm-up at app launch"
 ```
+
+---
+
+### Task 33: Transparent Key Passthrough to Neovim
+
+**Files:**
+- Modify: `Veil/Rendering/NvimView+Keyboard.swift`
+- Modify: `Veil/Base.lproj/MainMenu.xib`
+
+**Problem:** Multiple key issues:
+1. Ctrl+key sends wrong characters — `event.characters` returns control chars (e.g. `\u{06}` for Ctrl+F) instead of the letter
+2. Cmd+key intercepted by system menus (Edit → Cmd+V, Format → Cmd+T) before reaching NvimView
+3. Format menu exists but is useless for a terminal app
+
+**Principle:** All keys pass through to nvim transparently, except ones we explicitly own:
+- Cmd+Q (quit app)
+- Cmd+N (new window)
+- Cmd+Shift+N (profile picker)
+- Cmd+H (hide — system)
+- Cmd+M (minimize — system)
+- Cmd+1-9 (tab switching — already handled)
+- Cmd+, (preferences — future)
+
+**Fix:**
+
+1. In `sendKeyDirectly`, use `event.charactersIgnoringModifiers` instead of `event.characters` when Ctrl/Cmd/Option modifiers are present. This gives `"f"` instead of `"\u{06}"` for Ctrl+F.
+
+2. Expand `performKeyEquivalent` to intercept ALL Cmd+key events except the system ones listed above. Send them to nvim as `<D-key>`. Return `true` to prevent menu system from handling them.
+
+```swift
+override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    guard event.modifierFlags.contains(.command),
+          let chars = event.charactersIgnoringModifiers else {
+        return super.performKeyEquivalent(with: event)
+    }
+
+    // Cmd+1-9: tab switching
+    if let digit = chars.first?.wholeNumberValue, digit >= 1 && digit <= 9 {
+        let cmd = digit == 9 ? "tablast" : "tabnext \(digit)"
+        Task { try? await channel?.command(cmd) }
+        return true
+    }
+
+    // Let system handle these
+    let systemKeys: Set<String> = ["q", "n", "h", "m", ","]
+    if systemKeys.contains(chars.lowercased()) {
+        // But Cmd+Shift+N is profile picker — also let system handle
+        return super.performKeyEquivalent(with: event)
+    }
+
+    // Everything else goes to nvim
+    let nvimKey = KeyUtils.nvimKey(characters: chars, modifiers: event.modifierFlags)
+    Task { await channel?.send(key: nvimKey) }
+    return true
+}
+```
+
+3. In `sendKeyDirectly`, fix character extraction:
+
+```swift
+private func sendKeyDirectly(_ event: NSEvent) {
+    let modifiers = event.modifierFlags.intersection([.control, .option, .command])
+    // Use charactersIgnoringModifiers when modifiers are present, so Ctrl+F
+    // gives "f" not "\u{06}". Fall back to characters for unmodified keys.
+    let chars: String?
+    if !modifiers.isEmpty {
+        chars = event.charactersIgnoringModifiers
+    } else {
+        chars = event.characters
+    }
+    guard let characters = chars, !characters.isEmpty else { return }
+    let nvimKey = KeyUtils.nvimKey(characters: characters, modifiers: event.modifierFlags)
+    guard !nvimKey.isEmpty else { return }
+    Task { await channel?.send(key: nvimKey) }
+}
+```
+
+4. Remove the Format menu from MainMenu.xib — find and delete the Format menu item and its submenu.
+
+- [ ] **Step 1: Read NvimView+Keyboard.swift and MainMenu.xib**
+- [ ] **Step 2: Fix `sendKeyDirectly` to use `charactersIgnoringModifiers`**
+- [ ] **Step 3: Expand `performKeyEquivalent` to intercept Cmd+key**
+- [ ] **Step 4: Remove Format menu from MainMenu.xib**
+- [ ] **Step 5: Build and verify**
+- [ ] **Step 6: Commit**
+
+```bash
+git add Veil/Rendering/NvimView+Keyboard.swift Veil/Base.lproj/MainMenu.xib
+git commit -m "Pass all keys through to nvim transparently, remove Format menu"
+```
+
+---
+
+### Task 34: Default Line Height 1.2
+
+**Files:**
+- Modify: `Veil/Rendering/NvimView.swift`
+- Modify: `Veil/Rendering/GlyphCache.swift`
+- Modify: `Veil/Rendering/RowRenderer.swift`
+
+**Problem:** Default line height is too tight for comfortable reading. Need a 1.2x line spacing multiplier.
+
+**Fix:** Add a `lineHeightMultiplier` constant (hardcoded 1.2 for now) and apply it to cell height calculation.
+
+1. In NvimView, add constant and apply to `computeCellSize`:
+
+```swift
+private static let lineHeightMultiplier: CGFloat = 1.2
+```
+
+In `computeCellSize(for:)`, multiply the height:
+```swift
+let height = ceil((CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)) * lineHeightMultiplier)
+```
+
+2. The extra height is vertical padding. Text should be vertically centered within the taller cell. GlyphCache's `render()` already positions text at `baselineY = descent + leading` from the bottom. With a taller cell, this naturally leaves more space above the text. May need to adjust baseline position to center text vertically:
+
+```swift
+let naturalHeight = CTFontGetAscent(drawFont) + CTFontGetDescent(drawFont) + CTFontGetLeading(drawFont)
+let extraPadding = (cellSize.height - naturalHeight) / 2
+let baselineY = descent + leading + extraPadding
+```
+
+3. RowRenderer doesn't need changes — it uses `cellSize` from NvimView which already includes the multiplier.
+
+- [ ] **Step 1: Read NvimView.swift (computeCellSize) and GlyphCache.swift (render baseline)**
+- [ ] **Step 2: Add lineHeightMultiplier constant in NvimView, apply to computeCellSize**
+- [ ] **Step 3: Adjust baseline in GlyphCache to center text in taller cell**
+- [ ] **Step 4: Build and verify**
+- [ ] **Step 5: Commit**
+
+```bash
+git add Veil/Rendering/NvimView.swift Veil/Rendering/GlyphCache.swift
+git commit -m "Default line height 1.2x for comfortable reading"
+```
