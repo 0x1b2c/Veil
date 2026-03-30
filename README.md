@@ -64,6 +64,10 @@ Everything else (including all Ctrl+key and other Cmd+key combinations) is sent 
 vim.keymap.set('n', '<D-p>', Snacks.picker.files)
 ```
 
+## Acknowledgments
+
+Thanks to [VimR](https://github.com/qvacua/vimr) by Tae Won Ha — Veil learned a great deal from its implementation of the Neovim UI protocol, input handling, and macOS integration.
+
 ## License
 
 MIT
