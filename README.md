@@ -69,7 +69,7 @@ These Cmd+key shortcuts are handled by Veil:
 | Cmd+1-9     | Switch tab (9 = last)                 |
 | Cmd+Ctrl+F  | Toggle full screen                    |
 
-Everything else (including all Ctrl+key and other Cmd+key combinations) is sent directly to neovim as `<D-...>` or `<C-...>`. Map them in your config:
+Everything else (including other Cmd+key and all Ctrl+key combinations) is sent directly to neovim as `<D-...>` or `<C-...>`. Map them in your config:
 
 ```lua
 -- Example: Cmd+P to open a file picker
@@ -78,7 +78,7 @@ vim.keymap.set('n', '<D-p>', Snacks.picker.files)
 
 ## CLI
 
-Veil ships a `veil` command inside the app bundle. Symlink it to your PATH:
+Veil ships CLI commands inside the app bundle: `veil`, plus `gvim` and `gvimdiff` as traditional aliases (`gvimdiff` is equivalent to `veil -d`). Symlink them to your PATH:
 
 ```bash
 ln -s /Applications/Veil.app/Contents/bin/veil ~/.local/bin/veil
