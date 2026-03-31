@@ -8,7 +8,7 @@ UNIVERSAL = ONLY_ACTIVE_ARCH=NO
 
 XCODEBUILD = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST)'
 
-.PHONY: build debug test clean install zip release
+.PHONY: build debug test clean install zip release lsp
 
 build:
 	$(XCODEBUILD) -configuration Release -derivedDataPath $(DERIVED) $(UNIVERSAL) -quiet
@@ -18,7 +18,7 @@ debug:
 	$(XCODEBUILD) -configuration Debug -derivedDataPath $(DERIVED) -quiet
 
 test:
-	$(XCODEBUILD) -only-testing:VeilTests CODE_SIGNING_ALLOWED=NO test
+	$(XCODEBUILD) -derivedDataPath $(DERIVED) -only-testing:VeilTests CODE_SIGNING_ALLOWED=NO test
 
 clean:
 	$(XCODEBUILD) clean -quiet
@@ -31,6 +31,9 @@ install: build
 zip: build
 	ditto -c -k --keepParent "$(APP)" Veil.zip
 	@echo "Packaged: Veil.zip"
+
+lsp:
+	xcode-build-server config -project $(PROJECT) -scheme $(SCHEME) --build_root $(DERIVED)
 
 # Usage: make release V=0.2
 release:

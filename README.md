@@ -38,7 +38,10 @@ make debug          # Debug build
 make test           # Run unit tests
 make install        # Release build + install to /Applications
 make clean          # Clean build artifacts
+make lsp            # Generate buildServer.json for SourceKit-LSP
 ```
+
+For neovim/editor LSP support, run `make lsp` after cloning to generate `buildServer.json` (requires [xcode-build-server](https://github.com/nicklockwood/xcode-build-server)).
 
 ## Usage
 
