@@ -114,6 +114,9 @@ class WindowController: NSWindowController, NSWindowDelegate {
     // and MsgpackRpc.request catches the write error, so this is safe.
     func windowDidBecomeKey(_ notification: Notification) {
         window?.makeFirstResponder(nvimView)
+        // Force a full redraw when returning from another Space or app.
+        // Metal drawable content may be stale after being offscreen.
+        (document as? WindowDocument)?.redraw()
         if let channel = (document as? WindowDocument)?.channel {
             Task {
                 _ = await channel.request("nvim_ui_set_focus", params: [.bool(true)])

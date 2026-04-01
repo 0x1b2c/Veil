@@ -166,6 +166,10 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         view.render(grid: grid)
     }
 
+    func redraw() {
+        nvimView?.render(grid: grid)
+    }
+
     func windowDidResize(to size: NSSize) {
         guard let nvimView else { return }
         let gridSize = nvimView.gridSizeForViewSize(size)
