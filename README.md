@@ -8,12 +8,13 @@ A quiet, vanilla Neovim GUI for macOS — in the tradition of MacVim.
 
 Your Neovim config, in proper macOS windows with Metal GPU rendering. Nothing more, nothing less. Fast startup, fast multi-tab session loading.
 
-### Why a GUI instead of the terminal?
+### Why another Neovim GUI?
 
-- **Cmd+1/2/3 to switch tabs**: in a terminal, these shortcuts conflict with the terminal emulator. Veil gives them directly to Neovim's tabpages, zero configuration.
-- **Cmd+\` to cycle windows**: each window is an independent Neovim session. Instantly switch between projects in the same space, or spread them across spaces and displays.
+MacVim introduced a workflow that set it apart from gVim: multiple independent windows in a single app, each with its own tabs, switching between projects instantly with Cmd+\`. You could have three codebases open, Cmd+\` between them, and Cmd+1/2/3 to jump to specific tabs within each one.
 
-No terminal keybinding hacks, no tmux layers. Just Neovim in a native macOS window.
+In the Neovim era, most GUI frontends followed the gVim model: you can open multiple instances, but each is a separate process with no way to Cmd+\` between them. VimR was the exception, bringing the MacVim multi-window experience to Neovim, but its Redux architecture made startup and multi-tab session loading noticeably slow.
+
+Veil carries this tradition forward: a minimal, fast wrapper that gives Neovim first-class macOS citizenship. Multiple windows as independent workspaces, intuitive tab switching with Cmd+1/2/3, and as a native app instead of a terminal process, nearly all key sequences reach Neovim without being intercepted.
 
 ## Features
 
@@ -31,9 +32,9 @@ No terminal keybinding hacks, no tmux layers. Just Neovim in a native macOS wind
 ## Requirements
 
 - macOS 14+
-- Neovim 0.10+ (install via `brew install neovim`)
+- Neovim 0.10+ recommended (install via `brew install neovim`)
 
-Veil uses your system-installed Neovim. No bundled binary, you always get the latest version you chose to install.
+Veil uses your system-installed Neovim. No bundled binary. Veil communicates with Neovim via its stable msgpack-RPC and `ext_linegrid` UI protocol, so it works with any recent Neovim version.
 
 ## Install
 
