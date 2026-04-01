@@ -125,6 +125,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                     titleReady = true
                 case .defaultColorsSet(let fg, let bg, _, _, _):
                     nvimView?.setDefaultColors(fg: fg, bg: bg)
+                    windowController?.updateTitleBarColors(fg: fg, bg: bg)
                 case .modeInfoSet(_, let modes):
                     nvimView?.updateModeInfo(modes)
                 case .modeChange(_, let index):

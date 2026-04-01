@@ -22,7 +22,19 @@ class WindowController: NSWindowController, NSWindowDelegate {
         window.isRestorable = false
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.backgroundColor = NSColor(rgb: 0x1e1e1e)
+        // Title bar colors are derived from neovim's default fg/bg, cached in
+        // UserDefaults so the window opens with the correct colors immediately,
+        // avoiding a visible flash when neovim's colorscheme loads later.
+        // First launch has no cache and falls back to system appearance colors.
+        // The title bar bg is darkened relative to the content bg to give the
+        // chrome a grounded, recessive look that visually separates it from
+        // the editing area without clashing with the colorscheme.
+        let defaults = UserDefaults.standard
+        if let cachedBg = defaults.object(forKey: "VeilDefaultBg") as? Int {
+            window.backgroundColor = NSColor(rgb: Self.darkenColor(cachedBg, factor: 0.75))
+        } else {
+            window.backgroundColor = .windowBackgroundColor
+        }
 
         self.init(window: window)
         window.delegate = self
@@ -30,7 +42,11 @@ class WindowController: NSWindowController, NSWindowDelegate {
         let titleLabel = NSTextField(labelWithString: "Veil")
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.font = .titleBarFont(ofSize: 0)
-        titleLabel.textColor = .white
+        if let cachedFg = defaults.object(forKey: "VeilDefaultFg") as? Int {
+            titleLabel.textColor = NSColor(rgb: cachedFg)
+        } else {
+            titleLabel.textColor = .windowFrameTextColor
+        }
         titleLabel.lineBreakMode = .byTruncatingTail
 
         let container = NSView()
@@ -60,6 +76,21 @@ class WindowController: NSWindowController, NSWindowDelegate {
     func updateTitle(_ title: String) {
         customTitleLabel?.stringValue = title
         window?.title = title
+    }
+
+    func updateTitleBarColors(fg: Int, bg: Int) {
+        let titleBg = Self.darkenColor(bg, factor: 0.75)
+        window?.backgroundColor = NSColor(rgb: titleBg)
+        customTitleLabel?.textColor = NSColor(rgb: fg)
+        UserDefaults.standard.set(fg, forKey: "VeilDefaultFg")
+        UserDefaults.standard.set(bg, forKey: "VeilDefaultBg")
+    }
+
+    private static func darkenColor(_ rgb: Int, factor: CGFloat) -> Int {
+        let r = Int(CGFloat((rgb >> 16) & 0xFF) * factor)
+        let g = Int(CGFloat((rgb >> 8) & 0xFF) * factor)
+        let b = Int(CGFloat(rgb & 0xFF) * factor)
+        return (r << 16) | (g << 8) | b
     }
 
     func windowDidResize(_ notification: Notification) {

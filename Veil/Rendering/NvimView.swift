@@ -61,7 +61,8 @@ final class NvimView: NSView {
         self.gridFont = defaultFont
         let size = NvimView.computeCellSize(for: defaultFont)
         self.cellSize = size
-        self.defaultBg = NSColor.windowBackgroundColor.intValue
+        self.defaultBg = UserDefaults.standard.object(forKey: "VeilDefaultBg") as? Int
+            ?? NSColor.windowBackgroundColor.intValue
         self.glyphCache = GlyphCache(font: defaultFont, cellSize: size)
         self.rowRenderer = RowRenderer(cellSize: size, glyphCache: glyphCache)
         super.init(frame: frame)
@@ -73,7 +74,8 @@ final class NvimView: NSView {
         self.gridFont = defaultFont
         let size = NvimView.computeCellSize(for: defaultFont)
         self.cellSize = size
-        self.defaultBg = NSColor.windowBackgroundColor.intValue
+        self.defaultBg = UserDefaults.standard.object(forKey: "VeilDefaultBg") as? Int
+            ?? NSColor.windowBackgroundColor.intValue
         self.glyphCache = GlyphCache(font: defaultFont, cellSize: size)
         self.rowRenderer = RowRenderer(cellSize: size, glyphCache: glyphCache)
         super.init(coder: coder)
@@ -82,7 +84,7 @@ final class NvimView: NSView {
 
     private func setupLayers() {
         wantsLayer = true
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        layer?.backgroundColor = NSColor(rgb: defaultBg).cgColor
 
         cursorLayer.zPosition = 100
         cursorLayer.backgroundColor = NSColor(rgb: defaultFg).cgColor
