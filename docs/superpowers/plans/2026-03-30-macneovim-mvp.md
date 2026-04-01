@@ -5724,3 +5724,133 @@ git add Veil.xcodeproj/project.pbxproj Veil/AppDelegate.swift
 git commit -m "Register as file handler so Finder Open With works"
 ```
 
+---
+
+### Task 47: Fix CLI Script Binary Detection and Forward Shell Env on Single-Instance
+
+**Files:**
+- Modify: `bin/veil` (improve binary detection fallback)
+- Modify: `Veil/AppDelegate.swift` (forward full env in notification, use env in handleOpenFiles)
+- Modify: `Veil/Window/WindowDocument.swift` (accept custom env)
+- Modify: `Veil/Nvim/NvimChannel.swift` (pass env through)
+- Modify: `Veil/Nvim/NvimProcess.swift` (accept full env override)
+
+**Two problems:**
+
+**%5 — gvim script binary detection unreliable when copied instead of symlinked.**
+
+Current script resolves symlinks to find `../MacOS/Veil`. Fails if script is copied (not symlinked) to another location.
+
+Fix: add fallback chain after symlink resolution fails:
+1. Symlink resolution → `../MacOS/Veil` (current behavior)
+2. `/Applications/Veil.app/Contents/MacOS/Veil` (standard install location)
+3. `mdfind "kMDItemCFBundleIdentifier == 'org.1b2c.Veil'"` → `Contents/MacOS/Veil` (Spotlight search, exact bundle ID match)
+
+**%6 + env — Single-instance forwarding loses shell environment.**
+
+When a second instance forwards files to the existing one via DistributedNotification, only file paths and NVIM_APPNAME are forwarded. The user's full shell env (PWD, PATH, custom vars) is lost. The new window's nvim gets `cachedEnv` instead of the caller's env.
+
+Fix: forward the full `ProcessInfo.processInfo.environment` dict in the notification payload. The receiving side passes it to WindowDocument → NvimChannel → NvimProcess, which uses it instead of `cachedEnv`.
+
+**Implementation:**
+
+**bin/veil:**
+```bash
+# After current symlink resolution...
+if ! [ -x "$binary" ]; then
+    # Fallback: standard install location
+    binary="/Applications/Veil.app/Contents/MacOS/Veil"
+fi
+if ! [ -x "$binary" ]; then
+    # Fallback: Spotlight search
+    app_path=$(mdfind "kMDItemCFBundleIdentifier == 'org.1b2c.Veil'" | head -1)
+    if [ -n "$app_path" ]; then
+        binary="$app_path/Contents/MacOS/Veil"
+    fi
+fi
+if ! [ -x "$binary" ]; then
+    echo "Cannot find Veil executable." >&2
+    exit 1
+fi
+```
+
+**AppDelegate.swift — second instance (sender):**
+Add full env to the notification payload:
+```swift
+var payload: [String: Any] = [
+    "files": absolutePaths,
+    "env": ProcessInfo.processInfo.environment
+]
+if let nvimAppName { payload["nvimAppName"] = nvimAppName }
+```
+
+The env dict includes `PWD` (working directory), `PATH`, `NVIM_APPNAME`, and everything else from the caller's shell. No need to pass cwd separately.
+
+**AppDelegate.swift — existing instance (receiver):**
+In `handleOpenFilesNotification`, extract env and pass to WindowDocument:
+```swift
+let env = payload["env"] as? [String: String]
+doc.nvimEnv = env  // new property
+```
+
+**WindowDocument.swift:**
+Add `var nvimEnv: [String: String]?` property. In `startNvim()`:
+- Use `nvimEnv?["PWD"]` for cwd (fallback to `VEIL_CWD` then `NSHomeDirectory()`)
+- Pass `nvimEnv` to NvimChannel
+
+```swift
+let cwd = nvimEnv?["PWD"]
+    ?? ProcessInfo.processInfo.environment["VEIL_CWD"]
+    ?? NSHomeDirectory()
+try await channel.start(nvimPath: "", cwd: cwd, appName: profile.name,
+                        extraArgs: nvimArgs, env: nvimEnv)
+```
+
+**NvimChannel.swift:**
+Add `env: [String: String]?` parameter to `start()`, pass through to NvimProcess.
+
+**NvimProcess.swift:**
+Accept optional `env` override. When a CLI env is provided, also update `cachedEnv`
+so subsequent Cmd+N windows benefit from the refreshed PATH, API keys, etc.
+NVIM_APPNAME is excluded from the cache update since it's per-window intent.
+
+```swift
+// Add a static method to update the cached env
+static func updateCachedEnv(from cliEnv: [String: String]) {
+    var updated = cliEnv
+    updated.removeValue(forKey: "NVIM_APPNAME")
+    // Thread-safe update
+    envLock.lock()
+    _cachedEnv = updated
+    envLock.unlock()
+}
+```
+
+In `start()`:
+```swift
+var env = customEnv ?? Self.cachedEnv
+env["NVIM_APPNAME"] = appName
+env.merge(additionalEnv) { _, new in new }
+```
+
+In AppDelegate's `handleOpenFilesNotification`, after extracting env:
+```swift
+if let env {
+    NvimProcess.updateCachedEnv(from: env)
+}
+```
+
+- [ ] **Step 1: Read bin/veil, AppDelegate.swift, WindowDocument.swift, NvimChannel.swift, NvimProcess.swift**
+- [ ] **Step 2: Update bin/veil with fallback binary detection**
+- [ ] **Step 3: Forward full env in DistributedNotification payload**
+- [ ] **Step 4: Receive env in handleOpenFilesNotification, pass to WindowDocument**
+- [ ] **Step 5: Add nvimEnv to WindowDocument, use for cwd and pass to channel**
+- [ ] **Step 6: Thread env through NvimChannel to NvimProcess**
+- [ ] **Step 7: Build and verify**
+- [ ] **Step 8: Commit**
+
+```bash
+git add bin/veil Veil/AppDelegate.swift Veil/Window/WindowDocument.swift Veil/Nvim/NvimChannel.swift Veil/Nvim/NvimProcess.swift
+git commit -m "Fix CLI binary detection fallback and forward full shell env on single-instance"
+```
+
