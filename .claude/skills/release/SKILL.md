@@ -34,7 +34,22 @@ Required: version number (e.g., `/release 0.5`).
    git push origin master --tags
    ```
    CI builds a universal binary, packages Veil.zip, and creates the GitHub Release.
-9. Show the release URL: `https://github.com/rainux/Veil/releases/tag/v<version>`
+9. Wait for CI to finish, then update the Homebrew cask:
+   - Wait for the release workflow to complete:
+     ```
+     gh run watch -R rainux/Veil $(gh run list -R rainux/Veil -w Build --limit 1 --json databaseId -q '.[0].databaseId')
+     ```
+   - Download the release zip and compute SHA256:
+     ```
+     gh release download v<version> -R rainux/Veil -p Veil.zip -D /tmp && shasum -a 256 /tmp/Veil.zip
+     ```
+   - Update `homebrew-veil/Casks/veil.rb` with the new version and sha256
+   - Commit and push the homebrew-veil repo:
+     ```
+     git -C homebrew-veil commit -am "Update to v<version>"
+     git -C homebrew-veil push
+     ```
+10. Show the release URL: `https://github.com/rainux/Veil/releases/tag/v<version>`
 
 ## Release notes examples
 

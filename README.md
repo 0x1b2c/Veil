@@ -40,6 +40,17 @@ Veil uses your system-installed Neovim. No bundled binary, under 1 MB download. 
 
 ## Install
 
+### Homebrew
+
+```bash
+brew tap rainux/veil
+brew install --cask veil
+```
+
+This installs `Veil.app` to `/Applications` and symlinks the `veil`, `gvim`, and `gvimdiff` CLI commands to your Homebrew bin directory.
+
+### Manual
+
 Download `Veil.zip` from [Releases](https://github.com/rainux/Veil/releases), unzip, and move `Veil.app` to `/Applications`. Then remove the quarantine attribute so macOS doesn't block it:
 
 ```bash

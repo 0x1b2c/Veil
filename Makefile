@@ -23,6 +23,7 @@ test:
 
 clean:
 	$(XCODEBUILD) clean -quiet
+	/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -u $(APP) 2>/dev/null || true
 	rm -rf $(DERIVED)
 
 install: build
