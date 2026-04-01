@@ -67,3 +67,5 @@ Veil/AppIcon-Master-Masked.png
 icon-v*.png
 icon-*-master.png
 buildServer.json
+
+.claude/settings.local.json
