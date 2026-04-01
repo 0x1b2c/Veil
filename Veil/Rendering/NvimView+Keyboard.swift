@@ -160,6 +160,7 @@ extension NvimView {
 
     @objc func toggleDebugOverlay(_ sender: Any?) {
         debugOverlayEnabled.toggle()
+        delegate?.nvimViewNeedsDisplay(self)
     }
 
     // MARK: - Standard File actions

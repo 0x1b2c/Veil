@@ -3,9 +3,15 @@ import Metal
 import QuartzCore
 
 @MainActor
+protocol NvimViewDelegate: AnyObject {
+    func nvimViewNeedsDisplay(_ view: NvimView)
+}
+
+@MainActor
 final class NvimView: NSView {
     // MARK: - Public properties
 
+    weak var delegate: NvimViewDelegate?
     var channel: NvimChannel?
     var gridFont: NSFont {
         didSet { updateFont(gridFont) }
@@ -41,8 +47,7 @@ final class NvimView: NSView {
     // MARK: - Debug overlay
 
     var debugOverlayEnabled = false
-    private var lastRenderTime: CFAbsoluteTime = 0
-    private var currentFPS: Int = 0
+    private var lastFrameTime: Double = 0
 
     // MARK: - Private
 
@@ -137,18 +142,11 @@ final class NvimView: NSView {
             CATransaction.commit()
             glyphAtlas.scale = metalLayer.contentsScale
 
-            // FPS tracking
-            let now = CFAbsoluteTimeGetCurrent()
-            if lastRenderTime > 0 {
-                let delta = now - lastRenderTime
-                if delta > 0 { currentFPS = Int(1.0 / delta) }
-            }
-            lastRenderTime = now
-
             // Build debug overlay text if enabled
+            let renderStart = CACurrentMediaTime()
             let debugText: String? = debugOverlayEnabled ? """
             Renderer: Metal (\(metalRenderer.device.name))
-            FPS: \(currentFPS)
+            Frame: \(String(format: "%.1f", lastFrameTime)) ms
             Grid: \(grid.size.cols)×\(grid.size.rows)
             Atlas: \(glyphAtlas.regionCount)
             """ : nil
@@ -165,6 +163,7 @@ final class NvimView: NSView {
                 debugOverlay: debugText,
                 in: metalLayer
             )
+            lastFrameTime = (CACurrentMediaTime() - renderStart) * 1000
         } else {
             // Fallback: old CoreText rendering
             let rows = grid.size.rows

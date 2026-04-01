@@ -207,7 +207,7 @@ nonisolated final class MetalRenderer {
                                      encoder: MTLRenderCommandEncoder,
                                      viewportWidth: Float, viewportHeight: Float) {
         // Render debug text into a CGImage using CoreText
-        let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        let font = NSFont.monospacedSystemFont(ofSize: 18, weight: .regular)
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineSpacing = 2
         let attrs: [NSAttributedString.Key: Any] = [
@@ -217,13 +217,13 @@ nonisolated final class MetalRenderer {
         ]
         let attrString = NSAttributedString(string: text, attributes: attrs)
 
-        // Measure text size
-        let textStorage = NSTextStorage(attributedString: attrString)
-        let textContainer = NSTextContainer(size: NSSize(width: 300, height: 500))
-        let layoutManager = NSLayoutManager()
-        layoutManager.addTextContainer(textContainer)
-        textStorage.addLayoutManager(layoutManager)
-        let textRect = layoutManager.usedRect(for: textContainer)
+        // Measure text size using CTFramesetter (thread-safe, no AppKit dependency)
+        let cfAttrString = attrString as CFAttributedString
+        let framesetter = CTFramesetterCreateWithAttributedString(cfAttrString)
+        let textRect = CTFramesetterSuggestFrameSizeWithConstraints(
+            framesetter, CFRange(location: 0, length: 0),
+            nil, CGSize(width: 1024, height: 748), nil
+        )
 
         let padding: CGFloat = 8
         let width = ceil(textRect.width + padding * 2)
@@ -250,12 +250,16 @@ nonisolated final class MetalRenderer {
         ctx.fillPath()
 
         // Draw text (flip coordinates for NSAttributedString drawing)
+        let nsCtx = NSGraphicsContext(cgContext: ctx, flipped: true)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = nsCtx
         ctx.saveGState()
         ctx.translateBy(x: 0, y: height)
         ctx.scaleBy(x: 1, y: -1)
         let drawRect = CGRect(x: padding, y: padding, width: textRect.width, height: textRect.height)
         attrString.draw(in: drawRect)
         ctx.restoreGState()
+        NSGraphicsContext.restoreGraphicsState()
 
         guard let image = ctx.makeImage() else { return }
 
@@ -264,18 +268,18 @@ nonisolated final class MetalRenderer {
                                                                 width: pixelW, height: pixelH,
                                                                 mipmapped: false)
         texDesc.usage = .shaderRead
-        texDesc.storageMode = .managed
+        texDesc.storageMode = .shared
         guard let texture = device.makeTexture(descriptor: texDesc),
               let data = image.dataProvider?.data,
               let bytes = CFDataGetBytePtr(data) else { return }
         texture.replace(region: MTLRegionMake2D(0, 0, pixelW, pixelH),
                         mipmapLevel: 0, withBytes: bytes, bytesPerRow: pixelW * 4)
 
-        // Position at top-right with margin
+        // Position at top-left with margin
         let margin: Float = 10 * scale
         let quadW = Float(width) * scale
         let quadH = Float(height) * scale
-        let x = viewportWidth - quadW - margin
+        let x = margin
         let y = margin
 
         // Draw overlay quad using the overlay texture

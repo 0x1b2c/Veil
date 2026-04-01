@@ -1,7 +1,7 @@
 import AppKit
 import MessagePack
 
-class WindowDocument: NSDocument {
+class WindowDocument: NSDocument, NvimViewDelegate {
     var profile = Profile.default
     var nvimArgs: [String] = []
     var nvimEnv: [String: String]?
@@ -50,6 +50,7 @@ class WindowDocument: NSDocument {
 
     override func makeWindowControllers() {
         let controller = WindowController()
+        controller.nvimView.delegate = self
         controller.nvimView.channel = channel
         // When deferDisplay is set, start fully transparent so the window is
         // invisible until nvim finishes initialization. Without this, heavy
@@ -169,6 +170,10 @@ class WindowDocument: NSDocument {
         eventLoopTask?.cancel()
         Task { await channel.stop() }
         super.close()
+    }
+
+    func nvimViewNeedsDisplay(_ view: NvimView) {
+        view.render(grid: grid)
     }
 
     func windowDidResize(to size: NSSize) {
