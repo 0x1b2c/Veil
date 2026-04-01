@@ -83,7 +83,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // a window will already exist, so we skip the default one.
         DispatchQueue.main.async {
             if NSDocumentController.shared.documents.isEmpty {
-                self.createWindow(profile: self.profileFromEnvironment(), deferDisplay: false)
+                self.createWindow(profile: self.profileFromEnvironment())
             }
         }
     }
@@ -92,7 +92,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let doc = WindowDocument()
         doc.profile = profileFromEnvironment()
         doc.nvimArgs = filenames
-        doc.deferDisplay = true
         NSDocumentController.shared.addDocument(doc)
         doc.makeWindowControllers()
         doc.showWindows()
@@ -168,10 +167,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Creates and shows a new WindowDocument with the given profile.
-    func createWindow(profile: Profile, deferDisplay: Bool = true) {
+    func createWindow(profile: Profile) {
         let doc = WindowDocument()
         doc.profile = profile
-        doc.deferDisplay = deferDisplay
         if !initialCliArgs.isEmpty {
             doc.nvimArgs = initialCliArgs
             initialCliArgs = []
@@ -198,7 +196,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         doc.profile = profile
         doc.nvimArgs = files
         doc.nvimEnv = env
-        doc.deferDisplay = true
         NSDocumentController.shared.addDocument(doc)
         doc.makeWindowControllers()
         doc.showWindows()
