@@ -70,7 +70,11 @@ For Neovim/editor LSP support, run `make lsp` after cloning to generate `buildSe
 
 ## Usage
 
-Veil reads your existing Neovim configuration (`~/.config/nvim/`). Set `guifont` in your config to choose a font:
+Veil reads your existing Neovim configuration (`~/.config/nvim/`). We recommend [Maple Mono](https://github.com/subframe7536/maple-font) for its excellent CJK support and Nerd Font icons:
+
+```bash
+brew install font-maple-mono-nf-cn    # or font-maple-mono-nf without CJK
+```
 
 ```lua
 vim.o.guifont = 'Maple Mono NF CN:h16'
