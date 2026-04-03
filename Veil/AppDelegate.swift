@@ -68,7 +68,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(handleOpenFilesNotification(_:)),
-            name: .veilOpenFiles, object: nil
+            name: .veilOpenFiles, object: nil,
+            suspensionBehavior: .deliverImmediately
         )
 
         Task.detached { NvimProcess.warmUpEnvironment() }
@@ -209,6 +210,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSDocumentController.shared.addDocument(doc)
         doc.makeWindowControllers()
         doc.showWindows()
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     // MARK: - Menu Setup
