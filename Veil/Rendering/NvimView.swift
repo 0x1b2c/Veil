@@ -153,15 +153,7 @@ final class NvimView: NSView {
             // Build debug overlay text if enabled
             let renderStart = CACurrentMediaTime()
             let debugText: String? =
-                debugOverlayEnabled
-                ? """
-                Renderer: Metal (\(metalRenderer.device.name))
-                Frame: \(String(format: "%.1f", lastFrameTime)) ms
-                Grid: \(grid.size.cols)×\(grid.size.rows)
-                Atlas: \(glyphAtlas.regionCount)
-                Font (guifont): \(gridFont.displayName ?? gridFont.fontName) \(String(format: "%.0f", gridFont.pointSize))pt
-                Nerd Font: \(FontFallback.nerdFontName ?? "none")
-                """ : nil
+                debugOverlayEnabled ? debugInfoText(grid: grid) : nil
 
             metalRenderer.render(
                 cells: grid.cells, attributes: grid.attributes,
@@ -326,6 +318,31 @@ final class NvimView: NSView {
         let info = modeInfoList[modeIdx]
         currentCursorShape = info.cursorShape
         currentCursorCellPercentage = info.cellPercentage > 0 ? info.cellPercentage : 100
+    }
+
+    // MARK: - Debug info
+
+    /// Build debug info text. When `grid` is provided (during render), includes
+    /// render-time metrics. Without grid, returns static info only.
+    func debugInfoText(grid: Grid? = nil) -> String {
+        var lines: [String] = []
+        if let metalRenderer {
+            lines.append("Renderer: Metal (\(metalRenderer.device.name))")
+        } else {
+            lines.append("Renderer: CoreText")
+        }
+        lines.append("Frame: \(String(format: "%.1f", lastFrameTime)) ms")
+        if let grid {
+            lines.append("Grid: \(grid.size.cols)×\(grid.size.rows)")
+        }
+        if let glyphAtlas {
+            lines.append("Atlas: \(glyphAtlas.regionCount)")
+        }
+        let fontName = gridFont.displayName ?? gridFont.fontName
+        lines.append(
+            "Font (vim.o.guifont): \(fontName) \(String(format: "%.0f", gridFont.pointSize))pt")
+        lines.append("Nerd Font: \(FontFallback.nerdFontName ?? "none")")
+        return lines.joined(separator: "\n")
     }
 
     // MARK: - Coordinate conversion

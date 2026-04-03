@@ -100,6 +100,9 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                 try? await channel.command(
                     "command! VeilAppDebugToggle call rpcnotify(\(channelId), 'VeilAppDebugToggle')"
                 )
+                try? await channel.command(
+                    "command! VeilAppDebugCopy call rpcnotify(\(channelId), 'VeilAppDebugCopy')"
+                )
             }
 
             // Enable nvim title — set_title events will be ignored until first BufEnter
@@ -131,6 +134,11 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                     case .veilDebugToggle:
                         nvimView?.debugOverlayEnabled.toggle()
                         needsRender = true
+                    case .veilDebugCopy:
+                        if let text = nvimView?.debugInfoText() {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(text, forType: .string)
+                        }
                     case .defaultColorsSet(let fg, let bg, _, _, _):
                         nvimView?.setDefaultColors(fg: fg, bg: bg)
                         windowController?.updateTitleBarColors(fg: fg, bg: bg)
