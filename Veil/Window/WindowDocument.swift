@@ -105,6 +105,16 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                 )
             }
 
+            // Populate debug info
+            nvimView.nvimPath = await channel.nvimPath
+            let (_, versionResult) = await channel.request(
+                "nvim_exec2", params: [.string("version"), .map([.string("output"): .bool(true)])])
+            if let output = versionResult.dictionaryValue?[.string("output")]?.stringValue,
+                let firstLine = output.split(separator: "\n").first
+            {
+                nvimView.nvimVersion = String(firstLine)
+            }
+
             // Enable nvim title — set_title events will be ignored until first BufEnter
             try? await channel.command("set title")
         } catch {

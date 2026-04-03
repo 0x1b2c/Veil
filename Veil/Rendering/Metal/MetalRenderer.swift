@@ -27,6 +27,7 @@ nonisolated final class MetalRenderer {
     private var rowForegroundVertices: [[Vertex]] = []
     private var cachedRows: Int = 0
     private var cachedCols: Int = 0
+    private(set) var lastVertexCount: Int = 0
 
     init() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
@@ -180,6 +181,7 @@ nonisolated final class MetalRenderer {
             dst.advanced(by: offset).update(from: buf.baseAddress!, count: buf.count)
         }
         offset += cursorVerts.count
+        lastVertexCount = offset
 
         var uniforms = SIMD2<Float>(
             Float(metalLayer.drawableSize.width),
@@ -270,7 +272,7 @@ nonisolated final class MetalRenderer {
         let framesetter = CTFramesetterCreateWithAttributedString(cfAttrString)
         let textRect = CTFramesetterSuggestFrameSizeWithConstraints(
             framesetter, CFRange(location: 0, length: 0),
-            nil, CGSize(width: 1024, height: 748), nil
+            nil, CGSize(width: 2048, height: 1024), nil
         )
 
         let padding: CGFloat = 8

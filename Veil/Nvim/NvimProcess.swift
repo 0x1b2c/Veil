@@ -8,6 +8,7 @@ nonisolated final class NvimProcess: @unchecked Sendable {
     private nonisolated(unsafe) var _process: Process?
     private let _processLock = NSLock()
     private let nvimPath: String
+    private(set) var resolvedNvimPath: String = ""
     private let cwd: String
     private let appName: String
     private let customEnv: [String: String]?
@@ -44,6 +45,7 @@ nonisolated final class NvimProcess: @unchecked Sendable {
         process.currentDirectoryURL = URL(fileURLWithPath: cwd)
         process.qualityOfService = .userInteractive
         let binary = resolveNvimBinary()
+        resolvedNvimPath = binary
         process.executableURL = URL(fileURLWithPath: binary)
         var env = customEnv ?? Self.cachedEnv
         env["NVIM_APPNAME"] = appName

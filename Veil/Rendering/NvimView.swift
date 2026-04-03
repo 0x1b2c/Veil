@@ -50,7 +50,10 @@ final class NvimView: NSView {
     // MARK: - Debug overlay
 
     var debugOverlayEnabled = false
+    var nvimPath: String = ""
+    var nvimVersion: String = ""
     private var lastFrameTime: Double = 0
+    private var lastDirtyRowCount: Int = 0
 
     // MARK: - Private
 
@@ -152,6 +155,7 @@ final class NvimView: NSView {
 
             // Build debug overlay text if enabled
             let renderStart = CACurrentMediaTime()
+            lastDirtyRowCount = grid.dirtyRows.count
             let debugText: String? =
                 debugOverlayEnabled ? debugInfoText(grid: grid) : nil
 
@@ -326,6 +330,8 @@ final class NvimView: NSView {
     /// render-time metrics. Without grid, returns static info only.
     func debugInfoText(grid: Grid? = nil) -> String {
         var lines: [String] = []
+        if !nvimPath.isEmpty { lines.append("Nvim: \(nvimPath)") }
+        if !nvimVersion.isEmpty { lines.append("Version: \(nvimVersion)") }
         if let metalRenderer {
             lines.append("Renderer: Metal (\(metalRenderer.device.name))")
         } else {
@@ -335,6 +341,15 @@ final class NvimView: NSView {
         if let grid {
             lines.append("Grid: \(grid.size.cols)×\(grid.size.rows)")
         }
+        let scale = window?.backingScaleFactor ?? 0
+        lines.append("Scale: \(String(format: "%.0f", scale))x")
+        lines.append(
+            "Cell: \(String(format: "%.1f", cellSize.width))×\(String(format: "%.1f", cellSize.height))"
+        )
+        if let metalRenderer {
+            lines.append("Vertices: \(metalRenderer.lastVertexCount)")
+        }
+        lines.append("Dirty rows: \(lastDirtyRowCount)")
         if let glyphAtlas {
             lines.append("Atlas: \(glyphAtlas.regionCount)")
         }

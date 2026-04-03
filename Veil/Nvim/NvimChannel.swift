@@ -124,6 +124,8 @@ actor NvimChannel {
             ])
     }
 
+    var nvimPath: String { process?.resolvedNvimPath ?? "" }
+
     func stop() {
         rpcTask?.cancel()
         process?.stop()
