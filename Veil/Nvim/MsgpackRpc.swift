@@ -150,6 +150,14 @@ extension MessagePackValue {
         switch self {
         case .int(let v): return Int(v)
         case .uint(let v): return Int(v)
+        case .extended(_, let data):
+            // Neovim sends buffer/window/tabpage handles as msgpack ext types
+            // with the ID encoded as a little-endian integer.
+            var value: Int = 0
+            for (i, byte) in data.enumerated() {
+                value |= Int(byte) << (i * 8)
+            }
+            return value
         default: return 0
         }
     }

@@ -56,8 +56,8 @@ class TablineView: NSView {
             }
             rect.fill()
 
-            // Draw separator
-            if i > 0 {
+            // Draw separator (skip if either adjacent tab is selected)
+            if i > 0, !tab.isSelected, !tabs[i - 1].isSelected {
                 NSColor.separatorColor.setStroke()
                 let sep = NSBezierPath()
                 sep.move(to: NSPoint(x: rect.minX, y: 4))
@@ -66,16 +66,11 @@ class TablineView: NSView {
                 sep.stroke()
             }
 
-            // Draw bottom border for selected tab
-            if tab.isSelected {
-                NSColor.controlAccentColor.setFill()
-                NSRect(x: rect.minX, y: 0, width: rect.width, height: 2).fill()
-            }
-
             // Draw title
-            let title = tab.name.isEmpty ? "Tab \(i + 1)" : (tab.name as NSString).lastPathComponent
+            let baseName = tab.name.isEmpty ? "Tab \(i + 1)" : (tab.name as NSString).lastPathComponent
+            let title = "\(i + 1). \(baseName)"
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 11, weight: tab.isSelected ? .medium : .regular),
+                .font: NSFont.systemFont(ofSize: 14, weight: tab.isSelected ? .medium : .regular),
                 .foregroundColor: NSColor.labelColor,
             ]
             let size = title.size(withAttributes: attrs)
