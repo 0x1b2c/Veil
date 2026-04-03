@@ -102,40 +102,44 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     private func startEventLoop() {
         eventLoopTask = Task { @MainActor in
             let events = channel.events
-            for await event in events {
-                grid.apply(event)
-                switch event {
-                case .flush:
-                    nvimView?.render(grid: grid)
-                    grid.clearDirty()
-                case .setTitle(let title):
-                    if titleReady {
-                        windowController?.updateTitle(title)
-                    }
-                case .veilBufChanged:
-                    titleReady = true
-                case .defaultColorsSet(let fg, let bg, _, _, _):
-                    nvimView?.setDefaultColors(fg: fg, bg: bg)
-                    windowController?.updateTitleBarColors(fg: fg, bg: bg)
-                case .modeInfoSet(_, let modes):
-                    nvimView?.updateModeInfo(modes)
-                case .modeChange(_, let index):
-                    nvimView?.updateCursorMode(index)
-                case .bell:
-                    NSSound.beep()
-                case .optionSet(let name, let value):
-                    if name == "guifont", let fontStr = value.stringValue, !fontStr.isEmpty {
-                        nvimView?.parseAndSetGuifont(fontStr)
-                        if let nvimView {
-                            let newGridSize = nvimView.gridSizeForViewSize(nvimView.bounds.size)
-                            Task {
-                                await channel.uiTryResize(
-                                    width: newGridSize.cols, height: newGridSize.rows)
+            // Events arrive in batches (one array per redraw notification)
+            // to reduce actor isolation boundary crossings.
+            for await batch in events {
+                for event in batch {
+                    grid.apply(event)
+                    switch event {
+                    case .flush:
+                        nvimView?.render(grid: grid)
+                        grid.clearDirty()
+                    case .setTitle(let title):
+                        if titleReady {
+                            windowController?.updateTitle(title)
+                        }
+                    case .veilBufChanged:
+                        titleReady = true
+                    case .defaultColorsSet(let fg, let bg, _, _, _):
+                        nvimView?.setDefaultColors(fg: fg, bg: bg)
+                        windowController?.updateTitleBarColors(fg: fg, bg: bg)
+                    case .modeInfoSet(_, let modes):
+                        nvimView?.updateModeInfo(modes)
+                    case .modeChange(_, let index):
+                        nvimView?.updateCursorMode(index)
+                    case .bell:
+                        NSSound.beep()
+                    case .optionSet(let name, let value):
+                        if name == "guifont", let fontStr = value.stringValue, !fontStr.isEmpty {
+                            nvimView?.parseAndSetGuifont(fontStr)
+                            if let nvimView {
+                                let newGridSize = nvimView.gridSizeForViewSize(nvimView.bounds.size)
+                                Task {
+                                    await channel.uiTryResize(
+                                        width: newGridSize.cols, height: newGridSize.rows)
+                                }
                             }
                         }
+                    default:
+                        break
                     }
-                default:
-                    break
                 }
             }
             close()

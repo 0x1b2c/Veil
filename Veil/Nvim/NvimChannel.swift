@@ -4,13 +4,16 @@ import MessagePack
 actor NvimChannel {
     private var process: NvimProcess?
     private var rpc: MsgpackRpc?
-    private var eventContinuation: AsyncStream<NvimEvent>.Continuation?
+    private var eventContinuation: AsyncStream<[NvimEvent]>.Continuation?
     private var rpcTask: Task<Void, Never>?
 
-    let events: AsyncStream<NvimEvent>
+    /// Events are delivered in batches (one array per redraw notification)
+    /// to reduce actor isolation boundary crossings. A single redraw with
+    /// 50 grid_line events becomes one yield instead of 50.
+    let events: AsyncStream<[NvimEvent]>
 
     init() {
-        let (stream, continuation) = AsyncStream<NvimEvent>.makeStream()
+        let (stream, continuation) = AsyncStream<[NvimEvent]>.makeStream()
         self.events = stream
         self.eventContinuation = continuation
     }
@@ -44,11 +47,13 @@ actor NvimChannel {
                         if method == "redraw" {
                             guard let args = params.arrayValue else { continue }
                             let events = NvimEvent.parse(redrawArgs: args)
-                            for event in events {
-                                await self.yieldEvent(event)
+                            // Yield entire redraw batch at once to amortize
+                            // actor isolation crossing overhead.
+                            if !events.isEmpty {
+                                await self.yieldBatch(events)
                             }
                         } else if method == "VeilAppBufChanged" {
-                            await self.yieldEvent(.veilBufChanged)
+                            await self.yieldBatch([.veilBufChanged])
                         }
                     }
                 }
@@ -59,8 +64,8 @@ actor NvimChannel {
     }
 
     // Isolated helpers called from the unstructured Task above
-    private func yieldEvent(_ event: NvimEvent) {
-        eventContinuation?.yield(event)
+    private func yieldBatch(_ events: [NvimEvent]) {
+        eventContinuation?.yield(events)
     }
 
     private func finishEvents() {
