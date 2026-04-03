@@ -6,7 +6,7 @@
 
 A quiet, vanilla Neovim GUI for macOS — in the tradition of MacVim.
 
-Your Neovim config, in proper macOS windows with Metal GPU rendering. Nothing more, nothing less. Fast startup, fast multi-tab session loading.
+Your Neovim config, in proper macOS windows. Instant startup with near-zero overhead, fast Metal rendering, fast multi-tab session loading. Designed for focus. No visual noise, no distractions.
 
 ### Why another Neovim GUI?
 
@@ -20,7 +20,7 @@ Vim is a tool built for focused, efficient work. Animations consume attention. C
 - **Tabs**: Neovim's native tabline, switchable with Cmd+1 through Cmd+9.
 - **Profile support**: Cmd+Shift+N to choose a different `NVIM_APPNAME` per window.
 - **CJK & IME**: full input method support for Chinese, Japanese, Korean.
-- **Metal rendering**: GPU-accelerated rendering with glyph texture atlas. Entire grid drawn in a single Metal draw call. Falls back to CoreText if Metal is unavailable.
+- **Metal rendering**: heavily optimized GPU-accelerated rendering. Falls back to CoreText if Metal is unavailable.
 - **System integration**: standard Edit/File menu actions, trackpad scrolling, window size persistence.
 
 <p align="center">
@@ -32,7 +32,9 @@ Vim is a tool built for focused, efficient work. Animations consume attention. C
 - macOS 14+
 - Neovim 0.10+ recommended (install via `brew install neovim`)
 
-Veil uses your system-installed Neovim. No bundled binary, under 1 MB download. Veil communicates with Neovim via its stable msgpack-RPC and `ext_linegrid` UI protocol, so it works with any recent Neovim version.
+Veil uses your system-installed Neovim. No bundled binary, under 1 MB download. Veil finds nvim anywhere your interactive shell can access it, and caches the resolved path so only the first launch pays the detection cost.
+
+Veil communicates with Neovim via its stable msgpack-RPC and `ext_linegrid` UI protocol, and works with any recent Neovim version. The RPC layer is heavily optimized with event batching for responsive rendering.
 
 ## Install
 
@@ -109,6 +111,13 @@ Everything else (including other Cmd+key and all Ctrl+key combinations) is sent 
 -- Example: Cmd+P to open a file picker
 vim.keymap.set('n', '<D-p>', Snacks.picker.files)
 ```
+
+### Debug
+
+Veil registers two commands in Neovim for rendering diagnostics:
+
+- `:VeilAppDebugToggle` — show/hide an overlay with renderer info, frame time, grid size, font details, and more
+- `:VeilAppDebugCopy` — copy the same info to the system clipboard
 
 ## CLI
 
