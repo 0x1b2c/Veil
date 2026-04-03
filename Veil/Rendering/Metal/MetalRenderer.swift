@@ -362,47 +362,79 @@ nonisolated final class MetalRenderer {
         let transparentBg = SIMD4<Float>(0, 0, 0, 0)
         let y = topPad + Float(row) * cellH
 
-        // Background pass
+        // Background pass: merge contiguous cells with the same background
+        // color into single wide quads to reduce instance/vertex count.
         var bgVerts: [Vertex] = []
         var col = 0
+        var runStart = 0
+        var runBg = defaultBg
+        var lastBgHlId = -1
+        var lastBgAttrs = CellAttributes()
         while col < cols {
             let cell = cells[col]
-            let attrs = attributes[cell.hlId] ?? CellAttributes()
-            let bg = attrs.effectiveBackground(defaultFg: defaultFg, defaultBg: defaultBg)
-            let x = Float(col) * cellW
             let text = cell.text
             if text.isEmpty {
                 // Double-width placeholder, skip
                 col += 1
-            } else {
-                let isDoubleWidth = col + 1 < cols && cells[col + 1].text.isEmpty
-                let cellCount = isDoubleWidth ? 2 : 1
-                if bg != defaultBg {
-                    let quadW = cellW * Float(cellCount)
-                    addQuad(
-                        to: &bgVerts, x: x, y: y, w: quadW, h: cellH,
-                        region: emptyRegion, bgColor: colorToSIMD4(bg))
-                }
-                col += cellCount
+                continue
             }
+            // Cache attribute lookup: skip dictionary access when hlId repeats
+            if cell.hlId != lastBgHlId {
+                lastBgHlId = cell.hlId
+                lastBgAttrs = attributes[cell.hlId] ?? CellAttributes()
+            }
+            let bg = lastBgAttrs.effectiveBackground(defaultFg: defaultFg, defaultBg: defaultBg)
+            let isDoubleWidth = col + 1 < cols && cells[col + 1].text.isEmpty
+            let cellCount = isDoubleWidth ? 2 : 1
+
+            if bg != runBg {
+                // Flush previous run if it had a non-default background
+                if runBg != defaultBg {
+                    let x = Float(runStart) * cellW
+                    let w = Float(col - runStart) * cellW
+                    addQuad(
+                        to: &bgVerts, x: x, y: y, w: w, h: cellH,
+                        region: emptyRegion, bgColor: colorToSIMD4(runBg))
+                }
+                runStart = col
+                runBg = bg
+            }
+            col += cellCount
+        }
+        // Flush final run
+        if runBg != defaultBg {
+            let x = Float(runStart) * cellW
+            let w = Float(col - runStart) * cellW
+            addQuad(
+                to: &bgVerts, x: x, y: y, w: w, h: cellH,
+                region: emptyRegion, bgColor: colorToSIMD4(runBg))
         }
         rowBackgroundVertices[row] = bgVerts
 
         // Foreground glyph pass: atlas stores white alpha masks, so we pass
-        // the per-cell foreground color for the shader to apply
+        // the per-cell foreground color for the shader to apply.
+        // Cache last hlId to avoid repeated dictionary lookups for adjacent
+        // cells with the same highlight group.
         var fgVerts: [Vertex] = []
         col = 0
+        var lastFgHlId = -1
+        var lastFgAttrs = CellAttributes()
+        var lastFg = defaultFg
         while col < cols {
             let cell = cells[col]
             let text = cell.text
+            // Skip empty cells and spaces before any attribute lookup
             if text.isEmpty || text == " " {
                 col += 1
                 continue
             }
 
-            let attrs = attributes[cell.hlId] ?? CellAttributes()
-            let fg = attrs.effectiveForeground(defaultFg: defaultFg, defaultBg: defaultBg)
-            let fgSIMD = colorToSIMD4(fg)
+            if cell.hlId != lastFgHlId {
+                lastFgHlId = cell.hlId
+                lastFgAttrs = attributes[cell.hlId] ?? CellAttributes()
+                lastFg = lastFgAttrs.effectiveForeground(defaultFg: defaultFg, defaultBg: defaultBg)
+            }
+            let fgSIMD = colorToSIMD4(lastFg)
             let x = Float(col) * cellW
 
             let isDoubleWidth = col + 1 < cols && cells[col + 1].text.isEmpty
@@ -411,7 +443,7 @@ nonisolated final class MetalRenderer {
 
             let region = atlas.region(
                 text: text, font: font,
-                bold: attrs.bold, italic: attrs.italic,
+                bold: lastFgAttrs.bold, italic: lastFgAttrs.italic,
                 cellSize: cellSize, cellCount: cellCount)
 
             let glyphW = region.drawWidth * Float(atlas.scale)

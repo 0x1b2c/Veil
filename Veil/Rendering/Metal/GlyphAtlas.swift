@@ -32,14 +32,15 @@ nonisolated final class GlyphAtlas {
     private var nextY: Int = 0
     private var currentRowHeight: Int = 0
     private let atlasWidth: Int
-    private let atlasHeight: Int
+    private(set) var atlasHeight: Int
+    private let maxAtlasHeight = 8192
     var scale: CGFloat = 2.0
 
     init(device: MTLDevice, size: Int = 2048) {
         self.device = device
         self.atlasWidth = size
         self.atlasHeight = size
-        self.texture = createTexture(size: size)
+        self.texture = createTexture(width: size, height: size)
         self.nextX = 1  // Reserve pixel (0,0) as transparent sentinel for empty cells
         FontFallback.probe()
     }
@@ -91,9 +92,14 @@ nonisolated final class GlyphAtlas {
             currentRowHeight = 0
         }
 
-        // Check if atlas is full (for now just reset, could grow later)
+        // Grow atlas vertically if out of space, fall back to full
+        // invalidation only at the maximum supported texture size.
         if nextY + pixelH > atlasHeight {
-            invalidate()
+            if atlasHeight < maxAtlasHeight {
+                growAtlas()
+            } else {
+                invalidate()
+            }
         }
 
         // Render glyph as white alpha mask (color applied in fragment shader)
@@ -130,15 +136,54 @@ nonisolated final class GlyphAtlas {
         nextY = 0
         currentRowHeight = 0
         // Clear texture
-        texture = createTexture(size: atlasWidth)
+        texture = createTexture(width: atlasWidth, height: atlasHeight)
     }
 
     // MARK: - Private
 
-    private func createTexture(size: Int) -> MTLTexture {
+    /// Double the atlas height and blit existing content to the new texture.
+    /// Rescales all cached UV v-coordinates to account for the new height.
+    /// This avoids a full invalidation which would discard all cached glyphs.
+    private func growAtlas() {
+        let newHeight = min(atlasHeight * 2, maxAtlasHeight)
+        let newTexture = createTexture(width: atlasWidth, height: newHeight)
+
+        // Blit existing atlas content to the new texture
+        guard let commandBuffer = device.makeCommandQueue()?.makeCommandBuffer(),
+            let blit = commandBuffer.makeBlitCommandEncoder()
+        else {
+            invalidate()
+            return
+        }
+        blit.copy(
+            from: texture, sourceSlice: 0, sourceLevel: 0,
+            sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+            sourceSize: MTLSize(width: atlasWidth, height: atlasHeight, depth: 1),
+            to: newTexture, destinationSlice: 0, destinationLevel: 0,
+            destinationOrigin: MTLOrigin(x: 0, y: 0, z: 0))
+        blit.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+
+        // Rescale UV v-coordinates for the new height
+        let vScale = Float(atlasHeight) / Float(newHeight)
+        var rescaled: [Key: Region] = [:]
+        for (key, region) in regions {
+            rescaled[key] = Region(
+                u: region.u, v: region.v * vScale,
+                uMax: region.uMax, vMax: region.vMax * vScale,
+                drawWidth: region.drawWidth)
+        }
+        regions = rescaled
+
+        texture = newTexture
+        atlasHeight = newHeight
+    }
+
+    private func createTexture(width: Int, height: Int) -> MTLTexture {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm,
-            width: size, height: size,
+            width: width, height: height,
             mipmapped: false
         )
         descriptor.usage = [.shaderRead]
