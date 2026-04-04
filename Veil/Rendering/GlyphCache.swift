@@ -37,7 +37,7 @@ nonisolated final class GlyphCache: @unchecked Sendable {
 
     var scale: CGFloat = 2.0
     private var cache: [Key: CGImage] = [:]
-    private var font: NSFont
+    private(set) var font: NSFont
     private var cellSize: CGSize
 
     init(font: NSFont, cellSize: CGSize) {

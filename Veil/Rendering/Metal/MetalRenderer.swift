@@ -443,10 +443,10 @@ nonisolated final class MetalRenderer {
         }
         rowBackgroundVertices[row] = bgVerts
 
-        // Foreground glyph pass: atlas stores white alpha masks, so we pass
-        // the per-cell foreground color for the shader to apply.
-        // Cache last hlId to avoid repeated dictionary lookups for adjacent
-        // cells with the same highlight group.
+        // Foreground glyph pass with ligature support.
+        // Groups consecutive same-attribute single-width cells into runs,
+        // shapes each run via CoreText to detect font ligatures, then
+        // emits vertices for each shaped glyph.
         var fgVerts: [Vertex] = []
         col = 0
         var lastFgHlId = -1
@@ -455,7 +455,7 @@ nonisolated final class MetalRenderer {
         while col < cols {
             let cell = cells[col]
             let text = cell.text
-            // Skip empty cells and spaces before any attribute lookup
+
             if text.isEmpty || text == " " {
                 col += 1
                 continue
@@ -466,40 +466,84 @@ nonisolated final class MetalRenderer {
                 lastFgAttrs = attributes[cell.hlId] ?? CellAttributes()
                 lastFg = lastFgAttrs.effectiveForeground(defaultFg: defaultFg, defaultBg: defaultBg)
             }
-            let fgSIMD = colorToSIMD4(lastFg)
-            let x = Float(col) * cellW
 
             let isDoubleWidth = col + 1 < cols && cells[col + 1].text.isEmpty
-            let cellCount = isDoubleWidth ? 2 : 1
-            let allocatedW = cellW * Float(cellCount)
 
-            let region = atlas.region(
-                text: text, font: font,
-                bold: lastFgAttrs.bold, italic: lastFgAttrs.italic,
-                cellSize: cellSize, cellCount: cellCount)
-
-            let glyphW = region.drawWidth * Float(atlas.scale)
-            if glyphW > allocatedW {
-                // Glyph wider than allocated cells: overflow or scale down
-                let nextCol = col + cellCount
-                let followedBySpace = nextCol < cols && cells[nextCol].text == " "
-                if followedBySpace {
-                    // Overflow into the adjacent space (natural size)
+            if isDoubleWidth {
+                let fgSIMD = colorToSIMD4(lastFg)
+                let x = Float(col) * cellW
+                let allocatedW = cellW * 2
+                let region = atlas.region(
+                    text: text, font: font,
+                    bold: lastFgAttrs.bold, italic: lastFgAttrs.italic,
+                    cellSize: cellSize, cellCount: 2)
+                let glyphW = region.drawWidth * Float(atlas.scale)
+                if glyphW > allocatedW {
+                    let nextCol = col + 2
+                    let followedBySpace = nextCol < cols && cells[nextCol].text == " "
                     addQuad(
-                        to: &fgVerts, x: x, y: y, w: glyphW, h: cellH,
+                        to: &fgVerts, x: x, y: y,
+                        w: followedBySpace ? glyphW : allocatedW, h: cellH,
                         region: region, fgColor: fgSIMD, bgColor: transparentBg)
                 } else {
-                    // No room to overflow: squeeze into allocated width
                     addQuad(
                         to: &fgVerts, x: x, y: y, w: allocatedW, h: cellH,
                         region: region, fgColor: fgSIMD, bgColor: transparentBg)
                 }
-            } else {
-                addQuad(
-                    to: &fgVerts, x: x, y: y, w: allocatedW, h: cellH,
-                    region: region, fgColor: fgSIMD, bgColor: transparentBg)
+                col += 2
+                continue
             }
-            col += cellCount
+
+            // Collect run of same-hlId single-width non-space non-empty cells
+            let runStartCol = col
+            let runHlId = cell.hlId
+            var runEnd = col + 1
+            while runEnd < cols {
+                let c = cells[runEnd]
+                if c.text.isEmpty || c.text == " " || c.hlId != runHlId { break }
+                if runEnd + 1 < cols && cells[runEnd + 1].text.isEmpty { break }
+                runEnd += 1
+            }
+
+            let fgSIMD = colorToSIMD4(lastFg)
+            let runLen = runEnd - runStartCol
+
+            // Shape for ligature detection
+            let shaped: [ShapedGlyph]
+            if runLen == 1 {
+                shaped = [ShapedGlyph(text: text, colOffset: 0, cellCount: 1)]
+            } else {
+                var runText = ""
+                for i in runStartCol..<runEnd { runText += cells[i].text }
+                shaped = atlas.shapeRun(
+                    runText, font: font,
+                    bold: lastFgAttrs.bold, italic: lastFgAttrs.italic)
+            }
+
+            for glyph in shaped {
+                let glyphCol = runStartCol + glyph.colOffset
+                let x = Float(glyphCol) * cellW
+                let allocatedW = cellW * Float(glyph.cellCount)
+                let region = atlas.region(
+                    text: glyph.text, font: font,
+                    bold: lastFgAttrs.bold, italic: lastFgAttrs.italic,
+                    cellSize: cellSize, cellCount: glyph.cellCount)
+                let glyphW = region.drawWidth * Float(atlas.scale)
+                if glyphW > allocatedW {
+                    let nextCol = glyphCol + glyph.cellCount
+                    let followedBySpace = nextCol < cols && cells[nextCol].text == " "
+                    addQuad(
+                        to: &fgVerts, x: x, y: y,
+                        w: followedBySpace ? glyphW : allocatedW, h: cellH,
+                        region: region, fgColor: fgSIMD, bgColor: transparentBg)
+                } else {
+                    addQuad(
+                        to: &fgVerts, x: x, y: y, w: allocatedW, h: cellH,
+                        region: region, fgColor: fgSIMD, bgColor: transparentBg)
+                }
+            }
+
+            col = runEnd
         }
         rowForegroundVertices[row] = fgVerts
     }

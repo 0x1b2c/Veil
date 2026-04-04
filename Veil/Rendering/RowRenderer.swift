@@ -53,43 +53,94 @@ nonisolated final class RowRenderer: @unchecked Sendable {
         ctx.setFillColor(defaultBgColor.cgColor)
         ctx.fill(CGRect(x: 0, y: 0, width: pointWidth, height: pointHeight))
 
+        // Pass 1: backgrounds (per-cell, no ligature interaction)
         var col = 0
         while col < cols {
             let cell = row[col]
             let text = cell.text
             let attrs = attributes[cell.hlId] ?? defaultAttrs
 
-            // Detect double-width character
             let isDoubleWidth =
                 !text.isEmpty && text != " " && col + 1 < cols && row[col + 1].text.isEmpty
             let cellCount = isDoubleWidth ? 2 : 1
-            let drawWidth = cellSize.width * CGFloat(cellCount)
-
-            let x = CGFloat(col) * cellSize.width
-            let cellRect = CGRect(x: x, y: 0, width: drawWidth, height: cellSize.height)
 
             let bg = attrs.effectiveBackground(defaultFg: defaultFg, defaultBg: defaultBg)
-
-            // Fill cell background if different from default
             if bg != defaultBg {
-                let bgColor = NSColor(rgb: bg)
-                ctx.setFillColor(bgColor.cgColor)
-                ctx.fill(cellRect)
+                let drawWidth = cellSize.width * CGFloat(cellCount)
+                let x = CGFloat(col) * cellSize.width
+                ctx.setFillColor(NSColor(rgb: bg).cgColor)
+                ctx.fill(CGRect(x: x, y: 0, width: drawWidth, height: cellSize.height))
             }
 
-            // Skip rendering for spaces and empty text
-            if text == " " || text.isEmpty {
+            if text.isEmpty || text == " " {
+                col += 1
+            } else {
+                col += cellCount
+            }
+        }
+
+        // Pass 2: foreground glyphs with ligature support
+        let font = glyphCache.font
+        col = 0
+        while col < cols {
+            let cell = row[col]
+            let text = cell.text
+
+            if text.isEmpty || text == " " {
                 col += 1
                 continue
             }
 
-            // Get glyph image from cache and composite
-            let glyphImage = glyphCache.get(
-                text: text, attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg,
-                cellCount: cellCount)
-            ctx.draw(glyphImage, in: cellRect)
+            let attrs = attributes[cell.hlId] ?? defaultAttrs
+            let isDoubleWidth = col + 1 < cols && row[col + 1].text.isEmpty
 
-            col += cellCount
+            if isDoubleWidth {
+                let x = CGFloat(col) * cellSize.width
+                let cellRect = CGRect(
+                    x: x, y: 0, width: cellSize.width * 2, height: cellSize.height)
+                let glyphImage = glyphCache.get(
+                    text: text, attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg,
+                    cellCount: 2)
+                ctx.draw(glyphImage, in: cellRect)
+                col += 2
+                continue
+            }
+
+            // Collect run of same-hlId single-width non-space non-empty cells
+            let runStartCol = col
+            let runHlId = cell.hlId
+            var runEnd = col + 1
+            while runEnd < cols {
+                let c = row[runEnd]
+                if c.text.isEmpty || c.text == " " || c.hlId != runHlId { break }
+                if runEnd + 1 < cols && row[runEnd + 1].text.isEmpty { break }
+                runEnd += 1
+            }
+
+            let runLen = runEnd - runStartCol
+            let shaped: [ShapedGlyph]
+            if runLen == 1 {
+                shaped = [ShapedGlyph(text: text, colOffset: 0, cellCount: 1)]
+            } else {
+                var runText = ""
+                for i in runStartCol..<runEnd { runText += row[i].text }
+                shaped = shapeRunText(
+                    runText, font: font, bold: attrs.bold, italic: attrs.italic)
+            }
+
+            for glyph in shaped {
+                let glyphCol = runStartCol + glyph.colOffset
+                let x = CGFloat(glyphCol) * cellSize.width
+                let drawWidth = cellSize.width * CGFloat(glyph.cellCount)
+                let cellRect = CGRect(
+                    x: x, y: 0, width: drawWidth, height: cellSize.height)
+                let glyphImage = glyphCache.get(
+                    text: glyph.text, attrs: attrs, defaultFg: defaultFg,
+                    defaultBg: defaultBg, cellCount: glyph.cellCount)
+                ctx.draw(glyphImage, in: cellRect)
+            }
+
+            col = runEnd
         }
 
         return ctx.makeImage()
