@@ -18,18 +18,30 @@ enum CliArgParser {
                 skip = true
                 continue
             }
-            if arg == "--veil-renderer" {
-                if let value = iter.next(), value.lowercased() == "coretext" {
-                    result.renderer = .coretext
+            if arg.hasPrefix("--veil-") {
+                let (name, inlineValue) = splitFlag(arg)
+                switch name {
+                case "--veil-renderer":
+                    let value = (inlineValue ?? iter.next())?.lowercased()
+                    if value == "coretext" { result.renderer = .coretext }
+                case "--veil-no-ligatures":
+                    result.ligatures = false
+                default:
+                    break
                 }
-                continue
-            }
-            if arg == "--veil-no-ligatures" {
-                result.ligatures = false
                 continue
             }
             result.nvimArgs.append(arg)
         }
         return result
+    }
+
+    /// Split `--flag=value` into `("--flag", "value")`.
+    /// Returns `("--flag", nil)` for flags without `=`.
+    private static func splitFlag(_ arg: String) -> (String, String?) {
+        guard let eqIndex = arg.firstIndex(of: "=") else { return (arg, nil) }
+        let name = String(arg[..<eqIndex])
+        let value = String(arg[arg.index(after: eqIndex)...])
+        return (name, value)
     }
 }

@@ -97,4 +97,31 @@ struct CliArgParserTests {
         #expect(result.renderer == .metal)
         #expect(result.nvimArgs.isEmpty)
     }
+
+    @Test func rendererEqualsSign() {
+        let result = CliArgParser.parse(["/path/to/Veil", "--veil-renderer=coretext", "file.txt"])
+        #expect(result.renderer == .coretext)
+        #expect(result.nvimArgs == ["file.txt"])
+    }
+
+    @Test func rendererEqualsSignCaseInsensitive() {
+        let result = CliArgParser.parse(["/path/to/Veil", "--veil-renderer=CoreText"])
+        #expect(result.renderer == .coretext)
+    }
+
+    @Test func noLigatures() {
+        let result = CliArgParser.parse(["/path/to/Veil", "--veil-no-ligatures", "file.txt"])
+        #expect(result.ligatures == false)
+        #expect(result.nvimArgs == ["file.txt"])
+    }
+
+    @Test func ligaturesDefault() {
+        let result = CliArgParser.parse(["/path/to/Veil", "file.txt"])
+        #expect(result.ligatures == true)
+    }
+
+    @Test func unknownVeilFlag() {
+        let result = CliArgParser.parse(["/path/to/Veil", "--veil-unknown", "file.txt"])
+        #expect(result.nvimArgs == ["file.txt"])
+    }
 }
