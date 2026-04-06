@@ -4,8 +4,10 @@ import MessagePack
 actor NvimChannel {
     private var process: NvimProcess?
     private var rpc: MsgpackRpc?
+    private var transport: RpcTransport?
     private var eventContinuation: AsyncStream<[NvimEvent]>.Continuation?
     private var rpcTask: Task<Void, Never>?
+    private(set) var isRemote = false
 
     /// Events are delivered in batches (one array per redraw notification)
     /// to reduce actor isolation boundary crossings. A single redraw with
@@ -28,17 +30,32 @@ actor NvimChannel {
         try proc.start()
         self.process = proc
 
-        let rpc = MsgpackRpc(
-            inPipe: proc.stdinPipe.fileHandleForWriting,
-            outPipe: proc.stdoutPipe.fileHandleForReading
+        let pipeTransport = PipeTransport(
+            writePipe: proc.stdinPipe.fileHandleForWriting,
+            readPipe: proc.stdoutPipe.fileHandleForReading
         )
+        self.transport = pipeTransport
+        startRpcEventLoop(transport: pipeTransport)
+    }
+
+    /// Connect to a remote nvim instance over TCP. No local process is spawned.
+    func connectRemote(host: String, port: UInt16) async throws {
+        isRemote = true
+        let socketTransport = SocketTransport(host: host, port: port)
+        try await socketTransport.waitUntilReady()
+        self.transport = socketTransport
+        startRpcEventLoop(transport: socketTransport)
+    }
+
+    private func startRpcEventLoop(transport: RpcTransport) {
+        let rpc = MsgpackRpc(transport: transport)
         self.rpc = rpc
 
-        // Access notifications before spawning the task so the lazy var is
-        // initialized (and the continuation is stored) on the actor.
-        let notifications = await rpc.notifications
-
         rpcTask = Task {
+            // Access notifications before starting the receive loop so the
+            // lazy var is initialized (and the continuation is stored) on the
+            // MsgpackRpc actor.
+            let notifications = await rpc.notifications
             await withTaskGroup(of: Void.self) { group in
                 group.addTask { await rpc.start() }
                 group.addTask {
@@ -128,6 +145,7 @@ actor NvimChannel {
 
     func stop() {
         rpcTask?.cancel()
+        transport?.close()
         process?.stop()
         eventContinuation?.finish()
     }

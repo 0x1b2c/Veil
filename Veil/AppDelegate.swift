@@ -56,6 +56,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         Task.detached { NvimProcess.warmUpEnvironment() }
         addProfilePickerMenuItem()
+        addConnectRemoteMenuItem()
         addDebugOverlayMenuItem()
         NSApp.activate(ignoringOtherApps: true)
 
@@ -109,18 +110,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let documents = NSDocumentController.shared.documents.compactMap { $0 as? WindowDocument }
         if documents.isEmpty { return .terminateNow }
 
+        let localDocuments = documents.filter { !$0.isRemote }
+        let remoteDocuments = documents.filter { $0.isRemote }
+
+        // Remote documents just disconnect; no quit confirmation needed.
+        if localDocuments.isEmpty {
+            for doc in remoteDocuments { doc.close() }
+            return .terminateNow
+        }
+
         Task { @MainActor in
-            for doc in documents {
+            for doc in localDocuments {
                 do {
                     try await doc.channel.command("confirm qa")
-                    // Command returned normally — user cancelled the quit prompt
+                    // Command returned normally, user cancelled the quit prompt
                     NSApp.reply(toApplicationShouldTerminate: false)
                     return
                 } catch {
-                    // Command threw — nvim exited, continue to next document
+                    // Command threw, nvim exited, continue to next document
                 }
             }
-            // All documents closed successfully
+            // All local documents closed; disconnect remote ones
+            for doc in remoteDocuments { doc.close() }
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
@@ -249,6 +260,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 title: "Toggle Debug Overlay",
                 action: #selector(NvimView.toggleDebugOverlay(_:)),
                 keyEquivalent: ""))
+    }
+
+    /// Shift+Ctrl+Cmd+N: connect to a remote nvim instance.
+    @objc func connectToRemote(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.messageText = "Connect to Remote Neovim"
+        alert.informativeText = "Enter the address of a running nvim instance (host:port):"
+        alert.addButton(withTitle: "Connect")
+        alert.addButton(withTitle: "Cancel")
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        input.placeholderString = "example.com:7777"
+        alert.accessoryView = input
+        alert.window.initialFirstResponder = input
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let address = input.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !address.isEmpty else { return }
+
+        let doc = WindowDocument()
+        doc.preferredRenderer = preferredRenderer
+        doc.isRemote = true
+        doc.remoteAddress = address
+        NSDocumentController.shared.addDocument(doc)
+        doc.makeWindowControllers()
+        doc.showWindows()
+    }
+
+    private func addConnectRemoteMenuItem() {
+        guard let mainMenu = NSApp.mainMenu,
+            let fileMenu = mainMenu.items.first(where: { $0.title == "File" })?.submenu
+        else { return }
+
+        // Find the "New Window with Profile..." item and insert after it.
+        let profileItemIndex =
+            fileMenu.items.firstIndex(where: {
+                $0.action == #selector(newDocumentWithProfilePicker(_:))
+            }) ?? 1
+
+        let remoteItem = NSMenuItem(
+            title: "Connect to Remote...",
+            action: #selector(connectToRemote(_:)),
+            keyEquivalent: "n"
+        )
+        remoteItem.keyEquivalentModifierMask = [.command, .shift, .control]
+        remoteItem.target = self
+        fileMenu.insertItem(remoteItem, at: profileItemIndex + 1)
     }
 
     private func addProfilePickerMenuItem() {

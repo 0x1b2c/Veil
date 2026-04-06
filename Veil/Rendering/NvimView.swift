@@ -51,6 +51,7 @@ final class NvimView: NSView {
 
     var debugOverlayEnabled = false
     var nvimPath: String = ""
+    var remoteAddress: String?
     var nvimVersion: String = ""
     private var lastFrameTime: Double = 0
     private var lastDirtyRowCount: Int = 0
@@ -330,7 +331,11 @@ final class NvimView: NSView {
     /// render-time metrics. Without grid, returns static info only.
     func debugInfoText(grid: Grid? = nil) -> String {
         var lines: [String] = []
-        if !nvimPath.isEmpty { lines.append("Nvim: \(nvimPath)") }
+        if let addr = remoteAddress {
+            lines.append("Remote: \(addr)")
+        } else if !nvimPath.isEmpty {
+            lines.append("Nvim: \(nvimPath)")
+        }
         if !nvimVersion.isEmpty { lines.append("Version: \(nvimVersion)") }
         if let metalRenderer {
             lines.append("Renderer: Metal (\(metalRenderer.device.name))")

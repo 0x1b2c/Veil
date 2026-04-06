@@ -14,8 +14,7 @@ actor MsgpackRpc {
             [:]
     private var eventContinuation: AsyncStream<RpcMessage>.Continuation?
 
-    private let inPipe: FileHandle  // write to nvim stdin
-    private let outPipe: FileHandle  // read from nvim stdout
+    private let transport: RpcTransport
 
     lazy var notifications: AsyncStream<RpcMessage> = {
         AsyncStream { continuation in
@@ -23,14 +22,13 @@ actor MsgpackRpc {
         }
     }()
 
-    init(inPipe: FileHandle, outPipe: FileHandle) {
-        self.inPipe = inPipe
-        self.outPipe = outPipe
+    init(transport: RpcTransport) {
+        self.transport = transport
     }
 
     func start() async {
         var accumulated = Data()
-        for await chunk in outPipe.asyncDataChunks {
+        for await chunk in transport.dataStream {
             accumulated.append(chunk)
             let messages: [RpcMessage]
             do {
@@ -65,14 +63,8 @@ actor MsgpackRpc {
 
         return await withCheckedContinuation { continuation in
             pendingRequests[msgid] = continuation
-            // NSFileHandle has two write APIs: the ObjC write(_:) throws an
-            // NSFileHandleOperationException on broken pipe, which is an ObjC
-            // exception that Swift cannot catch — crashing the process. The
-            // Swift write(contentsOf:) throws a regular Swift error instead.
-            // Example: nvim exits via :qa, windowDidResignKey fires and tries
-            // to send nvim_ui_set_focus — the pipe is already closed.
             do {
-                try inPipe.write(contentsOf: data)
+                try transport.write(data)
             } catch {
                 pendingRequests.removeValue(forKey: msgid)
                 continuation.resume(

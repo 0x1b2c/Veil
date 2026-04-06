@@ -7,6 +7,11 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     var nvimArgs: [String] = []
     var nvimEnv: [String: String]?
     var preferredRenderer: NvimView.Renderer = .metal
+    /// When true, this document is connected to a remote nvim over TCP.
+    /// Closing a remote document disconnects without sending `:qa`.
+    var isRemote = false
+    /// Address for remote connections (e.g. "192.168.1.100:6666").
+    var remoteAddress: String?
 
     var channel: NvimChannel!
     private let grid = Grid()
@@ -63,12 +68,47 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         controller.nvimView.delegate = self
         controller.nvimView.channel = channel
         addWindowController(controller)
-        Task { await startNvim() }
+        if isRemote, let remoteAddress {
+            Task { await startRemoteNvim(address: remoteAddress) }
+        } else {
+            Task { await startNvim() }
+        }
     }
 
     nonisolated override class var autosavesInPlace: Bool { false }
     override func data(ofType typeName: String) throws -> Data { Data() }
     nonisolated override func read(from data: Data, ofType typeName: String) throws {}
+
+    private func startRemoteNvim(address: String) async {
+        titleReady = true
+        do {
+            let (host, port) = try Self.parseAddress(address)
+            try await channel.connectRemote(host: host, port: port)
+            guard let nvimView else { return }
+            let gridSize = nvimView.gridSizeForViewSize(nvimView.bounds.size)
+            try await channel.uiAttach(width: gridSize.cols, height: gridSize.rows)
+            startEventLoop()
+            await setupNvimIntegration()
+            nvimView.remoteAddress = address
+            windowController?.updateTitle("Veil [remote: \(address)]")
+            try? await channel.command("set title")
+        } catch {
+            NSAlert(error: error).runModal()
+            close()
+        }
+    }
+
+    /// Parse "host:port" (or "tcp://host:port") into components.
+    /// Uses URL parsing which handles IPv4, IPv6 bracket notation, and scheme URLs.
+    private static func parseAddress(_ input: String) throws -> (host: String, port: UInt16) {
+        let url = URL(string: input) ?? URL(string: "tcp://\(input)")
+        guard let host = url?.host, !host.isEmpty, let port = url?.port,
+            let port = UInt16(exactly: port)
+        else {
+            throw NvimChannelError.rpcError("Invalid address format. Expected host:port")
+        }
+        return (host, port)
+    }
 
     private func startNvim() async {
         if !nvimArgs.isEmpty { titleReady = true }
@@ -85,52 +125,57 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             try await channel.uiAttach(width: gridSize.cols, height: gridSize.rows)
             startEventLoop()
 
-            let channel = self.channel!
-            windowController?.tablineView.onSelectTab = { [weak self] handle in
-                guard self != nil else { return }
-                Task {
-                    _ = await channel.request(
-                        "nvim_set_current_tabpage",
-                        params: [.int(Int64(handle))]
-                    )
-                }
-            }
-
-            // Register autocmds AFTER uiAttach — the initial BufEnter fires
+            // Register autocmds AFTER uiAttach. The initial BufEnter fires
             // during nvim startup (before this point), so it's intentionally
             // missed. This keeps titleReady false, suppressing the ugly initial
             // set_title from Startify or similar plugins.
-            let (_, apiInfo) = await channel.request("nvim_get_api_info", params: [])
-            if let channelId = apiInfo.arrayValue?.first?.intValue {
-                try? await channel.command(
-                    "augroup VeilApp | autocmd! | "
-                        + "autocmd BufEnter * call rpcnotify(\(channelId), 'VeilAppBufChanged') | "
-                        + "autocmd TabEnter * call rpcnotify(\(channelId), 'VeilAppBufChanged') | "
-                        + "augroup END"
-                )
-                try? await channel.command(
-                    "command! VeilAppDebugToggle call rpcnotify(\(channelId), 'VeilAppDebugToggle')"
-                )
-                try? await channel.command(
-                    "command! VeilAppDebugCopy call rpcnotify(\(channelId), 'VeilAppDebugCopy')"
-                )
-            }
-
-            // Populate debug info
+            await setupNvimIntegration()
             nvimView.nvimPath = await channel.nvimPath
-            let (_, versionResult) = await channel.request(
-                "nvim_exec2", params: [.string("version"), .map([.string("output"): .bool(true)])])
-            if let output = versionResult.dictionaryValue?[.string("output")]?.stringValue,
-                let firstLine = output.split(separator: "\n").first
-            {
-                nvimView.nvimVersion = String(firstLine)
-            }
 
-            // Enable nvim title — set_title events will be ignored until first BufEnter
+            // Enable nvim title. set_title events will be ignored until first BufEnter.
             try? await channel.command("set title")
         } catch {
             NSAlert(error: error).runModal()
             close()
+        }
+    }
+
+    /// Shared post-uiAttach setup: wire up tab selection, register autocmds
+    /// for BufEnter/TabEnter notifications, debug commands, and query nvim version.
+    private func setupNvimIntegration() async {
+        let channel = self.channel!
+        windowController?.tablineView.onSelectTab = { [weak self] handle in
+            guard self != nil else { return }
+            Task {
+                _ = await channel.request(
+                    "nvim_set_current_tabpage",
+                    params: [.int(Int64(handle))]
+                )
+            }
+        }
+
+        let (_, apiInfo) = await channel.request("nvim_get_api_info", params: [])
+        if let channelId = apiInfo.arrayValue?.first?.intValue {
+            try? await channel.command(
+                "augroup VeilApp | autocmd! | "
+                    + "autocmd BufEnter * call rpcnotify(\(channelId), 'VeilAppBufChanged') | "
+                    + "autocmd TabEnter * call rpcnotify(\(channelId), 'VeilAppBufChanged') | "
+                    + "augroup END"
+            )
+            try? await channel.command(
+                "command! VeilAppDebugToggle call rpcnotify(\(channelId), 'VeilAppDebugToggle')"
+            )
+            try? await channel.command(
+                "command! VeilAppDebugCopy call rpcnotify(\(channelId), 'VeilAppDebugCopy')"
+            )
+        }
+
+        let (_, versionResult) = await channel.request(
+            "nvim_exec2", params: [.string("version"), .map([.string("output"): .bool(true)])])
+        if let output = versionResult.dictionaryValue?[.string("output")]?.stringValue,
+            let firstLine = output.split(separator: "\n").first
+        {
+            nvimView?.nvimVersion = String(firstLine)
         }
     }
 
@@ -148,11 +193,12 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                         needsRender = true
                     case .setTitle(let title):
                         if titleReady {
-                            // Replace nvim's hardcoded "- Nvim" suffix with "- Veil"
-                            // when the user hasn't customized titlestring.
+                            // Replace nvim's hardcoded "- Nvim" suffix with
+                            // "- Veil" or "- Veil [Remote]" depending on mode.
+                            let suffix = isRemote ? " - Veil [Remote]" : " - Veil"
                             let displayTitle =
                                 title.hasSuffix(" - Nvim")
-                                ? String(title.dropLast(6)) + " - Veil"
+                                ? String(title.dropLast(6)) + suffix
                                 : title
                             windowController?.updateTitle(displayTitle)
                         }
@@ -239,22 +285,36 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         withDelegate delegate: Any, shouldClose shouldCloseSelector: Selector?,
         contextInfo: UnsafeMutableRawPointer?
     ) {
-        Task { @MainActor in
-            // Send :confirm qa — nvim will prompt inside the terminal if unsaved buffers exist
-            try? await channel.command("confirm qa")
-            // Don't allow NSDocument to close — the window closes when nvim exits
-            // (event stream ends → close() is called from the event loop)
+        if isRemote {
+            // Remote connection: just disconnect. The remote nvim stays alive.
+            replyToCanClose(
+                true, delegate: delegate, selector: shouldCloseSelector, contextInfo: contextInfo)
+        } else {
+            Task { @MainActor in
+                // Send :confirm qa to let nvim prompt for unsaved buffers
+                try? await channel.command("confirm qa")
+                // Don't allow NSDocument to close; the window closes when nvim
+                // exits (event stream ends -> close() is called from event loop)
+            }
+            replyToCanClose(
+                false, delegate: delegate, selector: shouldCloseSelector, contextInfo: contextInfo)
         }
-        // Tell NSDocument NOT to close right now
-        if let selector = shouldCloseSelector {
-            let obj = delegate as AnyObject
-            typealias ShouldCloseFunc =
-                @convention(c) (AnyObject, Selector, AnyObject, Bool, UnsafeMutableRawPointer?) ->
-                Void
-            let imp = obj.method(for: selector)
-            let fn = unsafeBitCast(imp, to: ShouldCloseFunc.self)
-            fn(obj, selector, self, false, contextInfo)
-        }
+    }
+
+    /// NSDocument canClose callback pattern: the framework doesn't accept a
+    /// direct return value. Instead, you must invoke the delegate's selector
+    /// with a Bool indicating whether the document should close.
+    private func replyToCanClose(
+        _ shouldClose: Bool, delegate: Any, selector: Selector?,
+        contextInfo: UnsafeMutableRawPointer?
+    ) {
+        guard let selector else { return }
+        let obj = delegate as AnyObject
+        typealias ShouldCloseFunc =
+            @convention(c) (AnyObject, Selector, AnyObject, Bool, UnsafeMutableRawPointer?) -> Void
+        let imp = obj.method(for: selector)
+        let fn = unsafeBitCast(imp, to: ShouldCloseFunc.self)
+        fn(obj, selector, self, shouldClose, contextInfo)
     }
 
     override func close() {
