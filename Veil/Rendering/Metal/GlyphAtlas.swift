@@ -239,8 +239,12 @@ nonisolated final class GlyphAtlas {
         let glyphBounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
         let naturalWidth = glyphBounds.origin.x + glyphBounds.size.width
 
-        // Use the larger of allocated and natural width for rendering
-        let renderWidth = max(allocatedWidth, naturalWidth)
+        // Custom-drawn box-drawing/block characters use exact cell
+        // dimensions; skip natural width to avoid bitmap/quad mismatch.
+        let isCustomDrawn =
+            text.unicodeScalars.count == 1
+            && (0x2500...0x259F).contains(text.unicodeScalars.first!.value)
+        let renderWidth = isCustomDrawn ? allocatedWidth : max(allocatedWidth, naturalWidth)
         let pixelW = Int(ceil(renderWidth * scale))
         let pixelH = Int(ceil(cellSize.height * scale))
 
@@ -410,8 +414,17 @@ nonisolated final class GlyphAtlas {
         let extraPadding = (cellHeight - naturalHeight) / 2
         let baselineY = descent + leading + extraPadding
 
-        ctx.textPosition = CGPoint(x: 0, y: baselineY)
-        CTLineDraw(line, ctx)
+        let scalar = text.unicodeScalars.first
+        if let scalar, text.unicodeScalars.count == 1,
+            BoxDrawing.render(
+                scalar.value, ctx: ctx,
+                cellWidth: drawWidth, cellHeight: cellHeight, font: font)
+        {
+            // Custom drawing handled
+        } else {
+            ctx.textPosition = CGPoint(x: 0, y: baselineY)
+            CTLineDraw(line, ctx)
+        }
 
         // Extract pixel data
         guard let data = ctx.data else { return Array(repeating: 0, count: width * height * 4) }

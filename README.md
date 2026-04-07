@@ -175,6 +175,8 @@ Veil carries this tradition forward: a minimal, fast wrapper that gives Neovim f
 
 Thanks to [VimR](https://github.com/qvacua/vimr) by Tae Won Ha. Veil learned a great deal from its implementation of the Neovim UI protocol, input handling, and macOS integration.
 
+Box-drawing and block element rendering algorithms are ported from [Ghostty](https://github.com/ghostty-org/ghostty) (MIT License).
+
 ## License
 
 MIT
