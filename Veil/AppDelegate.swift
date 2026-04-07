@@ -169,6 +169,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Creates and shows a new WindowDocument with the given profile.
     func createWindow(profile: Profile) {
+        VeilConfig.current = VeilConfig.load()
         let doc = WindowDocument()
         doc.profile = profile
         doc.preferredRenderer = preferredRenderer
@@ -295,6 +296,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func openRemoteConnection(to address: String) {
+        VeilConfig.current = VeilConfig.load()
         let doc = WindowDocument()
         doc.preferredRenderer = preferredRenderer
         doc.isRemote = true
