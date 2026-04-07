@@ -17,10 +17,12 @@ Vim is a tool built for focused, efficient work. Animations consume attention. C
 ## Features
 
 - **Multi-window**: each window runs an independent Neovim process. Cmd+N to create, Cmd+\` to cycle.
-- **Tabs**: Neovim's native tabline, switchable with Cmd+1 through Cmd+9.
+- **Tabs**: Neovim's native tabline, switchable with Cmd+1 through Cmd+9. Optional native macOS tab bar via `native_tabs` config.
 - **Profile support**: Cmd+Shift+N to choose a different `NVIM_APPNAME` per window.
+- **Remote nvim**: connect to a remote Neovim instance over TCP. Clipboard integrates seamlessly with your local Mac.
+- **Font ligatures**: supported out of the box with ligature-capable fonts. Can be disabled via config.
 - **CJK & IME**: full input method support for Chinese, Japanese, Korean.
-- **Metal rendering**: heavily optimized GPU-accelerated rendering. Falls back to CoreText if Metal is unavailable.
+- **Metal rendering**: heavily optimized GPU-accelerated rendering with custom-drawn box-drawing and block element characters for pixel-perfect lines. Falls back to CoreText if Metal is unavailable.
 - **System integration**: standard Edit/File menu actions, trackpad scrolling, window size persistence.
 
 <p align="center">
@@ -88,22 +90,23 @@ Setting a [Nerd Font](https://www.nerdfonts.com/) as your `guifont` is the most 
 
 These Cmd+key shortcuts are handled by Veil:
 
-| Key         | Action                                |
-| ----------- | ------------------------------------- |
-| Cmd+N       | New window                            |
-| Cmd+Shift+N | New window with profile picker        |
-| Cmd+W       | Close tab (or window if only one tab) |
-| Cmd+Shift+W | Close window                          |
-| Cmd+Q       | Quit                                  |
-| Cmd+S       | Save (`:w`)                           |
-| Cmd+Z       | Undo (`u`)                            |
-| Cmd+Shift+Z | Redo (`Ctrl+R`)                       |
-| Cmd+C/X/V   | Copy/Cut/Paste (system clipboard)     |
-| Cmd+A       | Select all                            |
-| Cmd+M       | Minimize                              |
-| Cmd+\`      | Cycle windows                         |
-| Cmd+1-9     | Switch tab (9 = last)                 |
-| Cmd+Ctrl+F  | Toggle full screen                    |
+| Key              | Action                                |
+| ---------------- | ------------------------------------- |
+| Cmd+N            | New window                            |
+| Cmd+Shift+N      | New window with profile picker        |
+| Cmd+W            | Close tab (or window if only one tab) |
+| Cmd+Shift+W      | Close window                          |
+| Cmd+Q            | Quit                                  |
+| Cmd+S            | Save (`:w`)                           |
+| Cmd+Z            | Undo (`u`)                            |
+| Cmd+Shift+Z      | Redo (`Ctrl+R`)                       |
+| Cmd+C/X/V        | Copy/Cut/Paste (system clipboard)     |
+| Cmd+A            | Select all                            |
+| Cmd+M            | Minimize                              |
+| Cmd+\`           | Cycle windows                         |
+| Cmd+1-9          | Switch tab (9 = last)                 |
+| Cmd+Ctrl+Shift+N | Connect to remote nvim                |
+| Cmd+Ctrl+F       | Toggle full screen                    |
 
 Everything else (including other Cmd+key and all Ctrl+key combinations) is sent directly to Neovim as `<D-...>` or `<C-...>`. Map them in your config:
 
@@ -115,6 +118,50 @@ vim.keymap.set('n', '<D-p>', Snacks.picker.files)
 ### Configuration
 
 Veil reads settings from `~/.config/veil/veil.toml`. All fields are optional and have sensible defaults. See [`veil.sample.toml`](veil.sample.toml) for the full reference.
+
+### Remote Neovim
+
+Veil can connect to a Neovim instance running on a remote machine over TCP. Start Neovim on the remote host listening on localhost:
+
+```bash
+nvim --headless --listen 127.0.0.1:6666
+```
+
+Neovim's RPC protocol has no authentication, so always bind to `127.0.0.1` and use SSH tunneling. Never expose the listening port to the network directly.
+
+Forward the port over SSH, then connect from Veil using Cmd+Ctrl+Shift+N:
+
+```bash
+# -L local_port:remote_host:remote_port
+ssh -L 6666:127.0.0.1:6666 your-server
+```
+
+For a persistent setup, add to `~/.ssh/config`:
+
+```properties
+Host dev-nvim
+    HostName your-server
+    # local_port remote_host:remote_port
+    LocalForward 6666 127.0.0.1:6666
+```
+
+Then `ssh dev-nvim` automatically forwards the port. Use `ssh -N dev-nvim` to forward without opening a shell.
+
+You can save frequently used connections in `veil.toml`:
+
+```toml
+[[remote]]
+name = "Dev Server"
+address = "127.0.0.1:6666"
+
+[[remote]]
+name = "Staging"
+address = "127.0.0.1:6667"
+```
+
+> ~~_I don't always code, but when I do, I code in production._~~
+
+Clipboard integrates seamlessly with your local Mac. Yank/paste with `+` and `*` registers in the remote session operates on your local pasteboard.
 
 ### Debug
 
@@ -176,6 +223,8 @@ Veil carries this tradition forward: a minimal, fast wrapper that gives Neovim f
 Thanks to [VimR](https://github.com/qvacua/vimr) by Tae Won Ha. Veil learned a great deal from its implementation of the Neovim UI protocol, input handling, and macOS integration.
 
 Box-drawing and block element rendering algorithms are ported from [Ghostty](https://github.com/ghostty-org/ghostty) (MIT License).
+
+Glyph overflow strategy inspired by [WezTerm](https://github.com/wez/wezterm): when a glyph (e.g. Nerd Font icon) is wider than its allocated cell, Veil renders it at full natural width if followed by a space, or shrinks it to fit otherwise.
 
 ## License
 

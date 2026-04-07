@@ -25,3 +25,15 @@
 # colorscheme background. Positive values lighten, negative values darken.
 # titlebar_brightness_offset = -0.08
 # tabbar_brightness_offset = 0.05
+
+# Saved remote nvim connections. Start nvim on the remote host with
+# `nvim --headless --listen 127.0.0.1:6666`, forward the port via SSH,
+# then connect via Cmd+Ctrl+Shift+N. See README for SSH forwarding setup.
+#
+# [[remote]]
+# name = "Dev Server"
+# address = "127.0.0.1:6666"
+#
+# [[remote]]
+# name = "Staging"
+# address = "127.0.0.1:6667"
