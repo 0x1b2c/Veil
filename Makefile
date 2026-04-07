@@ -19,7 +19,7 @@ debug:
 	$(XCODEBUILD) -configuration Debug -derivedDataPath $(DERIVED) -quiet
 
 test:
-	$(XCODEBUILD) -derivedDataPath $(DERIVED) -only-testing:VeilTests CODE_SIGNING_ALLOWED=NO test
+	$(XCODEBUILD) -derivedDataPath $(DERIVED) -only-testing:VeilTests CODE_SIGNING_ALLOWED=NO test -quiet
 
 clean:
 	$(XCODEBUILD) clean -quiet
