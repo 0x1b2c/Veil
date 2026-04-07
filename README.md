@@ -34,7 +34,7 @@ Vim is a tool built for focused, efficient work. Animations consume attention. C
 - macOS 14+
 - Neovim 0.10+ recommended (install via `brew install neovim`)
 
-Veil uses your system-installed Neovim. No bundled binary, under 1 MB download. Veil finds nvim anywhere your interactive shell can access it, and caches the resolved path so only the first launch pays the detection cost.
+Veil uses your system-installed Neovim. No bundled binary, ~1 MB download. Veil finds nvim anywhere your interactive shell can access it, and caches the resolved path so only the first launch pays the detection cost.
 
 Veil communicates with Neovim via its stable msgpack-RPC and `ext_linegrid` UI protocol, and works with any recent Neovim version. The RPC layer is heavily optimized with event batching for responsive rendering.
 
@@ -216,7 +216,7 @@ In the Neovim era, most GUI frontends followed the gVim model: you can open mult
 
 Veil carries this tradition forward: a minimal, fast wrapper that gives Neovim first-class macOS citizenship. Multiple windows as independent workspaces, intuitive tab switching with Cmd+1/2/3, and as a native app instead of a terminal process, nearly all key sequences reach Neovim without being intercepted.
 
-> **Note:** Neovide v0.16.0 also shipped macOS multi-window support within one day of Veil's first release, a fun coincidence. Neovide is an excellent choice if you prefer a cross-platform solution with visual effects. Veil focuses on being a minimal native macOS wrapper (under 1 MB).
+> **Note:** Neovide v0.16.0 also shipped macOS multi-window support within one day of Veil's first release, a fun coincidence. Neovide is an excellent choice if you prefer a cross-platform solution with visual effects. Veil focuses on being a minimal native macOS wrapper (~1 MB).
 
 ## Acknowledgments
 
