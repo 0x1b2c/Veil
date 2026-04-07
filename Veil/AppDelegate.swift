@@ -265,7 +265,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Shift+Ctrl+Cmd+N: connect to a remote nvim instance.
     /// Shows a picker if veil.toml has [[remote]] entries,
     /// otherwise falls through to the manual address input alert.
-    @objc func connectToRemote(_ sender: Any?) {
+    @IBAction func connectToRemote(_ sender: Any?) {
         RemotePicker.pick(in: NSApp.keyWindow) { [self] address in
             if let address {
                 openRemoteConnection(to: address)
