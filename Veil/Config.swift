@@ -40,6 +40,7 @@ extension DecodableDefault {
     enum False: Source { static var defaultValue: Bool { false } }
     enum EmptyString: Source { static var defaultValue: String { "" } }
     enum LineHeight: Source { static var defaultValue: CGFloat { 1.2 } }
+    enum LetterSpacing: Source { static var defaultValue: CGFloat { 1.0 } }
     enum TitleBarBrightness: Source { static var defaultValue: CGFloat { -0.08 } }
     enum TabBarBrightness: Source { static var defaultValue: CGFloat { 0.05 } }
 }
@@ -56,6 +57,8 @@ struct RemoteEntry: Decodable {
 struct VeilConfig: Decodable {
     @DecodableDefault.Wrapper<DecodableDefault.LineHeight>
     var line_height: CGFloat
+    @DecodableDefault.Wrapper<DecodableDefault.LetterSpacing>
+    var letter_spacing: CGFloat
     @DecodableDefault.Wrapper<DecodableDefault.True>
     var ligatures: Bool
     @DecodableDefault.Wrapper<DecodableDefault.EmptyString>

@@ -5,6 +5,10 @@
 # A value of 1.2 is recommended for comfortable reading.
 # line_height = 1.2
 
+# Letter spacing multiplier for the editor grid.
+# Values below 1.0 tighten character spacing, above 1.0 loosen it.
+# letter_spacing = 1.0
+
 # Enable font ligatures (e.g. -> becomes →  in supported fonts).
 # ligatures = true
 

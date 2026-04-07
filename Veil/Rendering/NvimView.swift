@@ -291,16 +291,18 @@ final class NvimView: NSView {
     }
 
     private static var lineHeightMultiplier: CGFloat { VeilConfig.current.line_height }
+    private static var letterSpacingMultiplier: CGFloat { VeilConfig.current.letter_spacing }
     static let gridTopPadding: CGFloat = 8
 
     private static func computeCellSize(for font: NSFont) -> CGSize {
         let glyph = font.glyph(withName: "M")
         let advancement = font.advancement(forGlyph: glyph)
-        let width = advancement.width > 0 ? advancement.width : font.pointSize * 0.6
+        let rawWidth = advancement.width > 0 ? advancement.width : font.pointSize * 0.6
+        let width = ceil(rawWidth * letterSpacingMultiplier)
         let height = ceil(
             (CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font))
                 * lineHeightMultiplier)
-        return CGSize(width: ceil(width), height: height)
+        return CGSize(width: width, height: height)
     }
 
     // MARK: - Colors
