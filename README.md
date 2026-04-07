@@ -159,7 +159,7 @@ name = "Staging"
 address = "127.0.0.1:6667"
 ```
 
-> ~~_I don't always code, but when I do, I code in production._~~
+> *I don't always code, but when I do, I code in ~~production~~.*
 
 Clipboard integrates seamlessly with your local Mac. Yank/paste with `+` and `*` registers in the remote session operates on your local pasteboard.
 
