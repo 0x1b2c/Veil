@@ -92,6 +92,7 @@ These Cmd+key shortcuts are handled by Veil:
 
 | Key              | Action                                |
 | ---------------- | ------------------------------------- |
+| Cmd+,            | Open settings (veil.toml)             |
 | Cmd+N            | New window                            |
 | Cmd+Shift+N      | New window with profile picker        |
 | Cmd+W            | Close tab (or window if only one tab) |

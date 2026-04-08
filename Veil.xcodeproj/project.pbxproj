@@ -10,6 +10,7 @@
 		D8BEFE202F79B31500CDE7C3 /* MessagePack in Frameworks */ = {isa = PBXBuildFile; productRef = E1000002AAAAAA0000000001 /* MessagePack */; };
 		D8BEFE212F79B31500CDE7C3 /* MessagePack in Frameworks */ = {isa = PBXBuildFile; productRef = E1000003AAAAAA0000000001 /* MessagePack */; };
 		E2000004BBBBBB0000000001 /* TOML in Frameworks */ = {isa = PBXBuildFile; productRef = E2000002BBBBBB0000000001 /* TOML */; };
+		A1B2C3D4E5F6A7B8C9D0E1F3 /* veil.sample.toml in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F4 /* veil.sample.toml */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +34,7 @@
 		D8BEFDEE2F7999A900CDE7C3 /* Veil.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Veil.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8BEFDFC2F7999AA00CDE7C3 /* VeilTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VeilTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8BEFE062F7999AA00CDE7C3 /* VeilUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VeilUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D4E5F6A7B8C9D0E1F4 /* veil.sample.toml */ = {isa = PBXFileReference; lastKnownFileType = text; path = "veil.sample.toml"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -88,6 +90,7 @@
 				D8BEFDFF2F7999AA00CDE7C3 /* VeilTests */,
 				D8BEFE092F7999AA00CDE7C3 /* VeilUITests */,
 				D8BEFDEF2F7999A900CDE7C3 /* Products */,
+				A1B2C3D4E5F6A7B8C9D0E1F4 /* veil.sample.toml */,
 			);
 			sourceTree = "<group>";
 		};
@@ -230,6 +233,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F6A7B8C9D0E1F3 /* veil.sample.toml in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

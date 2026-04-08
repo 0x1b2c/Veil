@@ -1,5 +1,5 @@
 # Veil configuration file
-# Copy to ~/.config/veil/veil.toml to customize.
+# Latest version: https://github.com/rainux/Veil/blob/master/veil.sample.toml
 
 # Line height multiplier for the editor grid.
 # A value of 1.2 is recommended for comfortable reading.
