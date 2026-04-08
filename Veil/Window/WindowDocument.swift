@@ -254,10 +254,14 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                             // Replace nvim's hardcoded "- Nvim" suffix with
                             // "- Veil" or "- Veil [Remote]" depending on mode.
                             let suffix = isRemote ? " - Veil [Remote]" : " - Veil"
-                            let displayTitle =
-                                title.hasSuffix(" - Nvim")
-                                ? String(title.dropLast(6)) + suffix
-                                : title
+                            let displayTitle: String
+                            if title.trimmingCharacters(in: .whitespaces).isEmpty {
+                                displayTitle = "Veil"
+                            } else if title.hasSuffix(" - Nvim") {
+                                displayTitle = String(title.dropLast(6)) + suffix
+                            } else {
+                                displayTitle = title
+                            }
                             windowController?.updateTitle(displayTitle)
                         }
                     case .veilBufChanged:
