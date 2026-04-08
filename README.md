@@ -163,12 +163,13 @@ address = "127.0.0.1:6667"
 
 Clipboard integrates seamlessly with your local Mac. Yank/paste with `+` and `*` registers in the remote session operates on your local pasteboard.
 
-### Debug
+### Commands
 
-Veil registers two commands in Neovim for rendering diagnostics:
+Veil registers these commands in Neovim:
 
-- `:VeilAppDebugToggle` — show/hide an overlay with renderer info, frame time, grid size, font details, and more
-- `:VeilAppDebugCopy` — copy the same info to the system clipboard
+- `:VeilAppVersion` show Veil and Neovim version info, and check for updates
+- `:VeilAppDebugToggle` show/hide an overlay with renderer info, frame time, grid size, font details, and more
+- `:VeilAppDebugCopy` copy the debug overlay info to the system clipboard
 
 ## CLI
 
