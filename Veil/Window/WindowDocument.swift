@@ -174,7 +174,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                 "command! VeilAppDebugCopy call rpcnotify(\(channelId), 'VeilAppDebugCopy')"
             )
             try? await channel.command(
-                "command! VeilAppVersion call rpcnotify(\(channelId), 'VeilAppVersion')"
+                "command! -bang VeilAppVersion call rpcnotify(\(channelId), 'VeilAppVersion', '<bang>')"
             )
 
             if await channel.isRemote {
@@ -270,15 +270,17 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(text, forType: .string)
                         }
-                    case .veilVersion:
+                    case .veilVersion(let detailed):
                         let nvimVer = nvimView?.nvimVersion
                         Task {
-                            if Self.hasUpdate() {
+                            if detailed {
                                 let lines = Self.versionLines(nvimVersion: nvimVer)
                                 await Self.showInScratchBuffer(lines, channel: channel)
                             } else {
-                                let msg = Self.versionSummary(nvimVersion: nvimVer)
-                                try? await channel.command("echo \"\(msg)\"")
+                                let chunks = Self.versionEchoChunks(nvimVersion: nvimVer)
+                                _ = await channel.request(
+                                    "nvim_echo",
+                                    params: [.array(chunks), .bool(false), .map([:])])
                             }
                         }
                     case .tablineUpdate(let current, let tabs):
@@ -323,20 +325,23 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         return false
     }
 
-    private static func versionSummary(nvimVersion: String? = nil) -> String {
-        let current =
-            Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
-        var msg = ""
-        if let nvimVersion { msg += "\(nvimVersion), " }
-        msg += "Veil v\(current)"
-        return msg
+    private static func versionEchoChunks(nvimVersion: String? = nil) -> [MessagePackValue] {
+        var text = ":VeilAppVersion\n"
+        text += versionLines(nvimVersion: nvimVersion).joined(separator: "\n")
+        if hasUpdate() {
+            text += "\n\n:VeilAppVersion! to open in buffer"
+        }
+        return [.array([.string(text)])]
     }
 
     private static func versionLines(nvimVersion: String? = nil) -> [String] {
-        var lines = versionSummary(nvimVersion: nvimVersion)
-            .components(separatedBy: ", ")
+        let current =
+            Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        var lines: [String] = []
+        if let nvimVersion { lines.append(nvimVersion) }
+        lines.append("Veil v\(current)")
 
-        if let latest = UpdateChecker.latestVersion {
+        if hasUpdate(), let latest = UpdateChecker.latestVersion {
             lines.append("")
             lines.append(
                 "Update v\(latest) available: `brew upgrade veil`"

@@ -168,7 +168,7 @@ Clipboard integrates seamlessly with your local Mac. Yank/paste with `+` and `*`
 
 Veil registers these commands in Neovim:
 
-- `:VeilAppVersion` show Veil and Neovim version info, and check for updates
+- `:VeilAppVersion` show Veil and Neovim version info, and check for updates. Use `:VeilAppVersion!` to open in a scratch buffer for easy copying
 - `:VeilAppDebugToggle` show/hide an overlay with renderer info, frame time, grid size, font details, and more
 - `:VeilAppDebugCopy` copy the debug overlay info to the system clipboard
 

@@ -78,7 +78,8 @@ actor NvimChannel {
                             } else if method == "VeilAppDebugCopy" {
                                 await self.yieldBatch([.veilDebugCopy])
                             } else if method == "VeilAppVersion" {
-                                await self.yieldBatch([.veilVersion])
+                                let bang = params.arrayValue?.first?.stringValue == "!"
+                                await self.yieldBatch([.veilVersion(detailed: bang)])
                             }
                         case .request(let msgid, let method, let params):
                             await self.handleRequest(
