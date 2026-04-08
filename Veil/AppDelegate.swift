@@ -55,6 +55,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         Task.detached { NvimProcess.warmUpEnvironment() }
+        if VeilConfig.current.update_check {
+            Task.detached { await UpdateChecker.check() }
+        }
         addProfilePickerMenuItem()
         addConnectRemoteMenuItem()
         addDebugOverlayMenuItem()

@@ -71,6 +71,8 @@ struct VeilConfig: Decodable {
     var titlebar_brightness_offset: CGFloat
     @DecodableDefault.Wrapper<DecodableDefault.TabBarBrightness>
     var tabbar_brightness_offset: CGFloat
+    @DecodableDefault.Wrapper<DecodableDefault.True>
+    var update_check: Bool
 
     var remote: [RemoteEntry]?
 

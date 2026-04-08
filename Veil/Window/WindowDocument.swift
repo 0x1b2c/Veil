@@ -173,6 +173,9 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             try? await channel.command(
                 "command! VeilAppDebugCopy call rpcnotify(\(channelId), 'VeilAppDebugCopy')"
             )
+            try? await channel.command(
+                "command! VeilAppVersion call rpcnotify(\(channelId), 'VeilAppVersion')"
+            )
 
             if await channel.isRemote {
                 await injectClipboardProvider(channelId: channelId)
@@ -267,6 +270,17 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(text, forType: .string)
                         }
+                    case .veilVersion:
+                        let nvimVer = nvimView?.nvimVersion
+                        Task {
+                            if Self.hasUpdate() {
+                                let lines = Self.versionLines(nvimVersion: nvimVer)
+                                await Self.showInScratchBuffer(lines, channel: channel)
+                            } else {
+                                let msg = Self.versionSummary(nvimVersion: nvimVer)
+                                try? await channel.command("echo \"\(msg)\"")
+                            }
+                        }
                     case .tablineUpdate(let current, let tabs):
                         windowController?.tablineView.update(current: current, tabInfos: tabs)
                     case .defaultColorsSet(let fg, let bg, _, _, _):
@@ -296,6 +310,66 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             }
             close()
         }
+    }
+
+    // MARK: - Version
+
+    private static func hasUpdate() -> Bool {
+        let current =
+            Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        if let latest = UpdateChecker.latestVersion {
+            return latest != current
+        }
+        return false
+    }
+
+    private static func versionSummary(nvimVersion: String? = nil) -> String {
+        let current =
+            Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        var msg = ""
+        if let nvimVersion { msg += "\(nvimVersion), " }
+        msg += "Veil v\(current)"
+        return msg
+    }
+
+    private static func versionLines(nvimVersion: String? = nil) -> [String] {
+        var lines = versionSummary(nvimVersion: nvimVersion)
+            .components(separatedBy: ", ")
+
+        if let latest = UpdateChecker.latestVersion {
+            lines.append("")
+            lines.append(
+                "Update v\(latest) available: `brew upgrade veil`"
+                    + " or visit <https://github.com/rainux/Veil/releases>")
+            if let notes = UpdateChecker.releaseNotes, !notes.isEmpty {
+                let trimmed = notes.trimmingCharacters(in: .newlines)
+                lines.append("")
+                lines.append("Release notes:")
+                lines.append("")
+                lines.append(contentsOf: trimmed.components(separatedBy: "\n"))
+            }
+        }
+
+        return lines
+    }
+
+    private static func showInScratchBuffer(
+        _ lines: [String], channel: NvimChannel
+    ) async {
+        let lineValues = lines.map { MessagePackValue.string($0) }
+        let lua = """
+            local lines = ...
+            vim.cmd('new')
+            local buf = vim.api.nvim_get_current_buf()
+            vim.bo[buf].buftype = 'nofile'
+            vim.bo[buf].bufhidden = 'wipe'
+            vim.bo[buf].swapfile = false
+            vim.bo[buf].filetype = 'markdown'
+            vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+            vim.bo[buf].modifiable = false
+            """
+        _ = await channel.request(
+            "nvim_exec_lua", params: [.string(lua), .array([.array(lineValues)])])
     }
 
     // MARK: - CVDisplayLink frame pacing

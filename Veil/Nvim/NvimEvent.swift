@@ -53,6 +53,7 @@ enum NvimEvent: Sendable {
     case veilBufChanged
     case veilDebugToggle
     case veilDebugCopy
+    case veilVersion
 
     // MARK: - Parse
 

@@ -30,6 +30,10 @@
 # titlebar_brightness_offset = -0.08
 # tabbar_brightness_offset = 0.05
 
+# Check for new Veil releases on GitHub at startup.
+# Disable if you prefer not to make network requests.
+# update_check = true
+
 # Saved remote nvim connections. Start nvim on the remote host with
 # `nvim --headless --listen 127.0.0.1:6666`, forward the port via SSH,
 # then connect via Cmd+Ctrl+Shift+N. See README for SSH forwarding setup.
