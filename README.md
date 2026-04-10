@@ -17,7 +17,7 @@ Vim is a tool built for focused, efficient work. Animations consume attention. C
 ## Features
 
 - **Multi-window**: each window runs an independent Neovim process. Cmd+N to create, Cmd+\` to cycle.
-- **Tabs**: Neovim's native tabline, switchable with Cmd+1 through Cmd+9. Optional native macOS tab bar via `native_tabs` config.
+- **Tabs**: by default, Veil lets Neovim handle the tabline so you get the best experience from awesome tabline plugins. A basic native macOS tab bar is available as a fallback via `native_tabs = true` in config. Switch tabs with Cmd+1 through Cmd+9.
 - **Profile support**: Cmd+Shift+N to choose a different `NVIM_APPNAME` per window.
 - **Remote nvim**: connect to a remote Neovim instance over TCP. Clipboard integrates seamlessly with your local Mac.
 - **Font ligatures**: supported out of the box with ligature-capable fonts. Can be disabled via config.

@@ -23,8 +23,9 @@
 # Default NVIM_APPNAME for new windows. Leave empty to use "nvim".
 # nvim_appname = ""
 
-# Use the native macOS tab bar for nvim tabs.
-# When false (default), nvim handles its own tabline rendering.
+# By default, Veil lets nvim handle the tabline so you get the best
+# experience from awesome tabline plugins. Set to true for a basic
+# native macOS tab bar as a fallback.
 # native_tabs = false
 
 # Brightness offset for the title bar and tab bar, relative to the
