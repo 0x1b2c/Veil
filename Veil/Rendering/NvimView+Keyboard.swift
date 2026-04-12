@@ -105,11 +105,14 @@ extension NvimView {
             return
         }
 
-        let cursorFrame = cursorLayer.frame
+        let originX = CGFloat(markedPosition.col) * cellSize.width
+        let originY = bounds.height - CGFloat(markedPosition.row + 1) * cellSize.height
+            - Self.gridTopPadding
         let screenScale = window?.backingScaleFactor ?? 2.0
 
         let charCount = text.count
-        let width = cellSize.width * CGFloat(charCount)
+        let cursorWidth: CGFloat = 2
+        let width = cellSize.width * CGFloat(charCount) + cursorWidth
         let height = cellSize.height
 
         let pixelWidth = Int(ceil(width * screenScale))
@@ -144,13 +147,18 @@ extension NvimView {
             ctx.draw(glyphImage, in: cellRect)
         }
 
-        // Draw underline at bottom
+        // Draw underline at bottom (under text only, not cursor)
+        let textWidth = cellSize.width * CGFloat(charCount)
         let underlineY: CGFloat = 1.5
         ctx.setStrokeColor(NSColor(rgb: defaultFg).cgColor)
         ctx.setLineWidth(1.0)
         ctx.move(to: CGPoint(x: 0, y: underlineY))
-        ctx.addLine(to: CGPoint(x: width, y: underlineY))
+        ctx.addLine(to: CGPoint(x: textWidth, y: underlineY))
         ctx.strokePath()
+
+        // Draw cursor line at the right edge of the marked text
+        ctx.setFillColor(NSColor(rgb: defaultFg).cgColor)
+        ctx.fill(CGRect(x: textWidth, y: 0, width: cursorWidth, height: height))
 
         guard let image = ctx.makeImage() else { return }
 
@@ -159,8 +167,8 @@ extension NvimView {
         markedLayer.contents = image
         markedLayer.contentsScale = screenScale
         markedLayer.frame = CGRect(
-            x: cursorFrame.origin.x,
-            y: cursorFrame.origin.y,
+            x: originX,
+            y: originY,
             width: width,
             height: height
         )

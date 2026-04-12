@@ -174,6 +174,7 @@ final class NvimView: NSView {
                 in: metalLayer
             )
             lastFrameTime = (CACurrentMediaTime() - renderStart) * 1000
+            updateCursorFrame(grid.cursorPosition)
         } else {
             // Fallback: old CoreText rendering
             let rows = grid.size.rows
@@ -226,7 +227,25 @@ final class NvimView: NSView {
 
     // MARK: - Cursor
 
+    /// Update cursorLayer frame only (for IME positioning in Metal mode).
+    private func updateCursorFrame(_ pos: Position) {
+        let (x, y, width, height) = cursorRect(for: pos)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        cursorLayer.frame = CGRect(x: x, y: y, width: width, height: height)
+        CATransaction.commit()
+    }
+
+    /// Update cursorLayer frame and show it (for CoreText fallback mode).
     private func updateCursorPosition(_ pos: Position) {
+        updateCursorFrame(pos)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        cursorLayer.isHidden = false
+        CATransaction.commit()
+    }
+
+    private func cursorRect(for pos: Position) -> (CGFloat, CGFloat, CGFloat, CGFloat) {
         let x: CGFloat
         let y = bounds.height - CGFloat(pos.row + 1) * cellSize.height - Self.gridTopPadding
         let width: CGFloat
@@ -247,11 +266,7 @@ final class NvimView: NSView {
             height = max(2, cellSize.height * CGFloat(currentCursorCellPercentage) / 100.0)
         }
 
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        cursorLayer.frame = CGRect(x: x, y: y, width: width, height: height)
-        cursorLayer.isHidden = false
-        CATransaction.commit()
+        return (x, y, width, height)
     }
 
     // MARK: - Grid sizing
