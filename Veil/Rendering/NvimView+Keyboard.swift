@@ -110,9 +110,13 @@ extension NvimView {
             - Self.gridTopPadding
         let screenScale = window?.backingScaleFactor ?? 2.0
 
-        let charCount = text.count
+        // Compute cell counts per character (CJK = 2, others = 1)
+        let chars = Array(text)
+        let cellCounts = chars.map { cellWidth(of: $0) }
+        let totalCells = cellCounts.reduce(0, +)
         let cursorWidth: CGFloat = 2
-        let width = cellSize.width * CGFloat(charCount) + cursorWidth
+        let textWidth = cellSize.width * CGFloat(totalCells)
+        let width = textWidth + cursorWidth
         let height = cellSize.height
 
         let pixelWidth = Int(ceil(width * screenScale))
@@ -137,18 +141,20 @@ extension NvimView {
 
         // Render each character using GlyphCache (same pipeline as grid)
         let attrs = CellAttributes()
-        for (i, char) in text.enumerated() {
-            let x = CGFloat(i) * cellSize.width
-            let cellRect = CGRect(x: x, y: 0, width: cellSize.width, height: height)
+        var xOffset: CGFloat = 0
+        for (i, char) in chars.enumerated() {
+            let count = cellCounts[i]
+            let charWidth = cellSize.width * CGFloat(count)
+            let cellRect = CGRect(x: xOffset, y: 0, width: charWidth, height: height)
             let glyphImage = glyphCache.get(
                 text: String(char), attrs: attrs,
-                defaultFg: defaultFg, defaultBg: defaultBg, cellCount: 1
+                defaultFg: defaultFg, defaultBg: defaultBg, cellCount: count
             )
             ctx.draw(glyphImage, in: cellRect)
+            xOffset += charWidth
         }
 
         // Draw underline at bottom (under text only, not cursor)
-        let textWidth = cellSize.width * CGFloat(charCount)
         let underlineY: CGFloat = 1.5
         ctx.setStrokeColor(NSColor(rgb: defaultFg).cgColor)
         ctx.setLineWidth(1.0)
@@ -350,5 +356,17 @@ extension NvimView: NSTextInputClient {
     override func doCommand(by selector: Selector) {
         keyDownDone = true
         // Most commands are handled by Neovim
+    }
+
+    /// Return cell count for a character by measuring its glyph advance.
+    private func cellWidth(of char: Character) -> Int {
+        let ctFont = gridFont as CTFont
+        var chars = Array(String(char).utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: chars.count)
+        guard CTFontGetGlyphsForCharacters(ctFont, &chars, &glyphs, chars.count) else {
+            return 1
+        }
+        let advance = CTFontGetAdvancesForGlyphs(ctFont, .horizontal, &glyphs, nil, glyphs.count)
+        return advance > Double(cellSize.width) * 1.5 ? 2 : 1
     }
 }
