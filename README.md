@@ -4,26 +4,27 @@
   <img src="Veil/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="128" alt="Veil">
 </p>
 
-A quiet, vanilla Neovim GUI for macOS — in the tradition of MacVim.
+A Neovim GUI built for efficiency, not for cool.
 
-Your Neovim config, in proper macOS windows. Instant startup with near-zero overhead, fast Metal rendering, fast multi-tab session loading. Designed for focus. No visual noise, no distractions.
+Your Neovim config, in proper macOS windows — in the tradition of MacVim. Instant startup with near-zero overhead, fast Metal rendering, fast multi-tab session loading. Designed for focus. No visual noise, no distractions.
 
 ### Why another Neovim GUI?
 
-Veil brings the MacVim workflow to Neovim: multiple independent windows in a single app, Cmd+\` to switch between projects, Cmd+1/2/3 to jump to tabs. As a native macOS app instead of a terminal process, nearly all key sequences reach Neovim without being intercepted.
+Veil brings the MacVim workflow to Neovim: multiple independent windows in a single app, `Cmd+\`` to switch between projects, `Cmd+1/2/3` to jump to tabs. As a native macOS app instead of a terminal process, nearly all key sequences reach Neovim without being intercepted.
 
-Vim is a tool built for focused, efficient work. Animations consume attention. Cursor effects, scroll easing, transition flourishes all pull your eyes away from what really matters — the text. Veil chooses to keep things quiet.
+Vim is a tool built for focused, efficient work. Animations consume attention. Cursor effects, scroll easing, transition flourishes all pull your eyes away from what really matters: the text. Veil chooses to keep things quiet.
 
 ## Features
 
-- **Multi-window**: each window runs an independent Neovim process. Cmd+N to create, Cmd+\` to cycle.
-- **Tabs**: by default, Veil lets Neovim handle the tabline so you get the best experience from awesome tabline plugins. A basic native macOS tab bar is available as a fallback via `native_tabs = true` in config. Switch tabs with Cmd+1 through Cmd+9.
-- **Profile support**: Cmd+Shift+N to choose a different `NVIM_APPNAME` per window.
-- **Remote nvim**: connect to a remote Neovim instance over TCP. Clipboard integrates seamlessly with your local Mac.
-- **Font ligatures**: supported out of the box with ligature-capable fonts. Can be disabled via config.
-- **CJK & IME**: full input method support for Chinese, Japanese, Korean.
-- **Metal rendering**: heavily optimized GPU-accelerated rendering with custom-drawn box-drawing and block element characters for pixel-perfect lines. Falls back to CoreText if Metal is unavailable.
-- **System integration**: standard Edit/File menu actions, trackpad scrolling, window size persistence.
+- **Native multi-window**: each window runs an independent Neovim process. `Cmd+N` to create, `Cmd+\`` to cycle.
+- **Tabs**: by default, Veil lets Neovim handle the tabline so you get the best experience from awesome tabline plugins. A basic native macOS tab bar is available as a fallback via `native_tabs = true` in config. Switch tabs with `Cmd+1` through `Cmd+9`.
+- **Instant startup**: sub-second cold start with near-zero overhead. Fast multi-tab session loading.
+- **Metal-accelerated**: heavily optimized GPU rendering with custom-drawn box-drawing and block element characters for pixel-perfect lines. Falls back to CoreText if Metal is unavailable.
+- **Full key passthrough**: as a native macOS app instead of a terminal process, nearly all key sequences reach Neovim without being intercepted.
+- **System integration**: standard Edit/File menu actions, trackpad scrolling, font ligatures, window size persistence.
+- **Profile support**: `Cmd+Shift+N` to choose a different `NVIM_APPNAME` per window.
+- **Seamless remote**: connect to a remote Neovim instance over TCP. Clipboard integrates seamlessly with your local Mac.
+- **CJK ready**: full input method support for Chinese, Japanese, Korean.
 
 <p align="center">
   <img src="screenshots/main.png" alt="Veil screenshot">
@@ -134,7 +135,7 @@ nvim --headless --listen 127.0.0.1:6666
 
 Neovim's RPC protocol has no authentication, so always bind to `127.0.0.1` and use SSH tunneling. Never expose the listening port to the network directly.
 
-Forward the port over SSH, then connect from Veil using Cmd+Ctrl+Shift+N:
+Forward the port over SSH, then connect from Veil using `Cmd+Ctrl+Shift+N`:
 
 ```bash
 # -L local_port:remote_host:remote_port
@@ -200,7 +201,7 @@ If Veil is already running, the CLI forwards arguments to the existing instance 
 
 ### Multiple nvim configs
 
-Each window can run a different Neovim configuration. Use `NVIM_APPNAME` from the CLI or Cmd+Shift+N from the GUI to select which config directory under `~/.config/` nvim uses:
+Each window can run a different Neovim configuration. Use `NVIM_APPNAME` from the CLI or `Cmd+Shift+N` from the GUI to select which config directory under `~/.config/` nvim uses:
 
 ```bash
 NVIM_APPNAME=astronvim veil              # launch Veil with astronvim config
