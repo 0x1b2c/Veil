@@ -10,13 +10,13 @@ Your Neovim config, in proper macOS windows — in the tradition of MacVim. Inst
 
 ### Why another Neovim GUI?
 
-Veil brings the MacVim workflow to Neovim: multiple independent windows in a single app, `Cmd+\`` to switch between projects, `Cmd+1/2/3` to jump to tabs. As a native macOS app instead of a terminal process, nearly all key sequences reach Neovim without being intercepted.
+Veil brings the MacVim workflow to Neovim: multiple independent windows in a single app, `` Cmd+` `` to switch between projects, `Cmd+1/2/3` to jump to tabs. As a native macOS app instead of a terminal process, nearly all key sequences reach Neovim without being intercepted.
 
 Vim is a tool built for focused, efficient work. Animations consume attention. Cursor effects, scroll easing, transition flourishes all pull your eyes away from what really matters: the text. Veil chooses to keep things quiet.
 
 ## Features
 
-- **Native multi-window**: each window runs an independent Neovim process. `Cmd+N` to create, `Cmd+\`` to cycle.
+- **Native multi-window**: each window runs an independent Neovim process. `Cmd+N` to create, `` Cmd+` `` to cycle.
 - **Tabs**: by default, Veil lets Neovim handle the tabline so you get the best experience from awesome tabline plugins. A basic native macOS tab bar is available as a fallback via `native_tabs = true` in config. Switch tabs with `Cmd+1` through `Cmd+9`.
 - **Instant startup**: sub-second cold start with near-zero overhead. Fast multi-tab session loading.
 - **Metal-accelerated**: heavily optimized GPU rendering with custom-drawn box-drawing and block element characters for pixel-perfect lines. Falls back to CoreText if Metal is unavailable.
@@ -165,7 +165,7 @@ name = "Staging"
 address = "127.0.0.1:6667"
 ```
 
-> *I don't always code, but when I do, I code in ~~production~~.*
+> _I don't always code, but when I do, I code in ~~production~~._
 
 Clipboard integrates seamlessly with your local Mac. Yank/paste with `+` and `*` registers in the remote session operates on your local pasteboard.
 
