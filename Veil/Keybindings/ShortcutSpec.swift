@@ -75,3 +75,28 @@ extension ShortcutSpec {
         return ShortcutSpec(modifiers: modifiers, key: .character(keyToken))
     }
 }
+
+extension ShortcutSpec {
+    /// Returns true if the given keyboard event matches this shortcut spec.
+    func matches(_ event: NSEvent) -> Bool {
+        // Compare modifiers, ignoring .function, .numericPad, .capsLock, and
+        // other flags Cocoa sets automatically but that aren't part of a shortcut.
+        let relevantMask: NSEvent.ModifierFlags =
+            [.command, .control, .option, .shift]
+        let eventMods = event.modifierFlags.intersection(relevantMask)
+        guard eventMods == self.modifiers else { return false }
+
+        switch self.key {
+        case .character(let c):
+            guard let eventChars = event.charactersIgnoringModifiers else { return false }
+            return eventChars.lowercased() == c.lowercased()
+        case .named(let namedKey):
+            return matchesNamedKey(namedKey, event: event)
+        }
+    }
+
+    private func matchesNamedKey(_ namedKey: NamedKey, event: NSEvent) -> Bool {
+        // Implemented in Task 7.
+        return false
+    }
+}

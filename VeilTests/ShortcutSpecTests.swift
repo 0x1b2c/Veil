@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import Veil
 
@@ -133,5 +134,96 @@ final class ShortcutSpecTests: XCTestCase {
         let spec = ShortcutSpec.parse("cmd++n")
         XCTAssertEqual(spec?.modifiers, .command)
         XCTAssertEqual(spec?.key, .character("n"))
+    }
+
+    // MARK: - Matches: single-character keys
+
+    /// Build a synthetic keyDown NSEvent with given characters and modifiers.
+    private func makeKeyDown(
+        chars: String,
+        charsIgnoringMods: String? = nil,
+        modifiers: NSEvent.ModifierFlags = [],
+        keyCode: UInt16 = 0
+    ) -> NSEvent {
+        NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: modifiers,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: chars,
+            charactersIgnoringModifiers: charsIgnoringMods ?? chars,
+            isARepeat: false,
+            keyCode: keyCode
+        )!
+    }
+
+    func testMatchesSimpleCharWithCmd() {
+        let spec = ShortcutSpec.parse("cmd+s")!
+        let event = makeKeyDown(chars: "s", modifiers: .command)
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    func testDoesNotMatchWhenModifiersDiffer() {
+        let spec = ShortcutSpec.parse("cmd+s")!
+        let event = makeKeyDown(chars: "s", modifiers: .control)
+        XCTAssertFalse(spec.matches(event))
+    }
+
+    func testMatchesCaseInsensitive() {
+        // Spec parsed as lowercase "a", but event has uppercase "A"
+        let spec = ShortcutSpec.parse("cmd+a")!
+        let event = makeKeyDown(chars: "A", modifiers: .command)
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    // MARK: - Matches: modifier flag stripping
+
+    func testMatchesIgnoresFunctionFlag() {
+        // F5 events have .function set automatically
+        let spec = ShortcutSpec.parse("f5")!
+        let event = makeKeyDown(
+            chars: String(Character(UnicodeScalar(NSF5FunctionKey)!)),
+            modifiers: .function,
+            keyCode: 96)
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    func testMatchesIgnoresNumericPadFlag() {
+        let spec = ShortcutSpec.parse("up")!
+        let event = makeKeyDown(
+            chars: String(Character(UnicodeScalar(NSUpArrowFunctionKey)!)),
+            modifiers: [.function, .numericPad],
+            keyCode: 126)
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    func testMatchesIgnoresCapsLock() {
+        let spec = ShortcutSpec.parse("cmd+s")!
+        let event = makeKeyDown(chars: "s", modifiers: [.command, .capsLock])
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    // MARK: - Matches: shifted punctuation
+
+    func testMatchesShiftedPunctuationCloseBrace() {
+        // Shift+Cmd+] produces charactersIgnoringModifiers == "}"
+        let spec = ShortcutSpec.parse("shift+cmd+}")!
+        let event = makeKeyDown(
+            chars: "}",
+            charsIgnoringMods: "}",
+            modifiers: [.shift, .command])
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    func testDoesNotMatchUnshiftedVersionWhenShiftedProduced() {
+        // A spec for "shift+cmd+]" does NOT match the event (which produces "}")
+        let spec = ShortcutSpec.parse("shift+cmd+]")!
+        let event = makeKeyDown(
+            chars: "}",
+            charsIgnoringMods: "}",
+            modifiers: [.shift, .command])
+        XCTAssertFalse(spec.matches(event))
     }
 }
