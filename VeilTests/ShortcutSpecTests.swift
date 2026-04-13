@@ -96,4 +96,42 @@ final class ShortcutSpecTests: XCTestCase {
         XCTAssertEqual(ShortcutSpec.parse("PAGEUP")?.key, .named(.pageUp))
         XCTAssertEqual(ShortcutSpec.parse("F5")?.key, .named(.f5))
     }
+
+    // MARK: - Parse: error cases
+
+    func testParseEmptyStringReturnsNil() {
+        XCTAssertNil(ShortcutSpec.parse(""))
+    }
+
+    func testParseWhitespaceOnlyReturnsNil() {
+        XCTAssertNil(ShortcutSpec.parse("   "))
+    }
+
+    func testParseNoKeyReturnsNil() {
+        XCTAssertNil(ShortcutSpec.parse("cmd+shift"))
+    }
+
+    func testParseOnlyModifierShiftReturnsNil() {
+        XCTAssertNil(ShortcutSpec.parse("shift"))
+    }
+
+    func testParseOnlyModifierCmdReturnsNil() {
+        XCTAssertNil(ShortcutSpec.parse("cmd"))
+    }
+
+    func testParseMultipleKeysReturnsNil() {
+        XCTAssertNil(ShortcutSpec.parse("cmd+a+b"))
+    }
+
+    func testParseMultiCharKeyWithoutNamedMatchReturnsNil() {
+        XCTAssertNil(ShortcutSpec.parse("cmd+nope"))
+    }
+
+    func testParseConsecutivePlusParsesAsNormal() {
+        // Swift's split(separator:) defaults to omittingEmptySubsequences: true,
+        // so "cmd++n" parses the same as "cmd+n". Documenting this behavior.
+        let spec = ShortcutSpec.parse("cmd++n")
+        XCTAssertEqual(spec?.modifiers, .command)
+        XCTAssertEqual(spec?.key, .character("n"))
+    }
 }
