@@ -1,6 +1,73 @@
 import AppKit
 import MessagePack
 
+// MARK: - Default Vim keymaps dispatch table
+
+/// A default keymap entry: the shortcut spec and a closure that runs when matched.
+/// The closure receives the matched NSEvent in case the dispatch needs information
+/// from it (e.g., Cmd+1-9 uses the digit from the event).
+///
+/// The closure is `@MainActor`-isolated because `NvimView` is an `NSView` subclass
+/// and therefore main-actor-bound. This matches how `performKeyEquivalent` itself
+/// is invoked, so calling the closure from there is allowed without `await`.
+private struct DefaultKeymapEntry {
+    let spec: ShortcutSpec
+    let dispatch: @MainActor (NvimView, NSEvent) -> Void
+}
+
+/// Default vim keymaps that are dispatched from performKeyEquivalent
+/// (as opposed to via menu items). These are the ones that aren't owned
+/// by any menu: Cmd+1-9, Ctrl+Tab, Shift+Ctrl+Tab, Shift+Cmd+{/}.
+private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
+    var entries: [DefaultKeymapEntry] = []
+
+    // Cmd+1 through Cmd+8: switch to tab N.
+    for digit in 1...8 {
+        guard let spec = ShortcutSpec.parse("cmd+\(digit)") else { continue }
+        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
+            Task { try? await view.channel?.command("tabnext \(digit)") }
+        })
+    }
+
+    // Cmd+9: switch to last tab.
+    if let spec = ShortcutSpec.parse("cmd+9") {
+        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
+            Task { try? await view.channel?.command("tablast") }
+        })
+    }
+
+    // Ctrl+Tab: next tab.
+    if let spec = ShortcutSpec.parse("ctrl+tab") {
+        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
+            Task { try? await view.channel?.command("tabnext") }
+        })
+    }
+
+    // Shift+Ctrl+Tab: previous tab.
+    if let spec = ShortcutSpec.parse("shift+ctrl+tab") {
+        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
+            Task { try? await view.channel?.command("tabprevious") }
+        })
+    }
+
+    // Shift+Cmd+}: next tab. (Note: the user presses Shift+Cmd+] which
+    // produces `}` via Cocoa's shifted-punctuation behavior.)
+    if let spec = ShortcutSpec.parse("shift+cmd+}") {
+        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
+            Task { try? await view.channel?.command("tabnext") }
+        })
+    }
+
+    // Shift+Cmd+{: previous tab. (User presses Shift+Cmd+[.)
+    if let spec = ShortcutSpec.parse("shift+cmd+{") {
+        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
+            Task { try? await view.channel?.command("tabprevious") }
+        })
+    }
+
+    return entries
+}()
+
 // MARK: - Keyboard handling
 
 extension NvimView {
