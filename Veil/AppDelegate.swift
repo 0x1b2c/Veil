@@ -321,6 +321,58 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return nil
     }
 
+    /// Apply config-driven shortcuts to menu items.
+    ///
+    /// Must be called after the main menu has been loaded from the xib AND
+    /// after AppDelegate's manual menu-item additions (profile picker, connect
+    /// remote). Overwrites any key equivalents set in the xib with values from
+    /// `VeilConfig.current.keysOrDefault`.
+    private func applyConfiguredKeyEquivalents() {
+        let keys = VeilConfig.current.keysOrDefault
+
+        // 1. Veil-owned actions: read per-action config and apply.
+        for action in KeyAction.allCases {
+            guard let item = findMenuItem(selector: action.selector) else {
+                NSLog("Veil: could not find menu item for \(action.rawValue)")
+                continue
+            }
+            applyShortcut(to: item, spec: keys.shortcut(for: action))
+        }
+
+        // 2. Default Vim keymaps — the menu-handled subset.
+        //    If bind_default_keymaps is false, clear the key equivalents on
+        //    these menu items so the keys fall through to performKeyEquivalent
+        //    and are synthesized as <D-...> for nvim.
+        if !keys.bind_default_keymaps {
+            let defaultKeymapSelectors: [Selector] = [
+                NSSelectorFromString("saveDocument:"),
+                NSSelectorFromString("undo:"),
+                NSSelectorFromString("redo:"),
+                NSSelectorFromString("cut:"),
+                NSSelectorFromString("copy:"),
+                NSSelectorFromString("paste:"),
+                NSSelectorFromString("selectAll:"),
+            ]
+            for selector in defaultKeymapSelectors {
+                if let item = findMenuItem(selector: selector) {
+                    item.keyEquivalent = ""
+                    item.keyEquivalentModifierMask = []
+                }
+            }
+        }
+    }
+
+    /// Apply a ShortcutSpec (or nil for disabled) to a menu item.
+    private func applyShortcut(to item: NSMenuItem, spec: ShortcutSpec?) {
+        if let spec, let (key, mask) = spec.toMenuKeyEquivalent() {
+            item.keyEquivalent = key
+            item.keyEquivalentModifierMask = mask
+        } else {
+            item.keyEquivalent = ""
+            item.keyEquivalentModifierMask = []
+        }
+    }
+
     private func addDebugOverlayMenuItem() {
         guard let mainMenu = NSApp.mainMenu,
             let viewMenu = mainMenu.items.first(where: { $0.title == "View" })?.submenu
