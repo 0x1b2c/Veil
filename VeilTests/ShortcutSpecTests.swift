@@ -258,4 +258,59 @@ final class ShortcutSpecTests: XCTestCase {
         XCTAssertEqual(key, ",")
         XCTAssertEqual(mask, .command)
     }
+
+    // MARK: - KeysConfig integration
+
+    func testKeysConfigDefaultBindDefaultKeymapsIsTrue() {
+        let config = KeysConfig()
+        XCTAssertTrue(config.bind_default_keymaps)
+    }
+
+    func testKeysConfigDefaultShortcutForNewWindow() {
+        let config = KeysConfig()
+        let spec = config.shortcut(for: .newWindow)
+        XCTAssertEqual(spec?.modifiers, .command)
+        XCTAssertEqual(spec?.key, .character("n"))
+    }
+
+    func testKeysConfigEmptyStringDisablesAction() {
+        var config = KeysConfig()
+        config.new_window = ""
+        XCTAssertNil(config.shortcut(for: .newWindow))
+    }
+
+    func testKeysConfigMalformedStringReturnsNil() {
+        var config = KeysConfig()
+        config.new_window = "not-a-valid-shortcut"
+        XCTAssertNil(config.shortcut(for: .newWindow))
+    }
+
+    func testKeyActionDefaultShortcutsAllParse() {
+        for action in KeyAction.allCases {
+            XCTAssertNotNil(
+                ShortcutSpec.parse(action.defaultShortcut),
+                "Default shortcut '\(action.defaultShortcut)' for \(action.rawValue) failed to parse"
+            )
+        }
+    }
+
+    // MARK: - KeyUtils round-trip (integration check)
+
+    /// Verify that KeyUtils.nvimKey produces the Vim notation the migration
+    /// cheatsheet promises. These are the notations nvim receives in step 3
+    /// of `performKeyEquivalent` when `bind_default_keymaps = false`.
+    func testKeyUtilsNvimKeyForShiftedPunctuation() {
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "}", modifiers: [.shift, .command]),
+            "<S-D-}>")
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "{", modifiers: [.shift, .command]),
+            "<S-D-{>")
+    }
+
+    func testKeyUtilsNvimKeyForShiftedLetter() {
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "z", modifiers: [.shift, .command]),
+            "<S-D-z>")
+    }
 }
