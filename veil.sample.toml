@@ -48,8 +48,10 @@
 # address = "127.0.0.1:6667"
 
 # Keyboard shortcuts. See KEYBOARD.md for full documentation.
+# To enable any of the options below, leave [keys] uncommented and
+# uncomment the specific lines you want to override.
+[keys]
 
-# [keys]
 # When true (default), Veil binds a set of Vim-friendly default keymaps:
 # Cmd+S → :w, Cmd+Z → u, Cmd+1-9 → switch tab, Ctrl+Tab → gt, etc.
 # Set to false to let these keys pass through to Neovim as <D-s>, <D-1>,
