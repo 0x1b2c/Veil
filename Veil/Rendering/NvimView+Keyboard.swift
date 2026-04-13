@@ -93,33 +93,36 @@ extension NvimView {
             }
         }
 
-        // Step 2: NSView's default subview walk. The main menu has already
-        //         been consulted by NSApplication before this method runs —
-        //         Cmd+Q, Cmd+N, Cmd+S, Cmd+` (via macOS's auto-injected
-        //         Window menu cycling), etc. are intercepted at the NSApp
-        //         level when their menu items have a keyEquivalent set.
-        //         This `super` call only matters if some subview wants to
-        //         claim the event; in practice it almost always returns
-        //         false and we fall through to step 3.
+        // Step 2: NSView's default subview walk. This rarely claims anything
+        //         in Veil (the text area has no interactive subviews), but
+        //         we honor the contract.
         if super.performKeyEquivalent(with: event) {
             return true
         }
 
-        // Step 3: Cmd+letter synthesis fallback.
+        // Step 3: let the main menu handle it. Cocoa's event routing consults
+        //         NvimView.performKeyEquivalent BEFORE the menu bar, so if we
+        //         return true here without asking the menu, Cmd+Q, Cmd+N,
+        //         Cmd+S and every other menu-bound shortcut never reaches
+        //         its action. Explicitly invoke the menu's performKeyEquivalent
+        //         so menu items with matching keyEquivalents can fire.
+        //         This also handles Cmd+` via macOS's auto-injected Window
+        //         menu cycling (`systemMenu="window"` in the xib).
+        if let mainMenu = NSApp.mainMenu,
+            mainMenu.performKeyEquivalent(with: event)
+        {
+            return true
+        }
+
+        // Step 4: Cmd+letter synthesis fallback.
         //         Cocoa does NOT naturally deliver Cmd+letter events to
         //         keyDown, so this branch synthesizes <D-letter> / <D-1> /
         //         <S-D-}> etc. for any Cmd+ event that no menu claimed.
         //         This is how Cmd+P, Cmd+J, and any unbound Cmd+letter
-        //         reach nvim today (previously via the fall-through after
-        //         the systemKeys whitelist), and also how disabled default
-        //         keymaps reach nvim when bind_default_keymaps = false.
-        //
-        //         Exception: Cmd+` is left alone so macOS's built-in
-        //         Window menu cycling (auto-injected via the xib's
-        //         `systemMenu="window"` attribute) can handle it through
-        //         whatever path it normally does. This preserves current
-        //         cycle_window behavior, which is explicitly out of scope
-        //         for this iteration per the spec.
+        //         reach nvim. Also how disabled default keymaps reach nvim
+        //         when bind_default_keymaps = false — the menu items have
+        //         cleared keyEquivalents, so step 3 above won't claim them
+        //         and they fall through here.
         if event.modifierFlags.contains(.command),
             let chars = event.charactersIgnoringModifiers,
             !chars.isEmpty,
@@ -131,7 +134,7 @@ extension NvimView {
             return true
         }
 
-        // Step 4: non-Cmd events fall through. Ctrl+Tab, F-keys, arrow
+        // Step 5: non-Cmd events fall through. Ctrl+Tab, F-keys, arrow
         //         keys, etc. become regular keyDown: calls in the next
         //         event dispatch stage.
         return false
