@@ -96,7 +96,46 @@ extension ShortcutSpec {
     }
 
     private func matchesNamedKey(_ namedKey: NamedKey, event: NSEvent) -> Bool {
-        // Implemented in Task 7.
-        return false
+        guard let chars = event.charactersIgnoringModifiers,
+              let scalar = chars.unicodeScalars.first
+        else { return false }
+        let code = Int(scalar.value)
+
+        switch namedKey {
+        case .up: return code == NSUpArrowFunctionKey
+        case .down: return code == NSDownArrowFunctionKey
+        case .left: return code == NSLeftArrowFunctionKey
+        case .right: return code == NSRightArrowFunctionKey
+        case .home: return code == NSHomeFunctionKey
+        case .end: return code == NSEndFunctionKey
+        case .pageUp: return code == NSPageUpFunctionKey
+        case .pageDown: return code == NSPageDownFunctionKey
+        case .delete: return code == NSDeleteFunctionKey
+        case .tab: return code == 0x09
+        case .return: return code == 0x0D
+        case .escape: return code == 0x1B
+        case .space: return code == 0x20
+        case .backspace: return code == 0x7F
+        case .f1: return code == NSF1FunctionKey
+        case .f2: return code == NSF2FunctionKey
+        case .f3: return code == NSF3FunctionKey
+        case .f4: return code == NSF4FunctionKey
+        case .f5: return code == NSF5FunctionKey
+        case .f6: return code == NSF6FunctionKey
+        case .f7: return code == NSF7FunctionKey
+        case .f8: return code == NSF8FunctionKey
+        case .f9: return code == NSF9FunctionKey
+        case .f10: return code == NSF10FunctionKey
+        case .f11: return code == NSF11FunctionKey
+        case .f12: return code == NSF12FunctionKey
+        case .f13: return code == NSF13FunctionKey
+        case .f14: return code == NSF14FunctionKey
+        case .f15: return code == NSF15FunctionKey
+        case .f16: return code == NSF16FunctionKey
+        case .f17: return code == NSF17FunctionKey
+        case .f18: return code == NSF18FunctionKey
+        case .f19: return code == NSF19FunctionKey
+        case .f20: return code == NSF20FunctionKey
+        }
     }
 }
