@@ -46,3 +46,25 @@
 # [[remote]]
 # name = "Staging"
 # address = "127.0.0.1:6667"
+
+# Keyboard shortcuts. See KEYBOARD.md for full documentation.
+
+# [keys]
+# When true (default), Veil binds a set of Vim-friendly default keymaps:
+# Cmd+S → :w, Cmd+Z → u, Cmd+1-9 → switch tab, Ctrl+Tab → gt, etc.
+# Set to false to let these keys pass through to Neovim as <D-s>, <D-1>,
+# <C-Tab>, etc. You can then map them yourself in your nvim config.
+# bind_default_keymaps = true
+
+# Rebind Veil's GUI actions. Set to "" to disable a shortcut
+# (the menu item remains and stays clickable).
+# new_window = "cmd+n"
+# new_window_with_profile = "cmd+shift+n"
+# close_tab = "cmd+w"
+# close_window = "cmd+shift+w"
+# quit = "cmd+q"
+# hide = "cmd+h"
+# minimize = "cmd+m"
+# toggle_fullscreen = "cmd+ctrl+f"
+# open_settings = "cmd+,"
+# connect_remote = "cmd+ctrl+shift+n"
