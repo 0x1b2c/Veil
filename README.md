@@ -20,7 +20,7 @@ Vim is a tool built for focused, efficient work. Animations consume attention. C
 - **Tabs**: by default, Veil lets Neovim handle the tabline so you get the best experience from awesome tabline plugins. A basic native macOS tab bar is available as a fallback via `native_tabs = true` in config. Switch tabs with `Cmd+1` through `Cmd+9`.
 - **Instant startup**: sub-second cold start with near-zero overhead. Fast multi-tab session loading.
 - **Metal-accelerated**: heavily optimized GPU rendering with custom-drawn box-drawing and block element characters for pixel-perfect lines. Falls back to CoreText if Metal is unavailable.
-- **Full key passthrough**: as a native macOS app instead of a terminal process, nearly all key sequences reach Neovim without being intercepted.
+- **Full key passthrough**: every Ctrl, Option, function key, and any Cmd combination not claimed by Veil reaches Neovim directly. As a native app instead of a terminal process, you gain a rich Cmd+ mapping space that terminal setups can't offer. All default shortcuts are configurable — see [KEYBOARD.md](KEYBOARD.md).
 - **System integration**: standard Edit/File menu actions, trackpad scrolling, font ligatures, window size persistence.
 - **Profile support**: `Cmd+Shift+N` to choose a different `NVIM_APPNAME` per window.
 - **Seamless remote**: connect to a remote Neovim instance over TCP. Clipboard integrates seamlessly with your local Mac.
@@ -89,32 +89,20 @@ Setting a [Nerd Font](https://www.nerdfonts.com/) as your `guifont` is the most 
 
 ### Keyboard
 
-These Cmd+key shortcuts are handled by Veil:
+Veil handles a small set of Cmd-key shortcuts for window and tab management; everything else is passed to Neovim as `<D-...>` or `<C-...>`. All shortcuts are configurable via `veil.toml` — see [KEYBOARD.md](KEYBOARD.md) for the full list, string format, and migration guide.
 
-| Key              | Action                                |
-| ---------------- | ------------------------------------- |
-| Cmd+,            | Open settings (veil.toml)             |
-| Cmd+N            | New window                            |
-| Cmd+Shift+N      | New window with profile picker        |
-| Cmd+W            | Close tab (or window if only one tab) |
-| Cmd+Shift+W      | Close window                          |
-| Cmd+Q            | Quit                                  |
-| Cmd+S            | Save (`:w`)                           |
-| Cmd+Z            | Undo (`u`)                            |
-| Cmd+Shift+Z      | Redo (`Ctrl+R`)                       |
-| Cmd+C/X/V        | Copy/Cut/Paste (system clipboard)     |
-| Cmd+A            | Select all                            |
-| Cmd+M            | Minimize                              |
-| Cmd+\`           | Cycle windows                         |
-| Cmd+1-9          | Switch tab (9 = last)                 |
-| Ctrl+Tab         | Next tab                              |
-| Shift+Ctrl+Tab   | Previous tab                          |
-| Shift+Cmd+]      | Next tab                              |
-| Shift+Cmd+[      | Previous tab                          |
-| Cmd+Ctrl+Shift+N | Connect to remote nvim                |
-| Cmd+Ctrl+F       | Toggle full screen                    |
+Quick reference:
 
-Everything else (including other Cmd+key and all Ctrl+key combinations) is sent directly to Neovim as `<D-...>` or `<C-...>`. Map them in your config:
+| Key                   | Action                                |
+| --------------------- | ------------------------------------- |
+| `Cmd+N`               | New window                            |
+| `Cmd+W`               | Close tab (or window if only one tab) |
+| `` Cmd+` ``           | Cycle windows                         |
+| `Cmd+1` – `Cmd+9`     | Switch tab                            |
+| `Cmd+,`               | Open settings (veil.toml)             |
+| `Cmd+Ctrl+Shift+N`    | Connect to remote nvim                |
+
+For custom Cmd-key mappings in your nvim config:
 
 ```lua
 -- Example: Cmd+P to open a file picker
