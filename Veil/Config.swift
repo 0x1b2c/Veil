@@ -107,6 +107,56 @@ struct RemoteEntry: Decodable {
     let address: String
 }
 
+// MARK: - KeysConfig
+
+struct KeysConfig: Decodable {
+    @DecodableDefault.Wrapper<DecodableDefault.True>
+    var bind_default_keymaps: Bool
+
+    var new_window: String?
+    var new_window_with_profile: String?
+    var close_tab: String?
+    var close_window: String?
+    var quit: String?
+    var hide: String?
+    var minimize: String?
+    var toggle_fullscreen: String?
+    var open_settings: String?
+    var connect_remote: String?
+
+    /// Returns the user's value for the given action, or the built-in default
+    /// if the user didn't specify one.
+    func rawShortcut(for action: KeyAction) -> String {
+        let userValue: String?
+        switch action {
+        case .newWindow: userValue = new_window
+        case .newWindowWithProfile: userValue = new_window_with_profile
+        case .closeTab: userValue = close_tab
+        case .closeWindow: userValue = close_window
+        case .quit: userValue = quit
+        case .hide: userValue = hide
+        case .minimize: userValue = minimize
+        case .toggleFullscreen: userValue = toggle_fullscreen
+        case .openSettings: userValue = open_settings
+        case .connectRemote: userValue = connect_remote
+        }
+        return userValue ?? action.defaultShortcut
+    }
+
+    /// Returns the parsed ShortcutSpec for the given action, or `nil` if the
+    /// user disabled it (empty string) or the string fails to parse.
+    func shortcut(for action: KeyAction) -> ShortcutSpec? {
+        let raw = rawShortcut(for: action)
+        if raw.isEmpty { return nil }
+        if let spec = ShortcutSpec.parse(raw) { return spec }
+        // Malformed: log and treat as disabled.
+        NSLog("Veil: malformed shortcut '\(raw)' for \(action.rawValue); treated as disabled")
+        return nil
+    }
+
+    init() {}
+}
+
 // MARK: - VeilConfig
 
 struct VeilConfig: Decodable {
@@ -130,6 +180,12 @@ struct VeilConfig: Decodable {
     var update_check: Bool
 
     var remote: [RemoteEntry]?
+
+    var keys: KeysConfig?
+
+    var keysOrDefault: KeysConfig {
+        keys ?? KeysConfig()
+    }
 
     static var current: VeilConfig = load()
 
