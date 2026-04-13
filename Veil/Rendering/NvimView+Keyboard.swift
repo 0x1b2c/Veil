@@ -24,45 +24,51 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     // Cmd+1 through Cmd+8: switch to tab N.
     for digit in 1...8 {
         guard let spec = ShortcutSpec.parse("cmd+\(digit)") else { continue }
-        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
-            Task { try? await view.channel?.command("tabnext \(digit)") }
-        })
+        entries.append(
+            DefaultKeymapEntry(spec: spec) { view, _ in
+                Task { try? await view.channel?.command("tabnext \(digit)") }
+            })
     }
 
     // Cmd+9: switch to last tab.
     if let spec = ShortcutSpec.parse("cmd+9") {
-        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
-            Task { try? await view.channel?.command("tablast") }
-        })
+        entries.append(
+            DefaultKeymapEntry(spec: spec) { view, _ in
+                Task { try? await view.channel?.command("tablast") }
+            })
     }
 
     // Ctrl+Tab: next tab.
     if let spec = ShortcutSpec.parse("ctrl+tab") {
-        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
-            Task { try? await view.channel?.command("tabnext") }
-        })
+        entries.append(
+            DefaultKeymapEntry(spec: spec) { view, _ in
+                Task { try? await view.channel?.command("tabnext") }
+            })
     }
 
     // Shift+Ctrl+Tab: previous tab.
     if let spec = ShortcutSpec.parse("shift+ctrl+tab") {
-        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
-            Task { try? await view.channel?.command("tabprevious") }
-        })
+        entries.append(
+            DefaultKeymapEntry(spec: spec) { view, _ in
+                Task { try? await view.channel?.command("tabprevious") }
+            })
     }
 
     // Shift+Cmd+}: next tab. (Note: the user presses Shift+Cmd+] which
     // produces `}` via Cocoa's shifted-punctuation behavior.)
     if let spec = ShortcutSpec.parse("shift+cmd+}") {
-        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
-            Task { try? await view.channel?.command("tabnext") }
-        })
+        entries.append(
+            DefaultKeymapEntry(spec: spec) { view, _ in
+                Task { try? await view.channel?.command("tabnext") }
+            })
     }
 
     // Shift+Cmd+{: previous tab. (User presses Shift+Cmd+[.)
     if let spec = ShortcutSpec.parse("shift+cmd+{") {
-        entries.append(DefaultKeymapEntry(spec: spec) { view, _ in
-            Task { try? await view.channel?.command("tabprevious") }
-        })
+        entries.append(
+            DefaultKeymapEntry(spec: spec) { view, _ in
+                Task { try? await view.channel?.command("tabprevious") }
+            })
     }
 
     return entries
@@ -72,50 +78,63 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
 
 extension NvimView {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        // Ctrl+Tab / Shift+Ctrl+Tab: tab cycling
-        if event.keyCode == 48, event.modifierFlags.contains(.control) {
-            let cmd = event.modifierFlags.contains(.shift) ? "tabprevious" : "tabnext"
-            Task { try? await channel?.command(cmd) }
+        let keys = VeilConfig.current.keysOrDefault
+
+        // Step 1: try the non-menu default keymap dispatch table.
+        //         Skipped when bind_default_keymaps is false — the keys
+        //         then fall through to step 3 for <D-...> synthesis (for
+        //         Cmd+ events) or to keyDown (for Ctrl+Tab etc).
+        if keys.bind_default_keymaps {
+            for entry in nonMenuDefaultKeymaps {
+                if entry.spec.matches(event) {
+                    entry.dispatch(self, event)
+                    return true
+                }
+            }
+        }
+
+        // Step 2: NSView's default subview walk. The main menu has already
+        //         been consulted by NSApplication before this method runs —
+        //         Cmd+Q, Cmd+N, Cmd+S, Cmd+` (via macOS's auto-injected
+        //         Window menu cycling), etc. are intercepted at the NSApp
+        //         level when their menu items have a keyEquivalent set.
+        //         This `super` call only matters if some subview wants to
+        //         claim the event; in practice it almost always returns
+        //         false and we fall through to step 3.
+        if super.performKeyEquivalent(with: event) {
             return true
         }
 
-        guard event.modifierFlags.contains(.command),
-            let chars = event.charactersIgnoringModifiers
-        else {
-            return super.performKeyEquivalent(with: event)
-        }
-
-        // Cmd+1-9: tab switching
-        if let digit = chars.first?.wholeNumberValue, digit >= 1 && digit <= 9 {
-            let cmd = digit == 9 ? "tablast" : "tabnext \(digit)"
-            Task { try? await channel?.command(cmd) }
+        // Step 3: Cmd+letter synthesis fallback.
+        //         Cocoa does NOT naturally deliver Cmd+letter events to
+        //         keyDown, so this branch synthesizes <D-letter> / <D-1> /
+        //         <S-D-}> etc. for any Cmd+ event that no menu claimed.
+        //         This is how Cmd+P, Cmd+J, and any unbound Cmd+letter
+        //         reach nvim today (previously via the fall-through after
+        //         the systemKeys whitelist), and also how disabled default
+        //         keymaps reach nvim when bind_default_keymaps = false.
+        //
+        //         Exception: Cmd+` is left alone so macOS's built-in
+        //         Window menu cycling (auto-injected via the xib's
+        //         `systemMenu="window"` attribute) can handle it through
+        //         whatever path it normally does. This preserves current
+        //         cycle_window behavior, which is explicitly out of scope
+        //         for this iteration per the spec.
+        if event.modifierFlags.contains(.command),
+            let chars = event.charactersIgnoringModifiers,
+            !chars.isEmpty,
+            chars != "`"
+        {
+            let nvimKey = KeyUtils.nvimKey(
+                characters: chars, modifiers: event.modifierFlags)
+            Task { await channel?.send(key: nvimKey) }
             return true
         }
 
-        // Shift+Cmd+[ / Shift+Cmd+]: tab cycling
-        if event.modifierFlags.contains(.shift), chars == "{" || chars == "}" {
-            let cmd = chars == "{" ? "tabprevious" : "tabnext"
-            Task { try? await channel?.command(cmd) }
-            return true
-        }
-
-        // Cmd+Ctrl combinations: pass to system (e.g. Cmd+Ctrl+F for Full Screen)
-        if event.modifierFlags.contains(.control) {
-            return super.performKeyEquivalent(with: event)
-        }
-
-        // Let system handle these Cmd+key combos
-        let systemKeys: Set<String> = [
-            "q", "n", "h", "m", ",", "z", "x", "c", "v", "a", "`", "s", "w",
-        ]
-        if systemKeys.contains(chars.lowercased()) {
-            return super.performKeyEquivalent(with: event)
-        }
-
-        // Everything else goes to nvim as <D-key>
-        let nvimKey = KeyUtils.nvimKey(characters: chars, modifiers: event.modifierFlags)
-        Task { await channel?.send(key: nvimKey) }
-        return true
+        // Step 4: non-Cmd events fall through. Ctrl+Tab, F-keys, arrow
+        //         keys, etc. become regular keyDown: calls in the next
+        //         event dispatch stage.
+        return false
     }
 
     override func keyDown(with event: NSEvent) {
