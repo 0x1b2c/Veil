@@ -55,4 +55,45 @@ final class ShortcutSpecTests: XCTestCase {
         XCTAssertEqual(spec?.modifiers, [.command, .shift])
         XCTAssertEqual(spec?.key, .character("n"))
     }
+
+    // MARK: - Parse: named keys
+
+    func testParseNamedKeyTab() {
+        let spec = ShortcutSpec.parse("cmd+tab")
+        XCTAssertEqual(spec?.modifiers, .command)
+        XCTAssertEqual(spec?.key, .named(.tab))
+    }
+
+    func testParseNamedKeyReturn() {
+        XCTAssertEqual(ShortcutSpec.parse("return")?.key, .named(.return))
+    }
+
+    func testParseNamedKeyEscape() {
+        XCTAssertEqual(ShortcutSpec.parse("escape")?.key, .named(.escape))
+    }
+
+    func testParseNamedKeyArrows() {
+        XCTAssertEqual(ShortcutSpec.parse("up")?.key, .named(.up))
+        XCTAssertEqual(ShortcutSpec.parse("down")?.key, .named(.down))
+        XCTAssertEqual(ShortcutSpec.parse("left")?.key, .named(.left))
+        XCTAssertEqual(ShortcutSpec.parse("right")?.key, .named(.right))
+    }
+
+    func testParseNamedKeyPageUp() {
+        XCTAssertEqual(ShortcutSpec.parse("pageup")?.key, .named(.pageUp))
+    }
+
+    func testParseNamedKeyF5() {
+        XCTAssertEqual(ShortcutSpec.parse("f5")?.key, .named(.f5))
+    }
+
+    func testParseNamedKeyF20() {
+        XCTAssertEqual(ShortcutSpec.parse("f20")?.key, .named(.f20))
+    }
+
+    func testParseNamedKeyCaseInsensitive() {
+        XCTAssertEqual(ShortcutSpec.parse("Tab")?.key, .named(.tab))
+        XCTAssertEqual(ShortcutSpec.parse("PAGEUP")?.key, .named(.pageUp))
+        XCTAssertEqual(ShortcutSpec.parse("F5")?.key, .named(.f5))
+    }
 }
