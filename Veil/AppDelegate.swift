@@ -300,6 +300,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Menu Setup
 
+    /// Recursively search the main menu tree for an item with the given action selector.
+    /// Returns the first match, or nil.
+    private func findMenuItem(selector: Selector) -> NSMenuItem? {
+        guard let mainMenu = NSApp.mainMenu else { return nil }
+        return findMenuItem(selector: selector, in: mainMenu)
+    }
+
+    private func findMenuItem(selector: Selector, in menu: NSMenu) -> NSMenuItem? {
+        for item in menu.items {
+            if item.action == selector {
+                return item
+            }
+            if let submenu = item.submenu,
+                let found = findMenuItem(selector: selector, in: submenu)
+            {
+                return found
+            }
+        }
+        return nil
+    }
+
     private func addDebugOverlayMenuItem() {
         guard let mainMenu = NSApp.mainMenu,
             let viewMenu = mainMenu.items.first(where: { $0.title == "View" })?.submenu
