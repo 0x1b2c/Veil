@@ -53,6 +53,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         addProfilePickerMenuItem()
         addConnectRemoteMenuItem()
         addDebugOverlayMenuItem()
+        applyConfiguredKeyEquivalents()
         NSApp.activate(ignoringOtherApps: true)
 
         // Defer default window creation — if openFiles: is called (Finder launch),
