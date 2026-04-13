@@ -256,13 +256,12 @@ Algorithm:
 func matches(_ event: NSEvent) -> Bool
 ```
 
-Modifier comparison uses a **narrower mask** than `.deviceIndependentFlagsMask` because we need to ignore `.function` (which Cocoa automatically adds to F-key events) and `.numericPad` (which Cocoa adds to arrow key events on some keyboards). Specifically:
+Modifier comparison uses a **narrower mask** than `.deviceIndependentFlagsMask` because we need to ignore `.function` (which Cocoa automatically adds to F-key events) and `.numericPad` (which Cocoa adds to arrow key events on some keyboards), and because Caps Lock is never part of a shortcut:
 
 ```swift
 let relevantMask: NSEvent.ModifierFlags =
-    [.command, .control, .option, .shift, .capsLock]
+    [.command, .control, .option, .shift]
 let eventMods = event.modifierFlags.intersection(relevantMask)
-    .subtracting(.capsLock)  // Caps Lock is never part of a shortcut
 guard eventMods == self.modifiers else { return false }
 ```
 
@@ -278,22 +277,13 @@ The named key lookup table lives alongside the parser in `ShortcutSpec.swift` an
 func toMenuKeyEquivalent() -> (String, NSEvent.ModifierFlags)?
 ```
 
-NSMenu uses `keyEquivalent: String` + `keyEquivalentModifierMask: NSEvent.ModifierFlags`. For lowercase letters and punctuation this is a direct mapping.
+NSMenu uses `keyEquivalent: String` + `keyEquivalentModifierMask: NSEvent.ModifierFlags`. For lowercase letters, digits, and punctuation (including already-shifted punctuation like `}`), the mapping is a direct pass-through: the parsed character becomes `keyEquivalent` verbatim, and the parsed modifiers become the mask.
 
-**Cocoa Shift+letter convention**: for a shortcut like `cmd+shift+n`, Cocoa's menu system accepts both forms:
-- `keyEquivalent = "N"` (uppercase) with `modifierMask = [.command]` — some code uses this
-- `keyEquivalent = "N"` (uppercase) with `modifierMask = [.command, .shift]` — other code uses this
-- `keyEquivalent = "n"` (lowercase) with `modifierMask = [.command, .shift]` — also works
+**Veil's Shift+letter convention**, applied uniformly by `toMenuKeyEquivalent()`: when Shift is set and the key is an ASCII letter, use the **uppercase letter** in `keyEquivalent` and include `.shift` explicitly in `modifierMask`. This is the unambiguous form that works regardless of Cocoa's quirks around interpreting uppercase-in-keyEquivalent. The post-construction menu pass overwrites whatever the xib had with this consistent form.
 
-Veil adopts the **third form consistently**: lowercase character in `keyEquivalent`, Shift explicit in the mask. This matches the existing xib entries for `cmd+shift+w` (Close Window uses `keyEquivalent="W"` — wait, uppercase — ok the xib uses uppercase; let me correct this):
+The uppercase-letter rule applies **only to ASCII letters**. Punctuation passes through verbatim because the user already supplies the shifted glyph (e.g., `cmd+shift+}` becomes `keyEquivalent = "}"` with `modifierMask = [.command, .shift]` — we do NOT try to un-shift `}` back to `]`). Digits and named keys (tab, return, arrows, function keys) also pass through without case transformation.
 
-Correction: the existing xib uses `keyEquivalent="W"` (uppercase) with explicit `shift="YES"` in the mask for Close Window, and `keyEquivalent="Z"` (uppercase) with no explicit mask (defaults to cmd only, implicitly shift because of uppercase) for Redo. The existing code is inconsistent, which is a known Cocoa quirk.
-
-**Veil's new convention, applied uniformly by `toMenuKeyEquivalent()`**: use **uppercase letter** in `keyEquivalent` when shift is set, and include `.shift` explicitly in `modifierMask`. This is the unambiguous form that works regardless of Cocoa's internal interpretation. The post-construction menu pass overwrites whatever the xib had with this consistent form.
-
-For punctuation (e.g., `cmd+shift+}`), `keyEquivalent = "}"` + `modifierMask = [.command, .shift]`. For named keys, use the appropriate special key character (e.g., `tab` maps to `"\t"` with mask).
-
-Returns `nil` for inputs the converter cannot represent in an NSMenu (e.g., complex special keys without menu-friendly representations).
+For named keys, use the appropriate special-character string that NSMenu recognizes (e.g., `tab` maps to `"\t"`, `return` to `"\r"`) and include the parsed modifiers in the mask. Named keys that NSMenu has no standard representation for cause the function to return `nil`, and the caller (Consumer 1) leaves the menu item's shortcut unset.
 
 ## Architecture: Single Source of Truth + Two Consumers
 
@@ -378,7 +368,7 @@ Key differences from the current code:
 - **performKeyEquivalent** (Consumer 2) skips the step-1 dispatch table because `bind_default_keymaps == false`. Cmd+1, Ctrl+Tab, etc. fall through.
 - For Cmd+letter events (Cmd+S, Cmd+1, Cmd+Z, etc.), step 3 synthesizes `<D-s>`, `<D-1>`, `<D-z>`, ... and sends them to nvim.
 - For Ctrl+Tab (non-Cmd), step 4 returns false. Cocoa continues event dispatch: Ctrl+Tab becomes a `keyDown:` event and is handled by Veil's existing `keyDown(with:)` path, which sends it to nvim as `<C-Tab>` via `KeyUtils.nvimKey`.
-- For Shift+Cmd+} (is-Cmd), step 3 fires: synthesizes `<D-S-}>` and sends to nvim.
+- For Shift+Cmd+} (is-Cmd), step 3 fires: synthesizes `<S-D-}>` via `KeyUtils.nvimKey` (the existing utility outputs modifiers in `C-S-M-D` prefix order, so the explicit Shift flag becomes `S-` before the Cmd flag's `D-`) and sends to nvim.
 
 Both consumers must be synchronized by reading the same `VeilConfig.current.keysOrDefault` — disabling only one side would leave either the menu still catching Cmd+S or the step-1 dispatch table still catching Cmd+1-9, breaking the "all default keymaps pass through to nvim" guarantee.
 
@@ -416,8 +406,8 @@ end
 vim.keymap.set('n', '<D-9>', ':tablast<CR>')
 vim.keymap.set('n', '<C-Tab>', 'gt')
 vim.keymap.set('n', '<C-S-Tab>', 'gT')
-vim.keymap.set('n', '<D-}>', 'gt')  -- Shift+Cmd+]
-vim.keymap.set('n', '<D-{>', 'gT')  -- Shift+Cmd+[
+vim.keymap.set('n', '<S-D-}>', 'gt')  -- Shift+Cmd+]
+vim.keymap.set('n', '<S-D-{>', 'gT')  -- Shift+Cmd+[
 ```
 
 **Caveat for Cmd+V**: Veil's default uses `nvim_paste` RPC which handles multi-line bracketed paste correctly. A simple `"+p` mapping does not fully replicate this for insert mode with multi-line content. Users who care about this behavior should either keep `bind_default_keymaps = true` or write a more sophisticated Lua mapping. This caveat is called out in the cheatsheet section.
@@ -438,8 +428,11 @@ Steps 3 and 4 must both ship before the feature is actually usable (`bind_defaul
 
 ### Unit tests
 - `ShortcutSpec.parse` covering: all modifier combinations, all named keys, all single-character letters/digits/punctuation, malformed input (empty modifier, unknown modifier, no key, multiple keys, unknown named key), empty string.
-- `ShortcutSpec.matches` against synthetic `NSEvent` instances for the above.
-- `ShortcutSpec.toMenuKeyEquivalent` for: plain letter, shift+letter, cmd+shift+letter, cmd+punctuation, cmd+shift+punctuation (produces the shifted char), named key.
+- `ShortcutSpec.matches` against synthetic `NSEvent` instances for the above, including:
+  - **Modifier flag stripping**: an event with `.function` set (as F-keys naturally do) matches a spec with no modifiers, when the key is `f5`. An event with `.numericPad` set (as arrow keys may on some keyboards) matches a spec with no modifiers, when the key is `up`. An event with `.capsLock` set matches any spec that doesn't specify capsLock (and the spec never specifies capsLock).
+  - **Shifted punctuation**: an event produced by pressing Shift+Cmd+] (which has `charactersIgnoringModifiers == "}"`) matches a spec parsed from `"shift+cmd+}"` and does NOT match a spec parsed from `"shift+cmd+]"`.
+- `ShortcutSpec.toMenuKeyEquivalent` for: plain letter, shift+letter (uppercase rule), cmd+shift+letter (uppercase rule), cmd+punctuation, cmd+shift+punctuation (passthrough rule — no un-shifting), named key (tab, return).
+- **`KeyUtils.nvimKey` round-trip check** (not a new test — existing code path, but worth verifying): for `characters = "}"` and `modifiers = [.shift, .command]`, the function returns `"<S-D-}>"`. This confirms step 3's synthesis branch produces the expected notation for the migration cheatsheet.
 
 ### Manual verification
 - Existing users' behavior is unchanged with no config file or with empty `[keys]` section (default values from the built-in table match the xib).
@@ -448,4 +441,5 @@ Steps 3 and 4 must both ship before the feature is actually usable (`bind_defaul
 - Rebinding: change `new_window = "cmd+alt+n"` in config, confirm the File menu displays `⌥⌘N` and pressing it opens a new window.
 - Disabling a Veil-owned action: set `quit = ""`, confirm the App menu's Quit item has no shortcut but remains clickable.
 - Malformed config: set `new_window = "cmd+nope+n"`, confirm the stderr log shows a warning, the File menu's "New" item has no shortcut (treated as disabled), other actions are unaffected.
-- Duplicate binding: set `new_window = "cmd+w"` (colliding with `close_tab`), observe that the menu behavior is undefined (first match wins in menu order) and document in KEYBOARD.md that users are responsible for avoiding collisions.
+- Duplicate binding: set `new_window = "cmd+w"` (colliding with `close_tab`), observe that the first menu item in traversal order wins. Document in KEYBOARD.md that users are responsible for avoiding collisions.
+- **Precedence note**: within `NvimView.performKeyEquivalent`, the built-in default keymap dispatch table (step 1) runs **before** the menu delegation (step 2). So when `bind_default_keymaps = true`, a user who rebinds a Veil-owned action to e.g. `cmd+1` will be silently shadowed by the built-in `:tabnext 1` dispatch. This is called out in KEYBOARD.md so users know not to pick Cmd+1-9, Ctrl+Tab, Shift+Ctrl+Tab, Shift+Cmd+{, or Shift+Cmd+} as rebind targets while default keymaps are enabled.
