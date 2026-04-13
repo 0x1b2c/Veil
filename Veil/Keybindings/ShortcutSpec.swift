@@ -37,7 +37,8 @@ extension ShortcutSpec {
         let trimmed = string.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
 
-        let tokens = trimmed
+        let tokens =
+            trimmed
             .split(separator: "+")
             .map { $0.trimmingCharacters(in: .whitespaces) }
         guard !tokens.isEmpty else { return nil }
@@ -97,7 +98,7 @@ extension ShortcutSpec {
 
     private func matchesNamedKey(_ namedKey: NamedKey, event: NSEvent) -> Bool {
         guard let chars = event.charactersIgnoringModifiers,
-              let scalar = chars.unicodeScalars.first
+            let scalar = chars.unicodeScalars.first
         else { return false }
         let code = Int(scalar.value)
 
@@ -136,6 +137,72 @@ extension ShortcutSpec {
         case .f18: return code == NSF18FunctionKey
         case .f19: return code == NSF19FunctionKey
         case .f20: return code == NSF20FunctionKey
+        }
+    }
+}
+
+extension ShortcutSpec {
+    /// Convert to NSMenu's keyEquivalent + modifierMask form.
+    ///
+    /// For ASCII letters with Shift set, uses the uppercase letter and keeps
+    /// `.shift` in the mask (unambiguous form). Digits and punctuation pass
+    /// through verbatim — the caller is expected to write the shifted glyph
+    /// directly (e.g., `cmd+shift+}`, not `cmd+shift+]`).
+    ///
+    /// Returns `nil` for named keys without a standard NSMenu representation.
+    func toMenuKeyEquivalent() -> (String, NSEvent.ModifierFlags)? {
+        switch self.key {
+        case .character(let c):
+            let hasShift = modifiers.contains(.shift)
+            let isAsciiLetter =
+                c.count == 1
+                && c.unicodeScalars.first.map { $0.isASCII && $0.properties.isAlphabetic } == true
+            let keyString = (hasShift && isAsciiLetter) ? c.uppercased() : c
+            return (keyString, modifiers)
+        case .named(let namedKey):
+            return namedKey.menuCharacter.map { ($0, modifiers) }
+        }
+    }
+}
+
+extension ShortcutSpec.NamedKey {
+    /// The string NSMenu uses as `keyEquivalent` for this named key, if any.
+    var menuCharacter: String? {
+        switch self {
+        case .tab: return "\t"
+        case .return: return "\r"
+        case .escape: return "\u{1B}"
+        case .space: return " "
+        case .backspace: return "\u{8}"
+        case .delete: return "\u{7F}"
+        case .up: return String(Character(UnicodeScalar(NSUpArrowFunctionKey)!))
+        case .down: return String(Character(UnicodeScalar(NSDownArrowFunctionKey)!))
+        case .left: return String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!))
+        case .right: return String(Character(UnicodeScalar(NSRightArrowFunctionKey)!))
+        case .home: return String(Character(UnicodeScalar(NSHomeFunctionKey)!))
+        case .end: return String(Character(UnicodeScalar(NSEndFunctionKey)!))
+        case .pageUp: return String(Character(UnicodeScalar(NSPageUpFunctionKey)!))
+        case .pageDown: return String(Character(UnicodeScalar(NSPageDownFunctionKey)!))
+        case .f1: return String(Character(UnicodeScalar(NSF1FunctionKey)!))
+        case .f2: return String(Character(UnicodeScalar(NSF2FunctionKey)!))
+        case .f3: return String(Character(UnicodeScalar(NSF3FunctionKey)!))
+        case .f4: return String(Character(UnicodeScalar(NSF4FunctionKey)!))
+        case .f5: return String(Character(UnicodeScalar(NSF5FunctionKey)!))
+        case .f6: return String(Character(UnicodeScalar(NSF6FunctionKey)!))
+        case .f7: return String(Character(UnicodeScalar(NSF7FunctionKey)!))
+        case .f8: return String(Character(UnicodeScalar(NSF8FunctionKey)!))
+        case .f9: return String(Character(UnicodeScalar(NSF9FunctionKey)!))
+        case .f10: return String(Character(UnicodeScalar(NSF10FunctionKey)!))
+        case .f11: return String(Character(UnicodeScalar(NSF11FunctionKey)!))
+        case .f12: return String(Character(UnicodeScalar(NSF12FunctionKey)!))
+        case .f13: return String(Character(UnicodeScalar(NSF13FunctionKey)!))
+        case .f14: return String(Character(UnicodeScalar(NSF14FunctionKey)!))
+        case .f15: return String(Character(UnicodeScalar(NSF15FunctionKey)!))
+        case .f16: return String(Character(UnicodeScalar(NSF16FunctionKey)!))
+        case .f17: return String(Character(UnicodeScalar(NSF17FunctionKey)!))
+        case .f18: return String(Character(UnicodeScalar(NSF18FunctionKey)!))
+        case .f19: return String(Character(UnicodeScalar(NSF19FunctionKey)!))
+        case .f20: return String(Character(UnicodeScalar(NSF20FunctionKey)!))
         }
     }
 }

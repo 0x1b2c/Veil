@@ -226,4 +226,36 @@ final class ShortcutSpecTests: XCTestCase {
             modifiers: [.shift, .command])
         XCTAssertFalse(spec.matches(event))
     }
+
+    // MARK: - toMenuKeyEquivalent
+
+    func testMenuEquivalentSimpleLetter() {
+        let (key, mask) = ShortcutSpec.parse("cmd+n")!.toMenuKeyEquivalent()!
+        XCTAssertEqual(key, "n")
+        XCTAssertEqual(mask, .command)
+    }
+
+    func testMenuEquivalentShiftLetterUsesUppercase() {
+        let (key, mask) = ShortcutSpec.parse("cmd+shift+n")!.toMenuKeyEquivalent()!
+        XCTAssertEqual(key, "N")
+        XCTAssertEqual(mask, [.command, .shift])
+    }
+
+    func testMenuEquivalentShiftPunctuationPassthrough() {
+        let (key, mask) = ShortcutSpec.parse("cmd+shift+}")!.toMenuKeyEquivalent()!
+        XCTAssertEqual(key, "}")
+        XCTAssertEqual(mask, [.command, .shift])
+    }
+
+    func testMenuEquivalentDigitPassthrough() {
+        let (key, mask) = ShortcutSpec.parse("cmd+1")!.toMenuKeyEquivalent()!
+        XCTAssertEqual(key, "1")
+        XCTAssertEqual(mask, .command)
+    }
+
+    func testMenuEquivalentComma() {
+        let (key, mask) = ShortcutSpec.parse("cmd+,")!.toMenuKeyEquivalent()!
+        XCTAssertEqual(key, ",")
+        XCTAssertEqual(mask, .command)
+    }
 }
