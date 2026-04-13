@@ -332,8 +332,12 @@ override func performKeyEquivalent(with event: NSEvent) -> Bool:
                 execute(action)
                 return true
 
-    // 2. Let menu items / responder chain handle it.
-    //    This catches Cmd+Q, Cmd+N, Cmd+S (when bind_default_keymaps = true), etc.
+    // 2. NSView's default subview walk. The main menu has already been
+    //    consulted by NSApplication BEFORE this method is called, so Cmd+Q,
+    //    Cmd+N, Cmd+S (when their menu items have key equivalents set), etc.
+    //    were already intercepted there. This `super` call only matters if
+    //    some subview wants to claim the event; in practice it almost always
+    //    returns false and we fall through to step 3.
     if super.performKeyEquivalent(with: event):
         return true
 

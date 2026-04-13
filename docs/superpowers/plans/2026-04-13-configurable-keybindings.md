@@ -374,6 +374,14 @@ Append:
         XCTAssertNil(ShortcutSpec.parse("cmd+shift"))
     }
 
+    func testParseOnlyModifierShiftReturnsNil() {
+        XCTAssertNil(ShortcutSpec.parse("shift"))
+    }
+
+    func testParseOnlyModifierCmdReturnsNil() {
+        XCTAssertNil(ShortcutSpec.parse("cmd"))
+    }
+
     func testParseMultipleKeysReturnsNil() {
         XCTAssertNil(ShortcutSpec.parse("cmd+a+b"))
     }
@@ -382,37 +390,21 @@ Append:
         XCTAssertNil(ShortcutSpec.parse("cmd+nope"))
     }
 
-    func testParseEmptyTokenReturnsNil() {
-        XCTAssertNil(ShortcutSpec.parse("cmd++n"))
-    }
-```
-
-- [ ] **Step 2: Run tests**
-
-Run: `make test`
-
-Expected: some tests may pass, some may fail. Check the `cmd++n` case — after splitting, it produces `["cmd", "", "n"]`, and the empty token's lowercase is `""` which doesn't match any modifier, so it's treated as a key token — giving `keyTokens == ["", "n"]` (two tokens) which correctly returns nil via the `count == 1` check. So this test should pass. But verify.
-
-The `cmd+nope` case: after parsing, `keyTokens = ["nope"]`, `NamedKey(rawValue: "nope")` returns nil, then falls to `.character` path but `keyToken.count != 1` so returns nil. Passes.
-
-The `cmd+shift` case: `keyTokens = []`, fails `count == 1`. Returns nil. Passes.
-
-- [ ] **Step 3: If any test fails, fix the parser**
-
-If the empty-token case (`cmd++n`) does not behave correctly, add a filter to drop empty tokens before classification. Likely the current `split` behavior already drops empty separators, in which case `["cmd", "n"]` is produced and the test should be updated to expect a valid parse. Verify experimentally.
-
-If Swift's `split(separator:)` default drops empty substrings (it does, `omittingEmptySubsequences` defaults to `true`), then `cmd++n` parses as `cmd+n`. Update the test:
-
-```swift
-    func testParseEmptyTokenParsesAsNormal() {
-        // split drops empty subsequences by default
+    func testParseConsecutivePlusParsesAsNormal() {
+        // Swift's split(separator:) defaults to omittingEmptySubsequences: true,
+        // so "cmd++n" parses the same as "cmd+n". Documenting this behavior.
         let spec = ShortcutSpec.parse("cmd++n")
         XCTAssertEqual(spec?.modifiers, .command)
         XCTAssertEqual(spec?.key, .character("n"))
     }
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 2: Run tests**
+
+Run: `make test`
+Expected: all error-case tests pass. `cmd+shift` produces zero key tokens → fails `count == 1`. `shift` and `cmd` same. `cmd+a+b` produces two key tokens → fails `count == 1`. `cmd+nope` produces one multi-character non-named token → fails the single-character check. `cmd++n` benefits from Swift's default `omittingEmptySubsequences: true` and parses as `cmd+n`.
+
+- [ ] **Step 3: Commit**
 
 ```bash
 git add VeilTests/ShortcutSpecTests.swift
@@ -593,7 +585,7 @@ Replace the `matchesNamedKey` stub in `ShortcutSpec.swift` with:
         case .end: return code == NSEndFunctionKey
         case .pageUp: return code == NSPageUpFunctionKey
         case .pageDown: return code == NSPageDownFunctionKey
-        case .delete: return code == NSDeleteFunctionKey || code == 0x7F
+        case .delete: return code == NSDeleteFunctionKey
         case .tab: return code == 0x09
         case .return: return code == 0x0D
         case .escape: return code == 0x1B
@@ -623,7 +615,7 @@ Replace the `matchesNamedKey` stub in `ShortcutSpec.swift` with:
     }
 ```
 
-Note on `backspace` vs `delete`: On macOS, the "Delete" key (above the arrow keys, labeled Delete or ⌫) sends 0x7F which Vim calls Backspace (`<BS>`). The "Forward Delete" key (on full keyboards) sends `NSDeleteFunctionKey`. This matches the behavior of `KeyUtils.nvimKey` (see existing `KeyUtils.swift` lines 11-12).
+Note on `backspace` vs `delete`: On macOS, the main Delete key (⌫, top-right of the alpha block, labeled Delete) sends `0x7F` — Vim calls this `<BS>`. The Forward Delete key (⌦, on full-size keyboards) sends `NSDeleteFunctionKey`. In Veil's shortcut string format, `backspace` refers to ⌫ (main Delete) and `delete` refers to ⌦ (Forward Delete). Each key has exactly one spec name, so there's no duplicate-matching footgun where both `cmd+delete` and `cmd+backspace` match the same physical key. This matches the behavior of `KeyUtils.nvimKey` (see existing `KeyUtils.swift` lines 11-12, where `0x7F` maps to `<BS>` and `NSDeleteFunctionKey` maps to `<Del>`).
 
 - [ ] **Step 2: Run tests**
 
@@ -798,28 +790,24 @@ enum KeyAction: String, CaseIterable {
 
     /// The selector that this action's menu item uses. Used by AppDelegate's
     /// post-construction pass to locate the right menu item.
+    ///
+    /// We use `NSSelectorFromString` rather than `#selector(...)` because
+    /// several of these selectors resolve to methods on classes that aren't
+    /// visible from `Config.swift` (e.g., `NvimView.saveDocument`, or Cocoa's
+    /// `NSApplication.terminate`). Using the string form keeps this file
+    /// free of cross-module dependencies.
     var selector: Selector {
         switch self {
-        case .newWindow:
-            return Selector(("newDocument:"))
-        case .newWindowWithProfile:
-            return Selector(("newDocumentWithProfilePicker:"))
-        case .closeTab:
-            return Selector(("closeTabOrWindow:"))
-        case .closeWindow:
-            return Selector(("closeWindow:"))
-        case .quit:
-            return Selector(("terminate:"))
-        case .hide:
-            return Selector(("hide:"))
-        case .minimize:
-            return Selector(("performMiniaturize:"))
-        case .toggleFullscreen:
-            return Selector(("toggleFullScreen:"))
-        case .openSettings:
-            return Selector(("openSettings:"))
-        case .connectRemote:
-            return Selector(("connectToRemote:"))
+        case .newWindow: return NSSelectorFromString("newDocument:")
+        case .newWindowWithProfile: return NSSelectorFromString("newDocumentWithProfilePicker:")
+        case .closeTab: return NSSelectorFromString("closeTabOrWindow:")
+        case .closeWindow: return NSSelectorFromString("closeWindow:")
+        case .quit: return NSSelectorFromString("terminate:")
+        case .hide: return NSSelectorFromString("hide:")
+        case .minimize: return NSSelectorFromString("performMiniaturize:")
+        case .toggleFullscreen: return NSSelectorFromString("toggleFullScreen:")
+        case .openSettings: return NSSelectorFromString("openSettings:")
+        case .connectRemote: return NSSelectorFromString("connectToRemote:")
         }
     }
 
@@ -841,7 +829,7 @@ enum KeyAction: String, CaseIterable {
 }
 ```
 
-Note on `Selector(("..."))`: the double-parenthesis form is a Swift workaround to silence the warning about string-based selectors. Alternatively use `NSSelectorFromString("...")`, but the `Selector(("..."))` form matches the style of other Swift codebases.
+Note on `NSSelectorFromString`: this is the documented Cocoa API for runtime string-based selectors. It's clearer than `Selector(("..."))` (a double-paren workaround that suppresses warnings) and keeps `Config.swift` free of cross-module imports.
 
 - [ ] **Step 2: Build**
 
@@ -985,6 +973,26 @@ Append to `ShortcutSpecTests.swift` (or create `VeilTests/KeysConfigTests.swift`
                 "Default shortcut '\(action.defaultShortcut)' for \(action.rawValue) failed to parse")
         }
     }
+
+    // MARK: - KeyUtils round-trip (integration check)
+
+    /// Verify that KeyUtils.nvimKey produces the Vim notation the migration
+    /// cheatsheet promises. These are the notations nvim receives in step 3
+    /// of `performKeyEquivalent` when `bind_default_keymaps = false`.
+    func testKeyUtilsNvimKeyForShiftedPunctuation() {
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "}", modifiers: [.shift, .command]),
+            "<S-D-}>")
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "{", modifiers: [.shift, .command]),
+            "<S-D-{>")
+    }
+
+    func testKeyUtilsNvimKeyForShiftedLetter() {
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "z", modifiers: [.shift, .command]),
+            "<S-D-z>")
+    }
 ```
 
 Note: `@DecodableDefault.Wrapper` property wrappers have `var wrappedValue = S.defaultValue` so the default-initialized `KeysConfig()` should have `bind_default_keymaps = true`. Verify this works — if not, the test will reveal a wrapper initialization issue and you may need an explicit `bind_default_keymaps` setter.
@@ -1083,13 +1091,13 @@ Add to `AppDelegate`:
         //    and are synthesized as <D-...> for nvim.
         if !keys.bind_default_keymaps {
             let defaultKeymapSelectors: [Selector] = [
-                Selector(("saveDocument:")),
-                Selector(("undo:")),
-                Selector(("redo:")),
-                Selector(("cut:")),
-                Selector(("copy:")),
-                Selector(("paste:")),
-                Selector(("selectAll:")),
+                NSSelectorFromString("saveDocument:"),
+                NSSelectorFromString("undo:"),
+                NSSelectorFromString("redo:"),
+                NSSelectorFromString("cut:"),
+                NSSelectorFromString("copy:"),
+                NSSelectorFromString("paste:"),
+                NSSelectorFromString("selectAll:"),
             ]
             for selector in defaultKeymapSelectors {
                 if let item = findMenuItem(selector: selector) {
@@ -1207,9 +1215,13 @@ Near the top of the `NvimView` extension in `NvimView+Keyboard.swift`, add:
 /// A default keymap entry: the shortcut spec and a closure that runs when matched.
 /// The closure receives the matched NSEvent in case the dispatch needs information
 /// from it (e.g., Cmd+1-9 uses the digit from the event).
+///
+/// The closure is `@MainActor`-isolated because `NvimView` is an `NSView` subclass
+/// and therefore main-actor-bound. This matches how `performKeyEquivalent` itself
+/// is invoked, so calling the closure from there is allowed without `await`.
 private struct DefaultKeymapEntry {
     let spec: ShortcutSpec
-    let dispatch: (NvimView, NSEvent) -> Void
+    let dispatch: @MainActor (NvimView, NSEvent) -> Void
 }
 
 /// Default vim keymaps that are dispatched from performKeyEquivalent
@@ -1308,9 +1320,14 @@ Locate the existing `performKeyEquivalent(with:)` method (lines 7-52 as of the s
             }
         }
 
-        // Step 2: let menu / responder chain handle it.
-        //         Catches Cmd+Q, Cmd+N, Cmd+S (when default keymaps are
-        //         enabled), etc.
+        // Step 2: NSView's default subview walk. The main menu has already
+        //         been consulted by NSApplication before this method runs —
+        //         Cmd+Q, Cmd+N, Cmd+S, Cmd+` (via macOS's auto-injected
+        //         Window menu cycling), etc. are intercepted at the NSApp
+        //         level when their menu items have a keyEquivalent set.
+        //         This `super` call only matters if some subview wants to
+        //         claim the event; in practice it almost always returns
+        //         false and we fall through to step 3.
         if super.performKeyEquivalent(with: event) {
             return true
         }
@@ -1323,9 +1340,17 @@ Locate the existing `performKeyEquivalent(with:)` method (lines 7-52 as of the s
         //         reach nvim today (previously via the fall-through after
         //         the systemKeys whitelist), and also how disabled default
         //         keymaps reach nvim when bind_default_keymaps = false.
+        //
+        //         Exception: Cmd+` is left alone so macOS's built-in
+        //         Window menu cycling (auto-injected via the xib's
+        //         `systemMenu="window"` attribute) can handle it through
+        //         whatever path it normally does. This preserves current
+        //         cycle_window behavior, which is explicitly out of scope
+        //         for this iteration per the spec.
         if event.modifierFlags.contains(.command),
            let chars = event.charactersIgnoringModifiers,
-           !chars.isEmpty
+           !chars.isEmpty,
+           chars != "`"
         {
             let nvimKey = KeyUtils.nvimKey(
                 characters: chars, modifiers: event.modifierFlags)
