@@ -349,7 +349,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             lines.append("")
             lines.append(
                 "Update v\(latest) available: `brew upgrade veil`"
-                    + " or visit <https://github.com/rainux/Veil/releases>")
+                    + " or visit <https://github.com/0x1b2c/Veil/releases>")
             if let notes = UpdateChecker.releaseNotes, !notes.isEmpty {
                 let trimmed = notes.trimmingCharacters(in: .newlines)
                 lines.append("")

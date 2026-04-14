@@ -44,7 +44,7 @@ Veil communicates with Neovim via its stable msgpack-RPC and `ext_linegrid` UI p
 ### Homebrew
 
 ```bash
-brew tap rainux/veil
+brew tap 0x1b2c/veil
 brew install --cask veil
 ```
 
@@ -52,7 +52,7 @@ This installs `Veil.app` to `/Applications` and symlinks the `veil`, `gvim`, and
 
 ### Manual
 
-Download `Veil.zip` from [Releases](https://github.com/rainux/Veil/releases), unzip, and move `Veil.app` to `/Applications`. Then remove the quarantine attribute so macOS doesn't block it:
+Download `Veil.zip` from [Releases](https://github.com/0x1b2c/Veil/releases), unzip, and move `Veil.app` to `/Applications`. Then remove the quarantine attribute so macOS doesn't block it:
 
 ```bash
 xattr -cr /Applications/Veil.app

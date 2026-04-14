@@ -13,7 +13,7 @@ enum UpdateChecker {
     /// Fetches the latest release tag and notes from GitHub.
     /// Strips the leading "v" prefix if present (e.g. "v0.7" becomes "0.7").
     static func check() async {
-        let url = URL(string: "https://api.github.com/repos/rainux/Veil/releases/latest")!
+        let url = URL(string: "https://api.github.com/repos/0x1b2c/Veil/releases/latest")!
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             guard

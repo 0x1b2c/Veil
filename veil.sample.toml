@@ -1,5 +1,5 @@
 # Veil configuration file
-# Latest version: https://github.com/rainux/Veil/blob/master/veil.sample.toml
+# Latest version: https://github.com/0x1b2c/Veil/blob/master/veil.sample.toml
 
 # Line height multiplier for the editor grid.
 # A value of 1.2 is recommended for comfortable reading.
@@ -36,7 +36,7 @@
 # update_check = true
 
 
-# Keyboard shortcuts. See https://github.com/rainux/Veil/blob/master/KEYBOARD.md
+# Keyboard shortcuts. See https://github.com/0x1b2c/Veil/blob/master/KEYBOARD.md
 # for full documentation. To enable any of the options below, leave [keys]
 # uncommented and uncomment the specific lines you want to override.
 [keys]
