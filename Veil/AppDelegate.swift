@@ -166,6 +166,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Creates and shows a new WindowDocument with the given profile.
     func createWindow(profile: Profile) {
         VeilConfig.current = VeilConfig.load()
+        applyConfiguredKeyEquivalents()
         let doc = WindowDocument()
         doc.profile = profile
         doc.preferredRenderer = preferredRenderer
@@ -341,24 +342,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 2. Default Vim keymaps — the menu-handled subset.
-        //    If bind_default_keymaps is false, clear the key equivalents on
-        //    these menu items so the keys fall through to performKeyEquivalent
-        //    and are synthesized as <D-...> for nvim.
-        if !keys.bind_default_keymaps {
-            let defaultKeymapSelectors: [Selector] = [
-                NSSelectorFromString("saveDocument:"),
-                NSSelectorFromString("undo:"),
-                NSSelectorFromString("redo:"),
-                NSSelectorFromString("cut:"),
-                NSSelectorFromString("copy:"),
-                NSSelectorFromString("paste:"),
-                NSSelectorFromString("selectAll:"),
+        //    When bind_default_keymaps is true, set each menu item to its
+        //    built-in Cocoa shortcut. When false, clear it so the key falls
+        //    through performKeyEquivalent and is synthesized as <D-...> for
+        //    nvim. Both directions must be handled so toggling the flag at
+        //    runtime (e.g., after a config reload) correctly restores or
+        //    clears the menu bindings.
+        let defaultKeymapMenuBindings:
+            [(selector: String, key: String, mask: NSEvent.ModifierFlags)] = [
+                ("saveDocument:", "s", .command),
+                ("undo:", "z", .command),
+                ("redo:", "Z", [.command, .shift]),
+                ("cut:", "x", .command),
+                ("copy:", "c", .command),
+                ("paste:", "v", .command),
+                ("selectAll:", "a", .command),
             ]
-            for selector in defaultKeymapSelectors {
-                if let item = findMenuItem(selector: selector) {
-                    item.keyEquivalent = ""
-                    item.keyEquivalentModifierMask = []
-                }
+        for binding in defaultKeymapMenuBindings {
+            guard let item = findMenuItem(selector: NSSelectorFromString(binding.selector))
+            else { continue }
+            if keys.bind_default_keymaps {
+                item.keyEquivalent = binding.key
+                item.keyEquivalentModifierMask = binding.mask
+            } else {
+                item.keyEquivalent = ""
+                item.keyEquivalentModifierMask = []
             }
         }
     }
@@ -420,6 +428,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func openRemoteConnection(to address: String) {
         VeilConfig.current = VeilConfig.load()
+        applyConfiguredKeyEquivalents()
         let doc = WindowDocument()
         doc.preferredRenderer = preferredRenderer
         doc.isRemote = true

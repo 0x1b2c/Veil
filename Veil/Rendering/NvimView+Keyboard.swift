@@ -80,16 +80,20 @@ extension NvimView {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let keys = VeilConfig.current.keysOrDefault
 
-        // Step 1: try the non-menu default keymap dispatch table.
-        //         Skipped when bind_default_keymaps is false — the keys
-        //         then fall through to step 3 for <D-...> synthesis (for
-        //         Cmd+ events) or to keyDown (for Ctrl+Tab etc).
-        if keys.bind_default_keymaps {
-            for entry in nonMenuDefaultKeymaps {
-                if entry.spec.matches(event) {
+        // Step 1: non-menu default keymaps. Always matched, because macOS's
+        //         key view loop swallows Ctrl+Tab before it reaches keyDown,
+        //         so we must claim it here in both modes. When
+        //         bind_default_keymaps is true, run the vim command (tabnext
+        //         etc.). When false, forward the raw key to nvim (<C-Tab>,
+        //         <D-1>, <S-D-}>, ...) so user mappings on those keys fire.
+        for entry in nonMenuDefaultKeymaps {
+            if entry.spec.matches(event) {
+                if keys.bind_default_keymaps {
                     entry.dispatch(self, event)
-                    return true
+                } else {
+                    sendKeyDirectly(event)
                 }
+                return true
             }
         }
 
