@@ -35,8 +35,17 @@ nonisolated final class GlyphCache: @unchecked Sendable {
         var cellCount: Int
     }
 
+    /// A rasterized glyph together with its natural draw width.
+    /// `drawWidth` is the width (in points) the bitmap was rendered at; for
+    /// single-cell glyphs this equals `cellSize.width`, but for multi-cell
+    /// glyphs it is the typographic advance rather than `cellSize * cellCount`.
+    struct Glyph {
+        var image: CGImage
+        var drawWidth: CGFloat
+    }
+
     var scale: CGFloat = 2.0
-    private var cache: [Key: CGImage] = [:]
+    private var cache: [Key: Glyph] = [:]
     private(set) var font: NSFont
     private var cellSize: CGSize
 
@@ -48,7 +57,7 @@ nonisolated final class GlyphCache: @unchecked Sendable {
 
     func get(
         text: String, attrs: CellAttributes, defaultFg: Int, defaultBg: Int, cellCount: Int = 1
-    ) -> CGImage {
+    ) -> Glyph {
         let fg = attrs.effectiveForeground(defaultFg: defaultFg, defaultBg: defaultBg)
         let bg = attrs.effectiveBackground(defaultFg: defaultFg, defaultBg: defaultBg)
         let key = Key(
@@ -62,11 +71,11 @@ nonisolated final class GlyphCache: @unchecked Sendable {
             cellCount: cellCount
         )
         if let cached = cache[key] { return cached }
-        let image = render(
+        let glyph = render(
             text: text, bold: attrs.bold, italic: attrs.italic, fg: fg, bg: bg, cellCount: cellCount
         )
-        cache[key] = image
-        return image
+        cache[key] = glyph
+        return glyph
     }
 
     func invalidate() {
@@ -83,8 +92,40 @@ nonisolated final class GlyphCache: @unchecked Sendable {
 
     private func render(
         text: String, bold: Bool, italic: Bool, fg: Int, bg: Int, cellCount: Int = 1
-    ) -> CGImage {
-        let drawWidth = cellSize.width * CGFloat(cellCount)
+    ) -> Glyph {
+        // Resolve font variant
+        var drawFont = font
+        if bold {
+            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.bold)
+            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
+        }
+        if italic {
+            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.italic)
+            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
+        }
+
+        drawFont = FontFallback.resolveFont(drawFont, for: text)
+
+        let fgColor = NSColor(rgb: fg)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: drawFont,
+            .foregroundColor: fgColor,
+        ]
+        let attrString = NSAttributedString(string: text, attributes: attributes)
+        let line = CTLineCreateWithAttributedString(attrString)
+
+        // Multi-cell glyphs (CJK, wide ligatures) rasterize at their natural
+        // typographic advance so they keep their true aspect ratio instead of
+        // being stretched or compressed into `cellSize * cellCount`. Single-
+        // cell glyphs keep the old `cellSize.width` bitmap so single-width
+        // layout is unchanged.
+        let drawWidth: CGFloat
+        if cellCount >= 2 {
+            let advanceBounds = CTLineGetBoundsWithOptions(line, [])
+            drawWidth = advanceBounds.origin.x + advanceBounds.size.width
+        } else {
+            drawWidth = cellSize.width * CGFloat(cellCount)
+        }
         let pixelWidth = Int(ceil(drawWidth * scale))
         let pixelHeight = Int(ceil(cellSize.height * scale))
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
@@ -105,28 +146,6 @@ nonisolated final class GlyphCache: @unchecked Sendable {
         ctx.setFillColor(bgColor.cgColor)
         ctx.fill(CGRect(x: 0, y: 0, width: drawWidth, height: cellSize.height))
 
-        // Resolve font variant
-        var drawFont = font
-        if bold {
-            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.bold)
-            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
-        }
-        if italic {
-            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.italic)
-            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
-        }
-
-        drawFont = FontFallback.resolveFont(drawFont, for: text)
-
-        // Draw text via CoreText
-        let fgColor = NSColor(rgb: fg)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: drawFont,
-            .foregroundColor: fgColor,
-        ]
-        let attrString = NSAttributedString(string: text, attributes: attributes)
-        let line = CTLineCreateWithAttributedString(attrString)
-
         // Position baseline (centered in the potentially taller cell)
         let descent = CTFontGetDescent(drawFont)
         let leading = CTFontGetLeading(drawFont)
@@ -137,6 +156,6 @@ nonisolated final class GlyphCache: @unchecked Sendable {
         ctx.textPosition = CGPoint(x: 0, y: baselineY)
         CTLineDraw(line, ctx)
 
-        return ctx.makeImage()!
+        return Glyph(image: ctx.makeImage()!, drawWidth: drawWidth)
     }
 }

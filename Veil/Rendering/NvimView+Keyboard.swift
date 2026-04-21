@@ -106,7 +106,8 @@ extension NvimView {
         }
 
         let originX = CGFloat(markedPosition.col) * cellSize.width
-        let originY = bounds.height - CGFloat(markedPosition.row + 1) * cellSize.height
+        let originY =
+            bounds.height - CGFloat(markedPosition.row + 1) * cellSize.height
             - Self.gridTopPadding
         let screenScale = window?.backingScaleFactor ?? 2.0
 
@@ -145,12 +146,16 @@ extension NvimView {
         for (i, char) in chars.enumerated() {
             let count = cellCounts[i]
             let charWidth = cellSize.width * CGFloat(count)
-            let cellRect = CGRect(x: xOffset, y: 0, width: charWidth, height: height)
-            let glyphImage = glyphCache.get(
+            let cached = glyphCache.get(
                 text: String(char), attrs: attrs,
                 defaultFg: defaultFg, defaultBg: defaultBg, cellCount: count
             )
-            ctx.draw(glyphImage, in: cellRect)
+            // Multi-cell glyphs draw at their natural advance to match the
+            // grid renderer; the xOffset still advances by full cell width
+            // so IME caret position stays aligned to the grid.
+            let drawWidth = count >= 2 ? cached.drawWidth : charWidth
+            let cellRect = CGRect(x: xOffset, y: 0, width: drawWidth, height: height)
+            ctx.draw(cached.image, in: cellRect)
             xOffset += charWidth
         }
 

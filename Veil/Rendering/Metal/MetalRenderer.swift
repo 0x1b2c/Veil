@@ -50,9 +50,12 @@ nonisolated final class MetalRenderer {
         descriptor.fragmentFunction = fragmentFunction
         descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
         descriptor.colorAttachments[0].isBlendingEnabled = true
-        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        // Premultiplied-alpha blending: the fragment shader outputs genuinely
+        // premultiplied color, and the hardware combines with the destination
+        // using over-compositing (src + dst*(1-src.a)).
+        descriptor.colorAttachments[0].sourceRGBBlendFactor = .one
         descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
+        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
         descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
 
         // Set up vertex descriptor for the vertex buffer layout
@@ -472,24 +475,17 @@ nonisolated final class MetalRenderer {
             if isDoubleWidth {
                 let fgSIMD = colorToSIMD4(lastFg)
                 let x = Float(col) * cellW
-                let allocatedW = cellW * 2
                 let region = atlas.region(
                     text: text, font: font,
                     bold: lastFgAttrs.bold, italic: lastFgAttrs.italic,
                     cellSize: cellSize, cellCount: 2)
-                let glyphW = region.drawWidth * Float(atlas.scale)
-                if glyphW > allocatedW {
-                    let nextCol = col + 2
-                    let followedBySpace = nextCol < cols && cells[nextCol].text == " "
-                    addQuad(
-                        to: &fgVerts, x: x, y: y,
-                        w: followedBySpace ? glyphW : allocatedW, h: cellH,
-                        region: region, fgColor: fgSIMD, bgColor: transparentBg)
-                } else {
-                    addQuad(
-                        to: &fgVerts, x: x, y: y, w: allocatedW, h: cellH,
-                        region: region, fgColor: fgSIMD, bgColor: transparentBg)
-                }
+                // Multi-cell glyphs render at their natural advance so CJK
+                // and wide ligatures keep their true aspect ratio regardless
+                // of letter_spacing. The grid cursor still steps by 2 cells.
+                let quadW = region.drawWidth * Float(atlas.scale)
+                addQuad(
+                    to: &fgVerts, x: x, y: y, w: quadW, h: cellH,
+                    region: region, fgColor: fgSIMD, bgColor: transparentBg)
                 col += 2
                 continue
             }
@@ -529,18 +525,23 @@ nonisolated final class MetalRenderer {
                     bold: lastFgAttrs.bold, italic: lastFgAttrs.italic,
                     cellSize: cellSize, cellCount: glyph.cellCount)
                 let glyphW = region.drawWidth * Float(atlas.scale)
-                if glyphW > allocatedW {
+                let quadW: Float
+                if glyph.cellCount >= 2 {
+                    // Multi-cell glyphs draw at their natural advance; the
+                    // grid geometry is separate from the glyph's visual size.
+                    quadW = glyphW
+                } else if glyphW > allocatedW {
+                    // Single-cell overflow (Nerd Font icons, italic tails):
+                    // spill into the next cell only when it is empty space.
                     let nextCol = glyphCol + glyph.cellCount
                     let followedBySpace = nextCol < cols && cells[nextCol].text == " "
-                    addQuad(
-                        to: &fgVerts, x: x, y: y,
-                        w: followedBySpace ? glyphW : allocatedW, h: cellH,
-                        region: region, fgColor: fgSIMD, bgColor: transparentBg)
+                    quadW = followedBySpace ? glyphW : allocatedW
                 } else {
-                    addQuad(
-                        to: &fgVerts, x: x, y: y, w: allocatedW, h: cellH,
-                        region: region, fgColor: fgSIMD, bgColor: transparentBg)
+                    quadW = allocatedW
                 }
+                addQuad(
+                    to: &fgVerts, x: x, y: y, w: quadW, h: cellH,
+                    region: region, fgColor: fgSIMD, bgColor: transparentBg)
             }
 
             col = runEnd

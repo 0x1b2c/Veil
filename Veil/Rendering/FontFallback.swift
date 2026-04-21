@@ -37,6 +37,9 @@ nonisolated enum FontFallback {
 
     /// Returns a font suitable for rendering the given text. If the provided font
     /// lacks glyphs, falls back to a system font or the probed Nerd Font.
+    /// The fallback font is re-sized so its cap height matches the primary
+    /// font's, preventing the visual "small Chinese next to big English"
+    /// mismatch that appears when fallback metrics differ from the primary.
     static func resolveFont(_ font: CTFont, for text: String) -> CTFont {
         let utf16 = Array(text.utf16)
         var glyphs = [CGGlyph](repeating: 0, count: utf16.count)
@@ -48,11 +51,28 @@ nonisolated enum FontFallback {
             CFRange(location: 0, length: utf16.count))
         let fallbackName = CTFontCopyPostScriptName(fallback) as String
         if fallbackName != "LastResort" {
-            return fallback
+            return scaleToPrimaryCapHeight(fallback, primary: font)
         }
         if let cachedName = nerdFontName {
-            return CTFontCreateWithName(cachedName as CFString, CTFontGetSize(font), nil)
+            let nerd = CTFontCreateWithName(cachedName as CFString, CTFontGetSize(font), nil)
+            return scaleToPrimaryCapHeight(nerd, primary: font)
         }
         return fallback
+    }
+
+    /// Rescale `fallback` so its cap height matches the primary font's.
+    /// Mirrors Ghostty's `scaleFactor` using cap height as the normalization
+    /// metric (Ghostty's preferred chain is ic_width → ex_height → cap_height
+    /// → line_height; starting with cap_height is sufficient for most cases).
+    private static func scaleToPrimaryCapHeight(_ fallback: CTFont, primary: CTFont) -> CTFont {
+        let primaryCapHeight = CTFontGetCapHeight(primary)
+        let fallbackCapHeight = CTFontGetCapHeight(fallback)
+        guard primaryCapHeight > 0, fallbackCapHeight > 0,
+            primaryCapHeight != fallbackCapHeight
+        else { return fallback }
+        let scale = primaryCapHeight / fallbackCapHeight
+        let targetSize = CTFontGetSize(primary) * scale
+        let descriptor = CTFontCopyFontDescriptor(fallback)
+        return CTFontCreateWithFontDescriptor(descriptor, targetSize, nil)
     }
 }

@@ -228,23 +228,36 @@ nonisolated final class GlyphAtlas {
 
         drawFont = FontFallback.resolveFont(drawFont, for: text)
 
-        // Measure actual glyph ink width. Nerd font icons often have bounding
-        // boxes wider than the cell width neovim allocates. Rendering at the
-        // natural width allows the overflow logic in MetalRenderer to display
-        // them fully when followed by a space (WezTerm-style approach).
+        // Measure glyph width. For single-cell glyphs we use ink bounds and
+        // take max(allocated, ink) so overflowing shapes (Nerd Font icons,
+        // italic Latin descenders) can spill past the cell when followed by
+        // a space. For multi-cell glyphs (CJK, wide ligatures) we use the
+        // typographic advance instead, so the glyph renders at its natural
+        // width rather than being stretched or compressed into the cell grid.
         let allocatedWidth = cellSize.width * CGFloat(cellCount)
         let attributes: [NSAttributedString.Key: Any] = [.font: drawFont]
         let attrString = NSAttributedString(string: text, attributes: attributes)
         let line = CTLineCreateWithAttributedString(attrString)
-        let glyphBounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
-        let naturalWidth = glyphBounds.origin.x + glyphBounds.size.width
 
         // Custom-drawn box-drawing/block characters use exact cell
         // dimensions; skip natural width to avoid bitmap/quad mismatch.
         let isCustomDrawn =
             text.unicodeScalars.count == 1
             && (0x2500...0x259F).contains(text.unicodeScalars.first!.value)
-        let renderWidth = isCustomDrawn ? allocatedWidth : max(allocatedWidth, naturalWidth)
+
+        let renderWidth: CGFloat
+        if isCustomDrawn {
+            renderWidth = allocatedWidth
+        } else if cellCount >= 2 {
+            // Typographic bounds give the sum of advances — the correct
+            // layout width for CJK and other wide glyphs.
+            let advanceBounds = CTLineGetBoundsWithOptions(line, [])
+            renderWidth = advanceBounds.origin.x + advanceBounds.size.width
+        } else {
+            let inkBounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+            let naturalWidth = inkBounds.origin.x + inkBounds.size.width
+            renderWidth = max(allocatedWidth, naturalWidth)
+        }
         let pixelW = Int(ceil(renderWidth * scale))
         let pixelH = Int(ceil(cellSize.height * scale))
 
@@ -265,17 +278,18 @@ nonisolated final class GlyphAtlas {
             }
         }
 
-        // Render glyph as white alpha mask (color applied in fragment shader)
+        // Render glyph as a single-channel coverage mask. The fragment shader
+        // multiplies this coverage against the per-vertex foreground color.
         let imageData = renderGlyph(
             text: text, font: drawFont,
             width: pixelW, height: pixelH,
             drawWidth: renderWidth, cellHeight: cellSize.height)
 
-        // Copy to atlas texture
+        // Copy to atlas texture (1 byte per pixel, matches .r8Unorm)
         let mtlRegion = MTLRegionMake2D(nextX, nextY, pixelW, pixelH)
         texture.replace(
             region: mtlRegion, mipmapLevel: 0,
-            withBytes: imageData, bytesPerRow: pixelW * 4)
+            withBytes: imageData, bytesPerRow: pixelW)
 
         // Calculate UV coordinates
         let uvRegion = Region(
@@ -357,49 +371,64 @@ nonisolated final class GlyphAtlas {
     }
 
     private func createTexture(width: Int, height: Int) -> MTLTexture {
+        // Single-channel coverage atlas: 1 byte per pixel, 4x less memory
+        // than BGRA. The fragment shader samples `.r` to get the glyph's
+        // coverage mask and applies the foreground color itself.
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .bgra8Unorm,
+            pixelFormat: .r8Unorm,
             width: width, height: height,
             mipmapped: false
         )
         descriptor.usage = [.shaderRead]
         descriptor.storageMode = .managed  // CPU-writable, GPU-readable on macOS
         let texture = device.makeTexture(descriptor: descriptor)!
-        // Clear the sentinel pixel at (0,0) to guarantee transparency.
+        // Clear the sentinel pixel at (0,0) to guarantee zero coverage.
         // Background and cursor quads sample this pixel; Metal does not
         // guarantee initial texture contents.
-        let zero: [UInt8] = [0, 0, 0, 0]
+        let zero: [UInt8] = [0]
         texture.replace(
             region: MTLRegionMake2D(0, 0, 1, 1),
-            mipmapLevel: 0, withBytes: zero, bytesPerRow: 4
+            mipmapLevel: 0, withBytes: zero, bytesPerRow: 1
         )
         return texture
     }
 
-    /// Render glyph as a white alpha mask on transparent background.
-    /// The fragment shader multiplies this mask by the per-vertex fgColor,
-    /// allowing the same atlas entry to be reused across all color combinations.
+    /// Render glyph as a single-channel coverage mask in a linearGray +
+    /// alpha-only CGBitmapContext. CoreText's text rendering produces
+    /// coverage values directly (as opposed to sRGB-premultiplied color),
+    /// matching Ghostty's grayscale rasterization path. The fragment shader
+    /// multiplies this coverage by the per-vertex fgColor, so the same atlas
+    /// entry serves every color combination.
     private func renderGlyph(
         text: String, font: NSFont,
         width: Int, height: Int,
         drawWidth: CGFloat, cellHeight: CGFloat
     ) -> [UInt8] {
-        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
-        // premultipliedFirst + byteOrder32Little = BGRA byte order, matching .bgra8Unorm
+        let colorSpace = CGColorSpace(name: CGColorSpace.linearGray)!
         guard
             let ctx = CGContext(
                 data: nil, width: width, height: height,
-                bitsPerComponent: 8, bytesPerRow: width * 4,
+                bitsPerComponent: 8, bytesPerRow: width,
                 space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-                    | CGBitmapInfo.byteOrder32Little.rawValue
+                bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue
             )
-        else { return Array(repeating: 0, count: width * height * 4) }
+        else { return Array(repeating: 0, count: width * height) }
+
+        // Font smoothing flags — matches Ghostty's coretext path.
+        // `shouldSmoothFonts` (thickening) is intentionally off; it is a
+        // style choice rather than a correctness fix, and can be exposed
+        // through a config option later.
+        ctx.setAllowsFontSmoothing(true)
+        ctx.setShouldSmoothFonts(false)
+        ctx.setAllowsFontSubpixelPositioning(true)
+        ctx.setShouldSubpixelPositionFonts(true)
+        ctx.setAllowsFontSubpixelQuantization(false)
+        ctx.setShouldSubpixelQuantizeFonts(false)
 
         ctx.scaleBy(x: scale, y: scale)
 
-        // Background is left transparent (zeroed memory from CGContext init).
-        // Glyph is rendered in white; the shader colorizes via per-vertex fgColor.
+        // Background is zeroed (no coverage). Glyph is rendered in white;
+        // the shader colorizes via per-vertex fgColor.
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: NSColor.white,
@@ -426,11 +455,11 @@ nonisolated final class GlyphAtlas {
             CTLineDraw(line, ctx)
         }
 
-        // Extract pixel data
-        guard let data = ctx.data else { return Array(repeating: 0, count: width * height * 4) }
+        // Extract pixel data (1 byte per pixel)
+        guard let data = ctx.data else { return Array(repeating: 0, count: width * height) }
         return Array(
             UnsafeBufferPointer(
                 start: data.assumingMemoryBound(to: UInt8.self),
-                count: width * height * 4))
+                count: width * height))
     }
 }

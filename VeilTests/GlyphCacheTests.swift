@@ -20,32 +20,36 @@ final class GlyphCacheTests: XCTestCase {
 
     func testCacheMissRendersNonNilImage() {
         let attrs = CellAttributes()
-        let image = cache.get(text: "A", attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
-        XCTAssertGreaterThan(image.width, 0)
-        XCTAssertGreaterThan(image.height, 0)
+        let glyph = cache.get(text: "A", attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
+        XCTAssertGreaterThan(glyph.image.width, 0)
+        XCTAssertGreaterThan(glyph.image.height, 0)
     }
 
     func testCacheHitReturnsSameObject() {
         let attrs = CellAttributes()
-        let image1 = cache.get(text: "B", attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
-        let image2 = cache.get(text: "B", attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
-        XCTAssertTrue(image1 === image2, "Cache hit should return the same CGImage instance")
+        let glyph1 = cache.get(text: "B", attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
+        let glyph2 = cache.get(text: "B", attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
+        XCTAssertTrue(
+            glyph1.image === glyph2.image, "Cache hit should return the same CGImage instance")
     }
 
     func testDifferentAttributesProduceDifferentImages() {
         let attrs1 = CellAttributes()
         let attrs2 = CellAttributes(bold: true)
-        let image1 = cache.get(text: "C", attrs: attrs1, defaultFg: defaultFg, defaultBg: defaultBg)
-        let image2 = cache.get(text: "C", attrs: attrs2, defaultFg: defaultFg, defaultBg: defaultBg)
+        let glyph1 = cache.get(text: "C", attrs: attrs1, defaultFg: defaultFg, defaultBg: defaultBg)
+        let glyph2 = cache.get(text: "C", attrs: attrs2, defaultFg: defaultFg, defaultBg: defaultBg)
         XCTAssertFalse(
-            image1 === image2, "Different attributes should produce different cached images")
+            glyph1.image === glyph2.image,
+            "Different attributes should produce different cached images")
     }
 
     func testInvalidateClearsCache() {
         let attrs = CellAttributes()
-        let image1 = cache.get(text: "D", attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
+        let glyph1 = cache.get(text: "D", attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
         cache.invalidate()
-        let image2 = cache.get(text: "D", attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
-        XCTAssertFalse(image1 === image2, "After invalidation, a new image should be rendered")
+        let glyph2 = cache.get(text: "D", attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg)
+        XCTAssertFalse(
+            glyph1.image === glyph2.image,
+            "After invalidation, a new image should be rendered")
     }
 }

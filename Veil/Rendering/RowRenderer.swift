@@ -96,12 +96,14 @@ nonisolated final class RowRenderer: @unchecked Sendable {
 
             if isDoubleWidth {
                 let x = CGFloat(col) * cellSize.width
-                let cellRect = CGRect(
-                    x: x, y: 0, width: cellSize.width * 2, height: cellSize.height)
-                let glyphImage = glyphCache.get(
+                let glyph = glyphCache.get(
                     text: text, attrs: attrs, defaultFg: defaultFg, defaultBg: defaultBg,
                     cellCount: 2)
-                ctx.draw(glyphImage, in: cellRect)
+                // Multi-cell glyphs render at their natural advance; the grid
+                // cursor still steps by 2 cells so alignment is preserved.
+                let cellRect = CGRect(
+                    x: x, y: 0, width: glyph.drawWidth, height: cellSize.height)
+                ctx.draw(glyph.image, in: cellRect)
                 col += 2
                 continue
             }
@@ -131,13 +133,18 @@ nonisolated final class RowRenderer: @unchecked Sendable {
             for glyph in shaped {
                 let glyphCol = runStartCol + glyph.colOffset
                 let x = CGFloat(glyphCol) * cellSize.width
-                let drawWidth = cellSize.width * CGFloat(glyph.cellCount)
-                let cellRect = CGRect(
-                    x: x, y: 0, width: drawWidth, height: cellSize.height)
-                let glyphImage = glyphCache.get(
+                let cached = glyphCache.get(
                     text: glyph.text, attrs: attrs, defaultFg: defaultFg,
                     defaultBg: defaultBg, cellCount: glyph.cellCount)
-                ctx.draw(glyphImage, in: cellRect)
+                // Multi-cell glyphs use their natural advance; single-cell
+                // glyphs fill the allocated cell width as before.
+                let drawWidth =
+                    glyph.cellCount >= 2
+                    ? cached.drawWidth
+                    : cellSize.width * CGFloat(glyph.cellCount)
+                let cellRect = CGRect(
+                    x: x, y: 0, width: drawWidth, height: cellSize.height)
+                ctx.draw(cached.image, in: cellRect)
             }
 
             col = runEnd
