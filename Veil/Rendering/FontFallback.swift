@@ -10,6 +10,11 @@ import CoreText
 nonisolated enum FontFallback {
     nonisolated(unsafe) private(set) static var nerdFontName: String?
 
+    /// Cache of primary-family → CJK-variant-family lookups. An empty string
+    /// means "searched, no variant found" so we skip the expensive scan on
+    /// subsequent calls.
+    nonisolated(unsafe) private static var cjkVariantCache: [String: String] = [:]
+
     /// Probe for an installed Nerd Font by trying supplementary PUA characters
     /// from niche to popular. A font that covers niche characters is more likely
     /// to be a comprehensive Nerd Font with full icon coverage.
@@ -46,6 +51,14 @@ nonisolated enum FontFallback {
         if CTFontGetGlyphsForCharacters(font, utf16, &glyphs, utf16.count) {
             return font
         }
+        // Look for a same-family CJK variant (e.g. "Maple Mono NF" →
+        // "Maple Mono NF CN") before handing off to the system fallback.
+        // Family-matched variants preserve the primary font's design
+        // language, avoiding the visual mismatch that appears when
+        // CoreText picks an unrelated fallback such as PingFang SC.
+        if let variant = findFamilyCJKVariant(of: font, utf16: utf16) {
+            return scaleToPrimaryCapHeight(variant, primary: font)
+        }
         let fallback = CTFontCreateForString(
             font, text as CFString,
             CFRange(location: 0, length: utf16.count))
@@ -58,6 +71,49 @@ nonisolated enum FontFallback {
             return scaleToPrimaryCapHeight(nerd, primary: font)
         }
         return fallback
+    }
+
+    /// Try common CJK suffixes (" CN", " SC", " TC", " JP", " KR", " HK")
+    /// on the primary font's family name. A family is considered a match
+    /// only if CoreText returns a font whose family name exactly equals the
+    /// requested name AND that font actually contains glyphs for the text.
+    /// Results are cached per primary-family name to avoid re-scanning on
+    /// every glyph.
+    private static func findFamilyCJKVariant(of primary: CTFont, utf16: [UInt16]) -> CTFont? {
+        let familyName = CTFontCopyFamilyName(primary) as String
+        let size = CTFontGetSize(primary)
+
+        if let cached = cjkVariantCache[familyName] {
+            guard !cached.isEmpty else { return nil }
+            return resolvedCJKFont(name: cached, size: size, utf16: utf16)
+        }
+
+        let suffixes = [" CN", " SC", " TC", " JP", " KR", " HK"]
+        for suffix in suffixes {
+            let candidateName = familyName + suffix
+            let candidate = CTFontCreateWithName(candidateName as CFString, size, nil)
+            let actualName = CTFontCopyFamilyName(candidate) as String
+            // CoreText returns a substitute font when the requested name
+            // doesn't exist; verify the result actually matches.
+            guard actualName == candidateName else { continue }
+            var glyphs = [CGGlyph](repeating: 0, count: utf16.count)
+            if CTFontGetGlyphsForCharacters(candidate, utf16, &glyphs, utf16.count) {
+                cjkVariantCache[familyName] = candidateName
+                return candidate
+            }
+        }
+
+        cjkVariantCache[familyName] = ""
+        return nil
+    }
+
+    private static func resolvedCJKFont(name: String, size: CGFloat, utf16: [UInt16]) -> CTFont? {
+        let font = CTFontCreateWithName(name as CFString, size, nil)
+        var glyphs = [CGGlyph](repeating: 0, count: utf16.count)
+        guard CTFontGetGlyphsForCharacters(font, utf16, &glyphs, utf16.count) else {
+            return nil
+        }
+        return font
     }
 
     /// Rescale `fallback` so its cap height matches the primary font's.

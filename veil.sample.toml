@@ -7,8 +7,6 @@
 
 # Letter spacing multiplier for the editor grid.
 # Values below 1.0 tighten character spacing, above 1.0 loosen it.
-# Veil uses ceil() for cell width calculation, which may look slightly
-# wider than terminals. Try 0.9 or 0.95 for a tighter look.
 # letter_spacing = 1.0
 
 # Enable font ligatures (e.g. -> becomes →  in supported fonts).

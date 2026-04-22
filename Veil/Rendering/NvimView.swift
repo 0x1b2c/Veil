@@ -310,10 +310,28 @@ final class NvimView: NSView {
     static let gridTopPadding: CGFloat = 8
 
     private static func computeCellSize(for font: NSFont) -> CGSize {
-        let glyph = font.glyph(withName: "M")
-        let advancement = font.advancement(forGlyph: glyph)
-        let rawWidth = advancement.width > 0 ? advancement.width : font.pointSize * 0.6
-        let width = ceil(rawWidth * letterSpacingMultiplier)
+        // Take the max advance across printable ASCII and round to the
+        // nearest pixel. This matches Ghostty's cell sizing: using ceil
+        // overshoots the font's designed grid pitch by up to a pixel per
+        // cell, loosening the text density, and letter_spacing<1 was the
+        // historical way users compensated. Rounding gives the intended
+        // density out of the box, and max-across-ASCII stays robust if a
+        // font ships with slightly-wider punctuation or icons.
+        let ctFont = font as CTFont
+        var maxAdvance: CGFloat = 0
+        for codepoint: UInt32 in 32...126 {
+            var chars = [UniChar(codepoint)]
+            var glyph: CGGlyph = 0
+            guard CTFontGetGlyphsForCharacters(ctFont, &chars, &glyph, 1), glyph != 0 else {
+                continue
+            }
+            var glyphs = [glyph]
+            var advances = [CGSize(width: 0, height: 0)]
+            CTFontGetAdvancesForGlyphs(ctFont, .horizontal, &glyphs, &advances, 1)
+            maxAdvance = max(maxAdvance, advances[0].width)
+        }
+        let rawWidth = maxAdvance > 0 ? maxAdvance : font.pointSize * 0.6
+        let width = (rawWidth * letterSpacingMultiplier).rounded()
         let height = ceil(
             (CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font))
                 * lineHeightMultiplier)
