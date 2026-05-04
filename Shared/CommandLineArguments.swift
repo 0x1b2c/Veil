@@ -1,6 +1,6 @@
 import Foundation
 
-enum VeilRendererOption: String {
+enum VeilRendererOption: String, Codable {
     case metal
     case coretext
 }

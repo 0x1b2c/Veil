@@ -1,14 +1,5 @@
 import Cocoa
 
-private let veilEventClass = AEEventClass(bitPattern: fourCharCode("Veil"))
-private let veilOpenEventID = AEEventID(bitPattern: fourCharCode("Open"))
-private let veilJSONParamKey = AEKeyword(bitPattern: fourCharCode("json"))
-
-private func fourCharCode(_ s: String) -> Int32 {
-    let chars = Array(s.utf8)
-    return Int32(chars[0]) << 24 | Int32(chars[1]) << 16 | Int32(chars[2]) << 8 | Int32(chars[3])
-}
-
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
     // Parse CLI args eagerly at init time, before any delegate methods run.
@@ -51,7 +42,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSAppleEventManager.shared().setEventHandler(
             self, andSelector: #selector(handleVeilOpenEvent(_:withReply:)),
-            forEventClass: veilEventClass, andEventID: veilOpenEventID
+            forEventClass: VeilAppleEventProtocol.eventClass,
+            andEventID: VeilAppleEventProtocol.openEventID
         )
 
         Task.detached { NvimProcess.warmUpEnvironment() }
@@ -187,69 +179,93 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Single Instance Forwarding
 
-    /// Forward file arguments and environment to an existing Veil instance
-    /// via a custom Apple Event, then terminate. The JSON payload carries
-    /// file paths, the full shell environment, and NVIM_APPNAME so the
-    /// existing instance can open a new window with the correct nvim profile.
+    /// Compatibility path for launches that bypass the bundled CLI, such as
+    /// running `Veil.app/Contents/MacOS/Veil` directly while another instance
+    /// is already active. The supported CLI hot path sends the same request
+    /// schema from a separate client process and waits for an explicit reply.
     private func forwardToExistingInstance(_ existing: NSRunningApplication) -> Never {
+        // Best-effort only: preserve legacy GUI self-forwarding without
+        // promising delivery or waiting for acknowledgement.
         // Forward NVIM_APPNAME so the existing instance opens the window
         // with the correct nvim profile (e.g. NVIM_APPNAME=nvim-nvchad gvim).
         let nvimAppName = ProcessInfo.processInfo.environment["NVIM_APPNAME"]
         if !initialNvimArgs.isEmpty || nvimAppName != nil {
-            var payload: [String: Any] = [
-                "nvimArgs": initialNvimArgs,
-                "env": ProcessInfo.processInfo.environment,
-            ]
-            if let nvimAppName { payload["nvimAppName"] = nvimAppName }
-            if let data = try? JSONSerialization.data(withJSONObject: payload),
+            let request = VeilOpenRequest(
+                nvimArgs: initialNvimArgs,
+                env: ProcessInfo.processInfo.environment,
+                renderer: parsedArgs.renderer,
+                nvimAppName: nvimAppName)
+            if let data = try? JSONEncoder().encode(request),
                 let json = String(data: data, encoding: .utf8)
             {
                 let target = NSAppleEventDescriptor(processIdentifier: existing.processIdentifier)
                 let event = NSAppleEventDescriptor(
-                    eventClass: veilEventClass,
-                    eventID: veilOpenEventID,
+                    eventClass: VeilAppleEventProtocol.eventClass,
+                    eventID: VeilAppleEventProtocol.openEventID,
                     targetDescriptor: target,
                     returnID: AEReturnID(kAutoGenerateReturnID),
                     transactionID: AETransactionID(kAnyTransactionID))
                 event.setParam(
                     NSAppleEventDescriptor(string: json),
-                    forKeyword: veilJSONParamKey)
+                    forKeyword: VeilAppleEventProtocol.jsonParamKey)
                 _ = try? event.sendEvent(
                     options: .noReply,
-                    timeout: TimeInterval(kAEDefaultTimeout))
+                    timeout: VeilAppleEventProtocol.replyTimeout)
             }
         }
         existing.activate()
-        // Terminate immediately — no resources to clean up, event
-        // already delivered, just get out of the way.
+        // Terminate immediately; this compatibility path is best-effort.
         exit(0)
     }
 
     @objc private func handleVeilOpenEvent(
         _ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor
     ) {
-        guard let json = event.paramDescriptor(forKeyword: veilJSONParamKey)?.stringValue,
+        guard
+            let json = event.paramDescriptor(
+                forKeyword: VeilAppleEventProtocol.jsonParamKey)?.stringValue,
             let data = json.data(using: .utf8),
-            let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return }
-        let nvimArgs = payload["nvimArgs"] as? [String] ?? []
-        let env = payload["env"] as? [String: String]
+            let request = try? JSONDecoder().decode(VeilOpenRequest.self, from: data)
+        else {
+            setOpenEventReply(reply, ok: false, message: "Invalid Veil CLI request")
+            return
+        }
+        let env = request.env
         if let env {
             NvimProcess.updateCachedEnv(from: env)
         }
         // Use forwarded NVIM_APPNAME to select the correct nvim profile,
         // falling back to default if not specified.
-        let nvimAppName = payload["nvimAppName"] as? String
-        let profile = nvimAppName.map { Profile(name: $0, displayName: $0) } ?? Profile.default
+        let profile =
+            request.nvimAppName
+            .map { Profile(name: $0, displayName: $0) } ?? Profile.default
         let doc = WindowDocument()
         doc.profile = profile
-        doc.preferredRenderer = preferredRenderer
-        doc.nvimArgs = nvimArgs
+        doc.preferredRenderer =
+            request.renderer
+            .map { NvimView.Renderer($0) } ?? preferredRenderer
+        doc.nvimArgs = request.nvimArgs
         doc.nvimEnv = env
         NSDocumentController.shared.addDocument(doc)
         doc.makeWindowControllers()
         doc.showWindows()
         NSApp.activate(ignoringOtherApps: true)
+        setOpenEventReply(reply, ok: true)
+    }
+
+    private func setOpenEventReply(
+        _ reply: NSAppleEventDescriptor,
+        ok: Bool,
+        message: String? = nil
+    ) {
+        guard reply.descriptorType != typeNull else { return }
+        let payload = VeilOpenReply(ok: ok, message: message)
+        guard let data = try? JSONEncoder().encode(payload),
+            let json = String(data: data, encoding: .utf8)
+        else { return }
+        reply.setParam(
+            NSAppleEventDescriptor(string: json),
+            forKeyword: VeilAppleEventProtocol.jsonParamKey)
     }
 
     // MARK: - Settings

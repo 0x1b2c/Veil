@@ -276,7 +276,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin\" \"${DERIVED_FILE_DIR}\"\nCLI_BIN=\"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/veil\"\nrm -f \"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/veil-client\"\nCLI_SLICES=\"\"\nfor ARCH in ${ARCHS}; do\n    ARCH_BIN=\"${DERIVED_FILE_DIR}/veil-cli-${ARCH}\"\n    xcrun swiftc -parse-as-library -target \"${ARCH}-apple-macos${MACOSX_DEPLOYMENT_TARGET}\" \"${SRCROOT}/CLI/veil/main.swift\" -o \"${ARCH_BIN}\"\n    CLI_SLICES=\"${CLI_SLICES} ${ARCH_BIN}\"\ndone\nxcrun lipo -create ${CLI_SLICES} -output \"${CLI_BIN}\"\nchmod +x \"${CLI_BIN}\"\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY}\" ]; then\n    codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none \"${CLI_BIN}\"\nelse\n    codesign --force --sign - --timestamp=none \"${CLI_BIN}\"\nfi\nln -sf veil \"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/gvim\"\nln -sf veil \"${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/gvimdiff\"\n";
+			shellScript = "\"${SRCROOT}/Tools/build-bundled-cli.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
