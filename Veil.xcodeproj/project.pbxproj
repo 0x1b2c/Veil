@@ -38,6 +38,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		E3000001CCCCCC0000000001 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		D8BEFDF02F7999A900CDE7C3 /* Veil */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Veil;
@@ -86,6 +91,7 @@
 		D8BEFDE52F7999A900CDE7C3 = {
 			isa = PBXGroup;
 			children = (
+				E3000001CCCCCC0000000001 /* Shared */,
 				D8BEFDF02F7999A900CDE7C3 /* Veil */,
 				D8BEFDFF2F7999AA00CDE7C3 /* VeilTests */,
 				D8BEFE092F7999AA00CDE7C3 /* VeilUITests */,
@@ -121,6 +127,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				E3000001CCCCCC0000000001 /* Shared */,
 				D8BEFDF02F7999A900CDE7C3 /* Veil */,
 			);
 			name = Veil;

@@ -14,16 +14,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Parse CLI args eagerly at init time, before any delegate methods run.
     // application(_:openFiles:) can fire before applicationDidFinishLaunching
     // when macOS detects file arguments matching registered document types.
-    private(set) lazy var parsedArgs: CliArgParser.Result = CliArgParser.parse(
+    private(set) lazy var parsedArgs: VeilCommandLine.ParsedArguments = VeilCommandLine.parse(
         ProcessInfo.processInfo.arguments)
     /// Arguments to forward to nvim, parsed from the CLI invocation.
     /// Veil-specific flags (e.g. --veil-renderer) are already stripped by
-    /// CliArgParser; what remains are nvim flags (-d, -p) and file paths.
+    /// VeilCommandLine; what remains are nvim flags (-d, -p) and file paths.
     private var initialNvimArgs: [String] {
         get { parsedArgs.nvimArgs }
         set { parsedArgs.nvimArgs = newValue }
     }
-    var preferredRenderer: NvimView.Renderer { parsedArgs.renderer }
+    var preferredRenderer: NvimView.Renderer { NvimView.Renderer(parsedArgs.renderer) }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         ligaturesEnabled = VeilConfig.current.ligatures
@@ -76,7 +76,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !initialNvimArgs.isEmpty {
             // Cold start: macOS detected file arguments matching registered
             // document types. The same files are already in initialNvimArgs
-            // (parsed by CliArgParser), which also preserves nvim flags like
+            // (parsed by VeilCommandLine), which also preserves nvim flags like
             // -d that macOS strips. Let the deferred createWindow() handle
             // everything so flags aren't lost.
         } else {
@@ -379,5 +379,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pickerItem.keyEquivalentModifierMask = [.command, .shift]
         pickerItem.target = self
         fileMenu.insertItem(pickerItem, at: newItemIndex + 1)
+    }
+}
+
+private extension NvimView.Renderer {
+    init(_ option: VeilRendererOption) {
+        switch option {
+        case .metal:
+            self = .metal
+        case .coretext:
+            self = .coretext
+        }
     }
 }
