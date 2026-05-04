@@ -13,18 +13,27 @@ enum VeilCommandLine {
 
     static func parse(_ rawArgs: [String]) -> ParsedArguments {
         var result = ParsedArguments()
-        var iterator = rawArgs.dropFirst().makeIterator()
-        while let arg = iterator.next() {
+        var remaining = rawArgs.dropFirst()
+        while let arg = remaining.popFirst() {
             if arg.hasPrefix("-NS") || arg.hasPrefix("-Apple") {
-                _ = iterator.next()
+                // Cocoa launch flags often carry a value (e.g.
+                // `-NSDocumentRevisionsDebugMode YES`). Only swallow the
+                // next token when it looks like a value (does not start
+                // with `-`); otherwise leave it for the next iteration so
+                // a following flag like `--veil-renderer` is not lost.
+                if let next = remaining.first, !next.hasPrefix("-") {
+                    _ = remaining.popFirst()
+                }
                 continue
             }
             if arg.hasPrefix("--veil-") {
                 let parts = splitFlag(arg)
                 switch parts.name {
                 case "--veil-renderer":
-                    let value = (parts.value ?? iterator.next())?.lowercased()
-                    if let value, let renderer = VeilRendererOption(rawValue: value) {
+                    let raw = parts.value ?? remaining.popFirst()
+                    if let value = raw?.lowercased(),
+                        let renderer = VeilRendererOption(rawValue: value)
+                    {
                         result.renderer = renderer
                     }
                 default:
