@@ -28,7 +28,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     // the first BufEnter only arrives when the user actually switches buffers.
     // We use `titleReady` as a one-time gate: false at startup to suppress the
     // initial ugly set_title, flipped to true on first BufEnter, then stays true
-    // forever — all subsequent set_title events are displayed normally.
+    // forever, so all subsequent set_title events are displayed normally.
     //
     // Exception: when nvimArgs is non-empty (files passed via CLI or Finder Open
     // With), nvim opens the file directly without Startify, so the initial
@@ -80,6 +80,9 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     nonisolated override func read(from data: Data, ofType typeName: String) throws {}
 
     private func startRemoteNvim(address: String) async {
+        // Remote nvim has already booted before we attached, so there is no
+        // initial set_title to suppress (unlike startNvim, which keeps
+        // titleReady false until the BufEnter autocmd fires).
         titleReady = true
         do {
             let (host, port) = try Self.parseAddress(address)
@@ -158,28 +161,29 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             }
         }
 
+        // chan_id MUST be resolved here on the Swift side and passed into the
+        // Lua script. Moving this fetch into nvim-setup.lua looks like it
+        // would simplify things but breaks silently: `nvim_get_chan_info(0)`
+        // only resolves "0 = current channel" for direct RPC calls. Inside a
+        // nested nvim_exec_lua call the API treats Lua as an internal caller,
+        // 0 yields nil, and every rpcnotify or rpcrequest closure registered
+        // by the script then fires with chan_id = nil at autocmd or
+        // user-command time, nowhere near setup, hard to trace back.
         let (_, chanInfo) = await channel.request(
             "nvim_get_chan_info", params: [.int(0)])
-        if let channelId = chanInfo.dictionaryValue?[.string("id")]?.intValue, channelId > 0 {
-            try? await channel.command(
-                "augroup VeilApp | autocmd! | "
-                    + "autocmd BufEnter * call rpcnotify(\(channelId), 'VeilAppBufChanged') | "
-                    + "autocmd TabEnter * call rpcnotify(\(channelId), 'VeilAppBufChanged') | "
-                    + "augroup END"
-            )
-            try? await channel.command(
-                "command! VeilAppDebugToggle call rpcnotify(\(channelId), 'VeilAppDebugToggle')"
-            )
-            try? await channel.command(
-                "command! VeilAppDebugCopy call rpcnotify(\(channelId), 'VeilAppDebugCopy')"
-            )
-            try? await channel.command(
-                "command! -bang VeilAppVersion call rpcnotify(\(channelId), 'VeilAppVersion', '<bang>')"
-            )
-
-            if await channel.isRemote {
-                await injectClipboardProvider(channelId: channelId)
+        if let chanId = chanInfo.dictionaryValue?[.string("id")]?.intValue, chanId > 0 {
+            let isRemote = await channel.isRemote
+            let (err, _) = await channel.request(
+                "nvim_exec_lua",
+                params: [
+                    .string(NvimSetupScript.lua),
+                    .array([.int(Int64(chanId)), .bool(isRemote)]),
+                ])
+            if err != .nil {
+                NSLog("Veil: nvim setup failed: %@", "\(err)")
             }
+        } else {
+            NSLog("Veil: failed to resolve nvim channel id, skipping setup")
         }
 
         let (_, versionResult) = await channel.request(
@@ -188,52 +192,6 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             let firstLine = output.split(separator: "\n").first
         {
             nvimView?.nvimVersion = String(firstLine)
-        }
-    }
-
-    /// In remote mode, inject a g:clipboard provider that routes clipboard
-    /// operations through RPC back to the local Mac pasteboard.
-    private func injectClipboardProvider(channelId: Int) async {
-        // If g:clipboard exists but g:VeilAppClipboardInjected is absent,
-        // the user configured their own provider and we should not override it.
-        // If we injected it previously (e.g. prior connection), re-inject with
-        // the new channel ID so rpcrequest targets the current connection.
-        let (_, existsResult) = await channel.request(
-            "nvim_eval",
-            params: [.string("exists('g:clipboard') && !exists('g:VeilAppClipboardInjected')")]
-        )
-        if existsResult.intValue == 1 { return }
-
-        let lua = """
-            vim.g.VeilAppClipboardInjected = true
-            vim.g.clipboard = {
-              name = 'VeilClipboard',
-              copy = {
-                ['+'] = function(lines, regtype)
-                  vim.rpcrequest(\(channelId), 'VeilAppClipboardSet', lines, regtype)
-                end,
-                ['*'] = function(lines, regtype)
-                  vim.rpcrequest(\(channelId), 'VeilAppClipboardSet', lines, regtype)
-                end,
-              },
-              paste = {
-                ['+'] = function()
-                  return vim.rpcrequest(\(channelId), 'VeilAppClipboardGet')
-                end,
-                ['*'] = function()
-                  return vim.rpcrequest(\(channelId), 'VeilAppClipboardGet')
-                end,
-              },
-            }
-            -- Force reload clipboard provider so it picks up the new g:clipboard
-            package.loaded['vim.provider.clipboard'] = nil
-            vim.g.loaded_clipboard_provider = nil
-            vim.cmd('runtime autoload/provider/clipboard.vim')
-            """
-        let (clipErr, _) = await channel.request(
-            "nvim_exec_lua", params: [.string(lua), .array([])])
-        if clipErr != .nil {
-            NSLog("Veil: clipboard provider injection failed: %@", "\(clipErr)")
         }
     }
 
