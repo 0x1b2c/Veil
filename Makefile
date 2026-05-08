@@ -70,7 +70,7 @@ install: build
 	@echo "Installed to $(INSTALL_DIR)/Veil.app"
 
 zip: build-universal
-	ditto -c -k --keepParent "$(APP)" Veil.zip
+	ditto -c -k --keepParent --norsrc --noextattr --noacl "$(APP)" Veil.zip
 	@echo "Packaged: Veil.zip"
 
 lsp:
