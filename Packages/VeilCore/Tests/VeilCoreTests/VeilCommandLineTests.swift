@@ -1,5 +1,5 @@
 import Testing
-@testable import Veil
+import VeilCore
 
 struct VeilCommandLineTests {
     @Test func rendererOnly() {

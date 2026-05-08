@@ -1,17 +1,17 @@
 import Foundation
 
-enum VeilRendererOption: String, Codable {
+public enum VeilRendererOption: String, Codable {
     case metal
     case coretext
 }
 
-enum VeilCommandLine {
-    struct ParsedArguments {
-        var nvimArgs: [String] = []
-        var renderer: VeilRendererOption = .metal
+public enum VeilCommandLine {
+    public struct ParsedArguments {
+        public var nvimArgs: [String] = []
+        public var renderer: VeilRendererOption = .metal
     }
 
-    static func parse(_ rawArgs: [String]) -> ParsedArguments {
+    public static func parse(_ rawArgs: [String]) -> ParsedArguments {
         var result = ParsedArguments()
         var remaining = rawArgs.dropFirst()
         while let arg = remaining.popFirst() {

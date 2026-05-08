@@ -1,4 +1,5 @@
 import Cocoa
+import VeilCore
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {

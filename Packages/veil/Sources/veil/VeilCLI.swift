@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import VeilCore
 
 private let veilAppBundleIdentifier = "org.1b2c.Veil"
 

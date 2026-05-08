@@ -34,6 +34,7 @@ debug:
 # Assertion details aren't in the stdout log; open the .xcresult bundle in
 # Xcode or use xcrun xcresulttool to inspect them.
 test:
+	@swift test --package-path Packages/VeilCore --quiet
 	@out=$(DERIVED)/test.log; mkdir -p $(DERIVED); \
 	$(XCODEBUILD) -derivedDataPath $(DERIVED) -only-testing:VeilTests CODE_SIGNING_ALLOWED=NO test -quiet > $$out 2>&1; \
 	status=$$?; \
@@ -58,6 +59,7 @@ test:
 	fi
 
 test-verbose:
+	swift test --package-path Packages/VeilCore
 	$(XCODEBUILD) -derivedDataPath $(DERIVED) -only-testing:VeilTests CODE_SIGNING_ALLOWED=NO test -quiet
 
 clean:
