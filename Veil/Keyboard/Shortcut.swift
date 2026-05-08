@@ -85,7 +85,7 @@ extension Shortcut {
     /// and both match the same physical keystroke. Cocoa's
     /// `charactersIgnoringModifiers` applies Shift to punctuation, so without
     /// this table only one form would work for any given pair.
-    private static let shiftedPunctuation: [Character: Character] = [
+    nonisolated private static let shiftedPunctuation: [Character: Character] = [
         "1": "!", "2": "@", "3": "#", "4": "$", "5": "%",
         "6": "^", "7": "&", "8": "*", "9": "(", "0": ")",
         "-": "_", "=": "+",
@@ -100,11 +100,11 @@ extension Shortcut {
     /// Used by `KeyUtils` to undo Cocoa's automatic Shift application on
     /// punctuation before forwarding to nvim, so mappings can be written
     /// with the physical-key form (`<S-D-]>` instead of `<S-D-}>`).
-    static func unshifted(_ character: Character) -> Character? {
+    nonisolated static func unshifted(_ character: Character) -> Character? {
         unshiftedPunctuation[character]
     }
 
-    private static let unshiftedPunctuation: [Character: Character] = {
+    nonisolated private static let unshiftedPunctuation: [Character: Character] = {
         var reverse: [Character: Character] = [:]
         for (unshifted, shifted) in shiftedPunctuation {
             reverse[shifted] = unshifted

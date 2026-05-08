@@ -1,6 +1,10 @@
 PROJECT = Veil.xcodeproj
 SCHEME = Veil
-DEST = platform=macOS
+# Single-arch destination for fast local builds on Apple Silicon.
+# Specifying arch keeps xcodebuild from matching multiple "My Mac" entries.
+DEST = platform=macOS,arch=arm64
+# Generic destination for universal binary builds (no specific machine).
+DEST_UNIVERSAL = generic/platform=macOS
 DERIVED = .build
 APP = $(DERIVED)/Build/Products/Release/Veil.app
 INSTALL_DIR = /Applications
@@ -8,12 +12,17 @@ UNIVERSAL = ONLY_ACTIVE_ARCH=NO
 NO_PROFILING = CLANG_ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO
 
 XCODEBUILD = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST)'
+XCODEBUILD_UNIVERSAL = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST_UNIVERSAL)'
 
-.PHONY: build debug test clean install zip release lsp
+.PHONY: build build-universal debug test test-verbose clean install zip release lsp
 
 build:
-	$(XCODEBUILD) -configuration Release -derivedDataPath $(DERIVED) $(UNIVERSAL) $(NO_PROFILING) -quiet
+	$(XCODEBUILD) -configuration Release -derivedDataPath $(DERIVED) $(NO_PROFILING) -quiet
 	@echo "Built: $(APP)"
+
+build-universal:
+	$(XCODEBUILD_UNIVERSAL) -configuration Release -derivedDataPath $(DERIVED) $(UNIVERSAL) $(NO_PROFILING) -quiet
+	@echo "Built (universal): $(APP)"
 
 debug:
 	$(XCODEBUILD) -configuration Debug -derivedDataPath $(DERIVED) -quiet
@@ -60,7 +69,7 @@ install: build
 	rsync -a "$(APP)/" "$(INSTALL_DIR)/Veil.app/"
 	@echo "Installed to $(INSTALL_DIR)/Veil.app"
 
-zip: build
+zip: build-universal
 	ditto -c -k --keepParent "$(APP)" Veil.zip
 	@echo "Packaged: Veil.zip"
 

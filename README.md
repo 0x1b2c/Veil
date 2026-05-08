@@ -62,10 +62,11 @@ xattr -cr /Applications/Veil.app
 Open `Veil.xcodeproj` in Xcode and run, or:
 
 ```
-make                # Release build
+make                # Release build (arm-only, fast)
 make debug          # Debug build
 make test           # Run unit tests
-make install        # Release build + install to /Applications
+make install        # Build + install to /Applications
+make zip            # Universal build + package as Veil.zip for distribution
 make clean          # Clean build artifacts
 make lsp            # Generate buildServer.json for SourceKit-LSP
 ```
