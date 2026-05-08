@@ -107,9 +107,9 @@ struct RemoteEntry: Decodable {
     let address: String
 }
 
-// MARK: - KeysConfig
+// MARK: - KeyboardConfig
 
-struct KeysConfig: Decodable {
+struct KeyboardConfig: Decodable {
     @DecodableDefault.Wrapper<DecodableDefault.True>
     var bind_default_keymaps: Bool
 
@@ -181,10 +181,10 @@ struct VeilConfig: Decodable {
 
     var remote: [RemoteEntry]?
 
-    var keys: KeysConfig?
+    var keyboard: KeyboardConfig?
 
-    var keysOrDefault: KeysConfig {
-        keys ?? KeysConfig()
+    var keyboardOrDefault: KeyboardConfig {
+        keyboard ?? KeyboardConfig()
     }
 
     static var current: VeilConfig = load()

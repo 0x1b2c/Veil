@@ -21,10 +21,10 @@ Veil ships sensible defaults in both categories so it works well without any con
 
 ## Customizing app shortcuts
 
-Every app shortcut has a config key under `[keys]`. Assign a shortcut string to rebind, or `""` to disable.
+Every app shortcut has a config key under `[keyboard]`. Assign a shortcut string to rebind, or `""` to disable.
 
 ```toml
-[keys]
+[keyboard]
 # Rebind: move new-window from Cmd+N to Cmd+Alt+N (so Cmd+N is free for nvim)
 new_window = "cmd+alt+n"
 
@@ -76,7 +76,7 @@ The "Sent to nvim" column uses Vim's notation for modifier-prefixed keys: `C` is
 To override Veil's defaults entirely, disable them:
 
 ```toml
-[keys]
+[keyboard]
 bind_default_keymaps = false
 ```
 

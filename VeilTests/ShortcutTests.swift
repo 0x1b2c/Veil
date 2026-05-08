@@ -321,28 +321,28 @@ final class ShortcutTests: XCTestCase {
         XCTAssertEqual(mask, .command)
     }
 
-    // MARK: - KeysConfig integration
+    // MARK: - KeyboardConfig integration
 
-    func testKeysConfigDefaultBindDefaultKeymapsIsTrue() {
-        let config = KeysConfig()
+    func testKeyboardConfigDefaultBindDefaultKeymapsIsTrue() {
+        let config = KeyboardConfig()
         XCTAssertTrue(config.bind_default_keymaps)
     }
 
-    func testKeysConfigDefaultShortcutForNewWindow() {
-        let config = KeysConfig()
+    func testKeyboardConfigDefaultShortcutForNewWindow() {
+        let config = KeyboardConfig()
         let spec = config.shortcut(for: .newWindow)
         XCTAssertEqual(spec?.modifiers, .command)
         XCTAssertEqual(spec?.key, .character("n"))
     }
 
-    func testKeysConfigEmptyStringDisablesAction() {
-        var config = KeysConfig()
+    func testKeyboardConfigEmptyStringDisablesAction() {
+        var config = KeyboardConfig()
         config.new_window = ""
         XCTAssertNil(config.shortcut(for: .newWindow))
     }
 
-    func testKeysConfigMalformedStringReturnsNil() {
-        var config = KeysConfig()
+    func testKeyboardConfigMalformedStringReturnsNil() {
+        var config = KeyboardConfig()
         config.new_window = "not-a-valid-shortcut"
         XCTAssertNil(config.shortcut(for: .newWindow))
     }

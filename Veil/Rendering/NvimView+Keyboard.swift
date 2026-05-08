@@ -78,7 +78,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
 
 extension NvimView {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        let keys = VeilConfig.current.keysOrDefault
+        let keyboard = VeilConfig.current.keyboardOrDefault
 
         // Step 1: non-menu default keymaps. Always matched, because macOS's
         //         key view loop swallows Ctrl+Tab before it reaches keyDown,
@@ -88,7 +88,7 @@ extension NvimView {
         //         <D-1>, <S-D-}>, ...) so user mappings on those keys fire.
         for entry in nonMenuDefaultKeymaps {
             if entry.spec.matches(event) {
-                if keys.bind_default_keymaps {
+                if keyboard.bind_default_keymaps {
                     entry.dispatch(self, event)
                 } else {
                     sendKeyDirectly(event)

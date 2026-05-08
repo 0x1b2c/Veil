@@ -328,9 +328,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Must be called after the main menu has been loaded from the xib AND
     /// after AppDelegate's manual menu-item additions (profile picker, connect
     /// remote). Overwrites any key equivalents set in the xib with values from
-    /// `VeilConfig.current.keysOrDefault`.
+    /// `VeilConfig.current.keyboardOrDefault`.
     private func applyConfiguredKeyEquivalents() {
-        let keys = VeilConfig.current.keysOrDefault
+        let keyboard = VeilConfig.current.keyboardOrDefault
 
         // 1. Veil-owned actions: read per-action config and apply.
         for action in KeyAction.allCases {
@@ -338,7 +338,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("Veil: could not find menu item for \(action.rawValue)")
                 continue
             }
-            applyShortcut(to: item, spec: keys.shortcut(for: action))
+            applyShortcut(to: item, spec: keyboard.shortcut(for: action))
         }
 
         // 2. Default Vim keymaps — the menu-handled subset.
@@ -361,7 +361,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         for binding in defaultKeymapMenuBindings {
             guard let item = findMenuItem(selector: NSSelectorFromString(binding.selector))
             else { continue }
-            if keys.bind_default_keymaps {
+            if keyboard.bind_default_keymaps {
                 item.keyEquivalent = binding.key
                 item.keyEquivalentModifierMask = binding.mask
             } else {

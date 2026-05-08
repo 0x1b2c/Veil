@@ -37,9 +37,9 @@
 
 
 # Keyboard shortcuts. See https://github.com/0x1b2c/Veil/blob/master/KEYBOARD.md
-# for full documentation. To enable any of the options below, leave [keys]
+# for full documentation. To enable any of the options below, leave [keyboard]
 # uncommented and uncomment the specific lines you want to override.
-[keys]
+[keyboard]
 
 # When true (default), Veil binds a set of Vim-friendly default keymaps:
 # Cmd+S → :w, Cmd+Z → u, Cmd+1-9 → switch tab, Ctrl+Tab → gt, etc.
