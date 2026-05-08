@@ -6,7 +6,7 @@
 
 A Neovim GUI built for efficiency, not for cool.
 
-Your Neovim config, in proper macOS windows — in the tradition of MacVim. Instant startup with near-zero overhead, fast Metal rendering, fast multi-tab session loading. Designed for focus. No visual noise, no distractions.
+Your Neovim config in proper macOS windows, in the tradition of MacVim. Instant startup with near-zero overhead, fast Metal rendering, fast multi-tab session loading. Designed for focus. No visual noise, no distractions.
 
 ### Why another Neovim GUI?
 
@@ -16,15 +16,14 @@ Vim is a tool built for focused, efficient work. Animations consume attention. C
 
 ## Features
 
-- **Native multi-window**: each window runs an independent Neovim process. `Cmd+N` to create, `` Cmd+` `` to cycle.
-- **Tabs**: by default, Veil lets Neovim handle the tabline so you get the best experience from awesome tabline plugins. A basic native macOS tab bar is available as a fallback via `native_tabs = true` in config. Switch tabs with `Cmd+1` through `Cmd+9`.
-- **Instant startup**: sub-second cold start with near-zero overhead. Fast multi-tab session loading.
-- **Metal-accelerated**: heavily optimized GPU rendering with custom-drawn box-drawing and block element characters for pixel-perfect lines. Falls back to CoreText if Metal is unavailable.
-- **Full key passthrough**: every Ctrl, Option, function key, and any Cmd combination not claimed by Veil reaches Neovim directly. As a native app instead of a terminal process, you gain a rich Cmd+ mapping space that terminal setups can't offer. All default shortcuts are configurable — see [KEYBOARD.md](KEYBOARD.md).
-- **System integration**: standard Edit/File menu actions, trackpad scrolling, font ligatures, window size persistence.
-- **Profile support**: `Cmd+Shift+N` to choose a different `NVIM_APPNAME` per window.
-- **Seamless remote**: connect to a remote Neovim instance over TCP. Clipboard integrates seamlessly with your local Mac.
-- **CJK ready**: full input method support for Chinese, Japanese, Korean.
+- **MacVim-tradition multi-window**: each window runs an independent Neovim, `Cmd+N` to create, `` Cmd+` `` to cycle.
+- **Tabs**: Neovim drives the tabline by default; opt into native macOS tabs with `native_tabs = true`.
+- **Instant startup**: sub-second cold start with fast multi-tab session loading.
+- **Pixel-perfect Metal rendering**: GPU-accelerated, with continuous box-drawing lines and programming ligature support.
+- **Native macOS keyboard handling**: most key sequences reach Neovim untouched; app shortcuts and Neovim keymaps both configurable. See [KEYBOARD.md](KEYBOARD.md).
+- **Per-window profiles**: pick a different `NVIM_APPNAME` per window with `Cmd+Shift+N`.
+- **Seamless remote**: connect to a remote Neovim over TCP, with local clipboard integration.
+- **CJK ready**: auto-fallback to matching CJK font variants with full IME support.
 
 <p align="center">
   <img src="screenshots/main.png" alt="Veil screenshot">
@@ -87,31 +86,29 @@ vim.o.guifont = 'Maple Mono NF CN:h16'
 
 Setting a [Nerd Font](https://www.nerdfonts.com/) as your `guifont` is the most reliable way to get statusline icons and devicons working. If you don't, Veil will automatically search for any installed Nerd Font on your system and use it as a fallback for icon glyphs, similar to how terminals like WezTerm and Kitty handle font fallback.
 
+### Configuration
+
+Veil's own settings live in `~/.config/veil/veil.toml`, separate from your Neovim configuration. All fields are optional and have sensible defaults. See [`veil.sample.toml`](veil.sample.toml) for the full reference. Changes take effect on the next new window.
+
 ### Keyboard
 
-Veil handles a small set of Cmd-key shortcuts for window and tab management; everything else is passed to Neovim as `<D-...>` or `<C-...>`. All shortcuts are configurable via `veil.toml` — see [KEYBOARD.md](KEYBOARD.md) for the full list, string format, and migration guide.
+Veil's keybindings split into two categories: **app shortcuts** for Veil's own actions (new window, close tab, open settings, etc.) and **Neovim keymaps** for macOS-style shortcuts pre-bound to Neovim commands (`cmd+s` → `:w`, `cmd+1`-`9` → switch tabs, etc.). Both are configurable, and the Neovim keymaps can be disabled wholesale to free those keys for your own nvim mappings. See [KEYBOARD.md](KEYBOARD.md) for the full list and string format.
 
 Quick reference:
 
-| Key                   | Action                                |
-| --------------------- | ------------------------------------- |
-| `Cmd+N`               | New window                            |
-| `Cmd+W`               | Close tab (or window if only one tab) |
-| `` Cmd+` ``           | Cycle windows                         |
-| `Cmd+1` – `Cmd+9`     | Switch tab                            |
-| `Cmd+,`               | Open settings (veil.toml)             |
-| `Cmd+Ctrl+Shift+N`    | Connect to remote nvim                |
+| Key                | Action                                |
+| ------------------ | ------------------------------------- |
+| `Cmd+N`            | New window                            |
+| `Cmd+Shift+N`      | New window with profile picker        |
+| `Cmd+W`            | Close tab (or window if only one tab) |
+| `Cmd+Shift+W`      | Close window                          |
+| `Cmd+Q`            | Quit Veil                             |
+| `` Cmd+` ``        | Cycle windows                         |
+| `Cmd+1` – `Cmd+9`  | Switch tab                            |
+| `Cmd+,`            | Open settings (veil.toml)             |
+| `Cmd+Ctrl+Shift+N` | Connect to remote nvim                |
 
-For custom Cmd-key mappings in your nvim config:
-
-```lua
--- Example: Cmd+P to open a file picker
-vim.keymap.set('n', '<D-p>', Snacks.picker.files)
-```
-
-### Configuration
-
-Veil reads settings from `~/.config/veil/veil.toml`. All fields are optional and have sensible defaults. See [`veil.sample.toml`](veil.sample.toml) for the full reference. Changes take effect on the next new window.
+Each of these stays at the granularity macOS users expect: `Cmd+W` closes one tab, `Cmd+Shift+W` closes the window, `Cmd+Q` quits the entire app. Unsaved-buffer prompts route through Neovim's `:confirm qa`.
 
 ### Remote Neovim
 
