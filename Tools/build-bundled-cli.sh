@@ -1,6 +1,15 @@
 #!/bin/sh
 set -eu
 
+# Fallbacks let the script run standalone (without xcodebuild) for timing,
+# debugging, or A/B comparisons. When invoked as a Run Script build phase
+# Xcode supplies all five variables and overrides every default below.
+: "${SRCROOT:=$(cd "$(dirname "$0")/.." && pwd)}"
+: "${ARCHS:=$(uname -m)}"
+: "${BUILT_PRODUCTS_DIR:=/tmp/veil-cli-standalone}"
+: "${CONTENTS_FOLDER_PATH:=Veil.app/Contents}"
+: "${EXPANDED_CODE_SIGN_IDENTITY:=-}"
+
 mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin"
 
 cli_bin="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/veil"
@@ -19,17 +28,15 @@ swift build \
     ${arch_args}
 
 # Multi-arch SPM builds land under .build/apple/Products/Release/. Single-arch
-# builds land under .build/<arch>-apple-macosx/release/. Pick whichever exists
-# so the script works under either configuration Xcode hands us.
-src_bin="${pkg_dir}/.build/apple/Products/Release/veil"
-if [ ! -f "${src_bin}" ]; then
-    for arch in ${ARCHS}; do
-        candidate="${pkg_dir}/.build/${arch}-apple-macosx/release/veil"
-        if [ -f "${candidate}" ]; then
-            src_bin="${candidate}"
-            break
-        fi
-    done
+# builds land under .build/<arch>-apple-macosx/release/. Pick the path that
+# matches the current ARCHS, otherwise a stale multi-arch binary left over
+# from a previous `make zip` could shadow the fresh single-arch output of
+# `make build`.
+set -- ${ARCHS}
+if [ $# -gt 1 ]; then
+    src_bin="${pkg_dir}/.build/apple/Products/Release/veil"
+else
+    src_bin="${pkg_dir}/.build/$1-apple-macosx/release/veil"
 fi
 
 cp "${src_bin}" "${cli_bin}"
