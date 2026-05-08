@@ -1,6 +1,7 @@
 import AppKit
 import CoreVideo
 import MessagePack
+import VeilCore
 
 class WindowDocument: NSDocument, NvimViewDelegate {
     var profile = Profile.default
@@ -279,12 +280,8 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     // MARK: - Version
 
     private static func hasUpdate() -> Bool {
-        let current =
-            Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
-        if let latest = UpdateChecker.latestVersion {
-            return latest != current
-        }
-        return false
+        guard let latest = UpdateChecker.latestVersion else { return false }
+        return latest != BuildVersion.version
     }
 
     private static func versionEchoChunks(nvimVersion: String? = nil) -> [MessagePackValue] {
@@ -297,11 +294,9 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     }
 
     private static func versionLines(nvimVersion: String? = nil) -> [String] {
-        let current =
-            Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
         var lines: [String] = []
         if let nvimVersion { lines.append(nvimVersion) }
-        lines.append("Veil v\(current)")
+        lines.append("Veil \(BuildVersion.displayVersion)")
 
         if hasUpdate(), let latest = UpdateChecker.latestVersion {
             lines.append("")
