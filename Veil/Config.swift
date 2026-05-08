@@ -111,7 +111,7 @@ struct RemoteEntry: Decodable {
 
 struct KeyboardConfig: Decodable {
     @DecodableDefault.Wrapper<DecodableDefault.True>
-    var bind_default_keymaps: Bool
+    var bind_default_neovim_keymaps: Bool
 
     var new_window: String?
     var new_window_with_profile: String?

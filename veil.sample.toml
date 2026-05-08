@@ -45,7 +45,7 @@
 # Cmd+S → :w, Cmd+Z → u, Cmd+1-9 → switch tab, Ctrl+Tab → gt, etc.
 # Set to false to let these keys pass through to Neovim as <D-s>, <D-1>,
 # <C-Tab>, etc. You can then map them yourself in your nvim config.
-# bind_default_keymaps = true
+# bind_default_neovim_keymaps = true
 
 # Rebind Veil's GUI actions. Set to "" to disable a shortcut
 # (the menu item remains and stays clickable).

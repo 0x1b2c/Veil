@@ -83,12 +83,13 @@ extension NvimView {
         // Step 1: non-menu default keymaps. Always matched, because macOS's
         //         key view loop swallows Ctrl+Tab before it reaches keyDown,
         //         so we must claim it here in both modes. When
-        //         bind_default_keymaps is true, run the vim command (tabnext
-        //         etc.). When false, forward the raw key to nvim (<C-Tab>,
-        //         <D-1>, <S-D-}>, ...) so user mappings on those keys fire.
+        //         bind_default_neovim_keymaps is true, run the vim command
+        //         (tabnext etc.). When false, forward the raw key to nvim
+        //         (<C-Tab>, <D-1>, <S-D-}>, ...) so user mappings on those
+        //         keys fire.
         for entry in nonMenuDefaultKeymaps {
             if entry.spec.matches(event) {
-                if keyboard.bind_default_keymaps {
+                if keyboard.bind_default_neovim_keymaps {
                     entry.dispatch(self, event)
                 } else {
                     sendKeyDirectly(event)
@@ -124,9 +125,9 @@ extension NvimView {
         //         <S-D-}> etc. for any Cmd+ event that no menu claimed.
         //         This is how Cmd+P, Cmd+J, and any unbound Cmd+letter
         //         reach nvim. Also how disabled default keymaps reach nvim
-        //         when bind_default_keymaps = false — the menu items have
-        //         cleared keyEquivalents, so step 3 above won't claim them
-        //         and they fall through here.
+        //         when bind_default_neovim_keymaps = false — the menu items
+        //         have cleared keyEquivalents, so step 3 above won't claim
+        //         them and they fall through here.
         if event.modifierFlags.contains(.command),
             let chars = event.charactersIgnoringModifiers,
             !chars.isEmpty,

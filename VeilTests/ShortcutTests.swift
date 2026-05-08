@@ -323,9 +323,9 @@ final class ShortcutTests: XCTestCase {
 
     // MARK: - KeyboardConfig integration
 
-    func testKeyboardConfigDefaultBindDefaultKeymapsIsTrue() {
+    func testKeyboardConfigDefaultBindDefaultNeovimKeymapsIsTrue() {
         let config = KeyboardConfig()
-        XCTAssertTrue(config.bind_default_keymaps)
+        XCTAssertTrue(config.bind_default_neovim_keymaps)
     }
 
     func testKeyboardConfigDefaultShortcutForNewWindow() {
@@ -360,7 +360,7 @@ final class ShortcutTests: XCTestCase {
 
     /// Verify that KeyUtils.nvimKey produces the Vim notation the migration
     /// cheatsheet promises. These are the notations nvim receives in step 3
-    /// of `performKeyEquivalent` when `bind_default_keymaps = false`.
+    /// of `performKeyEquivalent` when `bind_default_neovim_keymaps = false`.
     func testKeyUtilsNvimKeyForShiftedPunctuation() {
         XCTAssertEqual(
             KeyUtils.nvimKey(characters: "}", modifiers: [.shift, .command]),

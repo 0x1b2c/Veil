@@ -342,12 +342,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 2. Default Vim keymaps — the menu-handled subset.
-        //    When bind_default_keymaps is true, set each menu item to its
-        //    built-in Cocoa shortcut. When false, clear it so the key falls
-        //    through performKeyEquivalent and is synthesized as <D-...> for
-        //    nvim. Both directions must be handled so toggling the flag at
-        //    runtime (e.g., after a config reload) correctly restores or
-        //    clears the menu bindings.
+        //    When bind_default_neovim_keymaps is true, set each menu item
+        //    to its built-in Cocoa shortcut. When false, clear it so the
+        //    key falls through performKeyEquivalent and is synthesized as
+        //    <D-...> for nvim. Both directions must be handled so toggling
+        //    the flag at runtime (e.g., after a config reload) correctly
+        //    restores or clears the menu bindings.
         let defaultKeymapMenuBindings:
             [(selector: String, key: String, mask: NSEvent.ModifierFlags)] = [
                 ("saveDocument:", "s", .command),
@@ -361,7 +361,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         for binding in defaultKeymapMenuBindings {
             guard let item = findMenuItem(selector: NSSelectorFromString(binding.selector))
             else { continue }
-            if keyboard.bind_default_keymaps {
+            if keyboard.bind_default_neovim_keymaps {
                 item.keyEquivalent = binding.key
                 item.keyEquivalentModifierMask = binding.mask
             } else {

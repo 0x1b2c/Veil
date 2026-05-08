@@ -15,7 +15,7 @@ Veil's keybindings split into two categories that differ in ownership and config
 
 **App shortcuts** trigger Veil's own actions: open a new window, quit, hide Veil, open settings, connect to a remote nvim. They correspond to items in Veil's menu bar. Each shortcut can be rebound or disabled independently. Disabling a shortcut leaves the menu item visible and clickable; only the keybinding is removed.
 
-**Neovim keymaps** are macOS-style shortcuts that Veil pre-binds to Neovim commands so the editor behaves like a native Mac app by default. `cmd+s` runs `:w`, `cmd+z` runs `u`, `cmd+1` through `cmd+9` switch tabs. They form a single all-or-nothing set, controlled by `bind_default_keymaps`: when `true` (the default), every key is bound to its Neovim action; when `false`, every key passes through to Neovim verbatim (`<D-s>`, `<D-z>`, `<D-1>`, ...) for you to map in your nvim config.
+**Neovim keymaps** are macOS-style shortcuts that Veil pre-binds to Neovim commands so the editor behaves like a native Mac app by default. `cmd+s` runs `:w`, `cmd+z` runs `u`, `cmd+1` through `cmd+9` switch tabs. They form a single all-or-nothing set, controlled by `bind_default_neovim_keymaps`: when `true` (the default), every key is bound to its Neovim action; when `false`, every key passes through to Neovim verbatim (`<D-s>`, `<D-z>`, `<D-1>`, ...) for you to map in your nvim config.
 
 Veil ships sensible defaults in both categories so it works well without any configuration. The two sections below cover how to change either.
 
@@ -47,7 +47,7 @@ Full list of app shortcuts:
 | `open_settings`           | `cmd+,`            | Open `veil.toml` for editing                  |
 | `connect_remote`          | `cmd+ctrl+shift+n` | Connect to a remote nvim instance over TCP    |
 
-**Conflict with Neovim keymaps**: when `bind_default_keymaps = true` (the default), every key listed in [Customizing Neovim keymaps](#customizing-neovim-keymaps) is claimed by Veil. Rebinding an app shortcut to one of those keys is silently shadowed. Either pick a different key or set `bind_default_keymaps = false` to free the entire set.
+**Conflict with Neovim keymaps**: when `bind_default_neovim_keymaps = true` (the default), every key listed in [Customizing Neovim keymaps](#customizing-neovim-keymaps) is claimed by Veil. Rebinding an app shortcut to one of those keys is silently shadowed. Either pick a different key or set `bind_default_neovim_keymaps = false` to free the entire set.
 
 **Not configurable**: `Cmd+backtick` (window cycling) is handled by macOS's built-in Window menu, not by Veil.
 
@@ -77,13 +77,13 @@ To override Veil's defaults entirely, disable them:
 
 ```toml
 [keyboard]
-bind_default_keymaps = false
+bind_default_neovim_keymaps = false
 ```
 
 Veil then forwards every key in the table to Neovim as the notation in the rightmost column. Map them in your nvim config:
 
 ```lua
--- Veil default keymaps, re-implemented for bind_default_keymaps = false
+-- Veil default keymaps, re-implemented for bind_default_neovim_keymaps = false
 vim.keymap.set('n', '<D-s>', ':w<CR>')
 vim.keymap.set('n', '<D-z>', 'u')
 vim.keymap.set('n', '<S-D-z>', '<C-r>')
@@ -105,7 +105,7 @@ vim.keymap.set('n', '<S-D-{>', 'gT')  -- Shift+Cmd+[
 
 There is no per-key disable. The toggle is intentionally all-or-nothing because the value of these keymaps lies in their consistency: a partially-bound set creates more confusion than either extreme.
 
-**Caveat for `cmd+v`**: the Lua mapping above calls `vim.paste`, the same API Veil uses internally. Veil's version is still more reliable and faster because it reads the system clipboard directly instead of going through Neovim's clipboard provider. If you paste a lot of multi-line content, keeping `bind_default_keymaps = true` is the safer choice.
+**Caveat for `cmd+v`**: the Lua mapping above calls `vim.paste`, the same API Veil uses internally. Veil's version is still more reliable and faster because it reads the system clipboard directly instead of going through Neovim's clipboard provider. If you paste a lot of multi-line content, keeping `bind_default_neovim_keymaps = true` is the safer choice.
 
 ## Shortcut syntax
 
