@@ -49,6 +49,8 @@ Full list of app shortcuts:
 
 **Conflict with Neovim keymaps**: when `bind_default_neovim_keymaps = true` (the default), every key listed in [Customizing Neovim keymaps](#customizing-neovim-keymaps) is claimed by Veil. Rebinding an app shortcut to one of those keys is silently shadowed. Either pick a different key or set `bind_default_neovim_keymaps = false` to free the entire set.
 
+**Exception**: `ctrl+tab` cannot be bound to a custom app shortcut. macOS's key view loop intercepts `ctrl+tab` before Veil's normal dispatch chain runs, and Veil currently routes the event straight to Neovim rather than override the system's handling. Binding an app shortcut to `ctrl+tab` is silently ignored.
+
 **Not configurable**: `Cmd+backtick` (window cycling) is handled by macOS's built-in Window menu, not by Veil.
 
 ## Customizing Neovim keymaps

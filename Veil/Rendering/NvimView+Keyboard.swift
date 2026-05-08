@@ -12,6 +12,7 @@ import MessagePack
 /// is invoked, so calling the closure from there is allowed without `await`.
 private struct DefaultKeymapEntry {
     let spec: Shortcut
+    let alwaysClaim: Bool
     let dispatch: @MainActor (NvimView, NSEvent) -> Void
 }
 
@@ -25,7 +26,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     for digit in 1...8 {
         guard let spec = Shortcut.parse("cmd+\(digit)") else { continue }
         entries.append(
-            DefaultKeymapEntry(spec: spec) { view, _ in
+            DefaultKeymapEntry(spec: spec, alwaysClaim: false) { view, _ in
                 Task { try? await view.channel?.command("tabnext \(digit)") }
             })
     }
@@ -33,15 +34,18 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     // Cmd+9: switch to last tab.
     if let spec = Shortcut.parse("cmd+9") {
         entries.append(
-            DefaultKeymapEntry(spec: spec) { view, _ in
+            DefaultKeymapEntry(spec: spec, alwaysClaim: false) { view, _ in
                 Task { try? await view.channel?.command("tablast") }
             })
     }
 
     // Ctrl+Tab: next tab.
+    // Only entry with alwaysClaim: true. macOS's key view loop swallows
+    // ctrl+tab before it reaches keyDown, so we must claim it in
+    // performKeyEquivalent regardless of bind_default_neovim_keymaps.
     if let spec = Shortcut.parse("ctrl+tab") {
         entries.append(
-            DefaultKeymapEntry(spec: spec) { view, _ in
+            DefaultKeymapEntry(spec: spec, alwaysClaim: true) { view, _ in
                 Task { try? await view.channel?.command("tabnext") }
             })
     }
@@ -49,7 +53,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     // Shift+Ctrl+Tab: previous tab.
     if let spec = Shortcut.parse("shift+ctrl+tab") {
         entries.append(
-            DefaultKeymapEntry(spec: spec) { view, _ in
+            DefaultKeymapEntry(spec: spec, alwaysClaim: false) { view, _ in
                 Task { try? await view.channel?.command("tabprevious") }
             })
     }
@@ -57,7 +61,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     // Shift+Cmd+]: next tab.
     if let spec = Shortcut.parse("shift+cmd+]") {
         entries.append(
-            DefaultKeymapEntry(spec: spec) { view, _ in
+            DefaultKeymapEntry(spec: spec, alwaysClaim: false) { view, _ in
                 Task { try? await view.channel?.command("tabnext") }
             })
     }
@@ -65,7 +69,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     // Shift+Cmd+[: previous tab.
     if let spec = Shortcut.parse("shift+cmd+[") {
         entries.append(
-            DefaultKeymapEntry(spec: spec) { view, _ in
+            DefaultKeymapEntry(spec: spec, alwaysClaim: false) { view, _ in
                 Task { try? await view.channel?.command("tabprevious") }
             })
     }
@@ -79,15 +83,23 @@ extension NvimView {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let keyboard = VeilConfig.current.keyboardOrDefault
 
-        // Step 1: non-menu default keymaps. Always matched, because macOS's
-        //         key view loop swallows Ctrl+Tab before it reaches keyDown,
-        //         so we must claim it here in both modes. When
-        //         bind_default_neovim_keymaps is true, run the vim command
-        //         (tabnext etc.). When false, forward the raw key to nvim
-        //         (<C-Tab>, <D-1>, <S-D-]>, ...) so user mappings on those
-        //         keys fire.
+        // Step 1: non-menu default keymaps. Only ctrl+tab is unconditionally
+        //         claimed here, because macOS's key view loop swallows it
+        //         before keyDown, so performKeyEquivalent is our only chance.
+        //         The other 5 entries (cmd+1-9, shift+ctrl+tab, shift+cmd+[/])
+        //         are gated on bind_default_neovim_keymaps: when true, run
+        //         the vim command (tabnext etc.) or forward the raw key to
+        //         nvim; when false, fall through so menu dispatch (Step 3)
+        //         or Cmd+letter synthesis (Step 4) can take over, allowing
+        //         users to bind app shortcuts to those keys.
         for entry in nonMenuDefaultKeymaps {
             if entry.spec.matches(event) {
+                if !entry.alwaysClaim && !keyboard.bind_default_neovim_keymaps {
+                    // The user has disabled default keymaps. For all keys except
+                    // ctrl+tab, let the event fall through so menu dispatch (Step 3)
+                    // or Cmd+letter synthesis (Step 4) can take over.
+                    break
+                }
                 if keyboard.bind_default_neovim_keymaps {
                     entry.dispatch(self, event)
                 } else {
