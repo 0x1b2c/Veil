@@ -1,10 +1,10 @@
 import AppKit
 
-/// A parsed keyboard shortcut specification.
+/// A parsed keyboard shortcut.
 ///
-/// Created from a string like `"cmd+shift+n"` via `ShortcutSpec.parse(_:)`.
+/// Created from a string like `"cmd+shift+n"` via `Shortcut.parse(_:)`.
 /// Used for runtime event matching and NSMenu key equivalent conversion.
-struct ShortcutSpec: Equatable {
+struct Shortcut: Equatable {
     let modifiers: NSEvent.ModifierFlags
     let key: Key
 
@@ -20,20 +20,22 @@ struct ShortcutSpec: Equatable {
 
     /// Special keys that can't be expressed as a single character.
     enum NamedKey: String, CaseIterable {
-        case tab, `return`, escape, space, backspace, delete
+        case tab, `return`, escape, space, backspace, delete, insert
         case up, down, left, right
         case home, end, pageUp = "pageup", pageDown = "pagedown"
         case f1, f2, f3, f4, f5, f6, f7, f8, f9, f10
         case f11, f12, f13, f14, f15, f16, f17, f18, f19, f20
+        case f21, f22, f23, f24, f25, f26, f27, f28, f29, f30
+        case f31, f32, f33, f34, f35
     }
 }
 
-extension ShortcutSpec {
-    /// Parse a shortcut string like `"cmd+shift+n"` into a `ShortcutSpec`.
+extension Shortcut {
+    /// Parse a shortcut string like `"cmd+shift+n"` into a `Shortcut`.
     ///
     /// Returns `nil` for empty strings (interpreted by callers as "disabled")
     /// or malformed input.
-    static func parse(_ string: String) -> ShortcutSpec? {
+    static func parse(_ string: String) -> Shortcut? {
         let trimmed = string.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
 
@@ -68,17 +70,32 @@ extension ShortcutSpec {
 
         // Try named key first (case-insensitive).
         if let namedKey = NamedKey(rawValue: keyToken.lowercased()) {
-            return ShortcutSpec(modifiers: modifiers, key: .named(namedKey))
+            return Shortcut(modifiers: modifiers, key: .named(namedKey))
         }
 
         // Fall back to single-character key.
         guard keyToken.count == 1 else { return nil }
-        return ShortcutSpec(modifiers: modifiers, key: .character(keyToken))
+        return Shortcut(modifiers: modifiers, key: .character(keyToken))
     }
 }
 
-extension ShortcutSpec {
-    /// Returns true if the given keyboard event matches this shortcut spec.
+extension Shortcut {
+    /// US ANSI shifted-punctuation pairs (unshifted → shifted). Used so that
+    /// users can write either form in config (`shift+cmd+]` or `shift+cmd+}`)
+    /// and both match the same physical keystroke. Cocoa's
+    /// `charactersIgnoringModifiers` applies Shift to punctuation, so without
+    /// this table only one form would work for any given pair.
+    private static let shiftedPunctuation: [Character: Character] = [
+        "1": "!", "2": "@", "3": "#", "4": "$", "5": "%",
+        "6": "^", "7": "&", "8": "*", "9": "(", "0": ")",
+        "-": "_", "=": "+",
+        "[": "{", "]": "}", "\\": "|",
+        ";": ":", "'": "\"",
+        ",": "<", ".": ">", "/": "?",
+        "`": "~",
+    ]
+
+    /// Returns true if the given keyboard event matches this shortcut.
     func matches(_ event: NSEvent) -> Bool {
         // Compare modifiers, ignoring .function, .numericPad, .capsLock, and
         // other flags Cocoa sets automatically but that aren't part of a shortcut.
@@ -90,7 +107,16 @@ extension ShortcutSpec {
         switch self.key {
         case .character(let c):
             guard let eventChars = event.charactersIgnoringModifiers else { return false }
-            return eventChars.lowercased() == c.lowercased()
+            if eventChars.lowercased() == c.lowercased() { return true }
+            // Accept the other side of the shifted-punctuation pair so that
+            // `shift+cmd+]` and `shift+cmd+}` both match Shift+Cmd+].
+            if modifiers.contains(.shift),
+                let specChar = c.first, let eventChar = eventChars.first
+            {
+                if Self.shiftedPunctuation[specChar] == eventChar { return true }
+                if Self.shiftedPunctuation[eventChar] == specChar { return true }
+            }
+            return false
         case .named(let namedKey):
             return matchesNamedKey(namedKey, event: event)
         }
@@ -111,37 +137,24 @@ extension ShortcutSpec {
         case .end: return code == NSEndFunctionKey
         case .pageUp: return code == NSPageUpFunctionKey
         case .pageDown: return code == NSPageDownFunctionKey
+        case .insert: return code == NSInsertFunctionKey
         case .delete: return code == NSDeleteFunctionKey
         case .tab: return code == 0x09
         case .return: return code == 0x0D
         case .escape: return code == 0x1B
         case .space: return code == 0x20
         case .backspace: return code == 0x7F
-        case .f1: return code == NSF1FunctionKey
-        case .f2: return code == NSF2FunctionKey
-        case .f3: return code == NSF3FunctionKey
-        case .f4: return code == NSF4FunctionKey
-        case .f5: return code == NSF5FunctionKey
-        case .f6: return code == NSF6FunctionKey
-        case .f7: return code == NSF7FunctionKey
-        case .f8: return code == NSF8FunctionKey
-        case .f9: return code == NSF9FunctionKey
-        case .f10: return code == NSF10FunctionKey
-        case .f11: return code == NSF11FunctionKey
-        case .f12: return code == NSF12FunctionKey
-        case .f13: return code == NSF13FunctionKey
-        case .f14: return code == NSF14FunctionKey
-        case .f15: return code == NSF15FunctionKey
-        case .f16: return code == NSF16FunctionKey
-        case .f17: return code == NSF17FunctionKey
-        case .f18: return code == NSF18FunctionKey
-        case .f19: return code == NSF19FunctionKey
-        case .f20: return code == NSF20FunctionKey
+        case .f1, .f2, .f3, .f4, .f5, .f6, .f7, .f8, .f9, .f10,
+            .f11, .f12, .f13, .f14, .f15, .f16, .f17, .f18, .f19, .f20,
+            .f21, .f22, .f23, .f24, .f25, .f26, .f27, .f28, .f29, .f30,
+            .f31, .f32, .f33, .f34, .f35:
+            guard let number = Int(namedKey.rawValue.dropFirst()) else { return false }
+            return code == NSF1FunctionKey + (number - 1)
         }
     }
 }
 
-extension ShortcutSpec {
+extension Shortcut {
     /// Convert to NSMenu's keyEquivalent + modifierMask form.
     ///
     /// For ASCII letters with Shift set, uses the uppercase letter and keeps
@@ -165,7 +178,7 @@ extension ShortcutSpec {
     }
 }
 
-extension ShortcutSpec.NamedKey {
+extension Shortcut.NamedKey {
     /// The string NSMenu uses as `keyEquivalent` for this named key, if any.
     var menuCharacter: String? {
         switch self {
@@ -175,34 +188,25 @@ extension ShortcutSpec.NamedKey {
         case .space: return " "
         case .backspace: return "\u{8}"
         case .delete: return "\u{7F}"
-        case .up: return String(Character(UnicodeScalar(NSUpArrowFunctionKey)!))
-        case .down: return String(Character(UnicodeScalar(NSDownArrowFunctionKey)!))
-        case .left: return String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!))
-        case .right: return String(Character(UnicodeScalar(NSRightArrowFunctionKey)!))
-        case .home: return String(Character(UnicodeScalar(NSHomeFunctionKey)!))
-        case .end: return String(Character(UnicodeScalar(NSEndFunctionKey)!))
-        case .pageUp: return String(Character(UnicodeScalar(NSPageUpFunctionKey)!))
-        case .pageDown: return String(Character(UnicodeScalar(NSPageDownFunctionKey)!))
-        case .f1: return String(Character(UnicodeScalar(NSF1FunctionKey)!))
-        case .f2: return String(Character(UnicodeScalar(NSF2FunctionKey)!))
-        case .f3: return String(Character(UnicodeScalar(NSF3FunctionKey)!))
-        case .f4: return String(Character(UnicodeScalar(NSF4FunctionKey)!))
-        case .f5: return String(Character(UnicodeScalar(NSF5FunctionKey)!))
-        case .f6: return String(Character(UnicodeScalar(NSF6FunctionKey)!))
-        case .f7: return String(Character(UnicodeScalar(NSF7FunctionKey)!))
-        case .f8: return String(Character(UnicodeScalar(NSF8FunctionKey)!))
-        case .f9: return String(Character(UnicodeScalar(NSF9FunctionKey)!))
-        case .f10: return String(Character(UnicodeScalar(NSF10FunctionKey)!))
-        case .f11: return String(Character(UnicodeScalar(NSF11FunctionKey)!))
-        case .f12: return String(Character(UnicodeScalar(NSF12FunctionKey)!))
-        case .f13: return String(Character(UnicodeScalar(NSF13FunctionKey)!))
-        case .f14: return String(Character(UnicodeScalar(NSF14FunctionKey)!))
-        case .f15: return String(Character(UnicodeScalar(NSF15FunctionKey)!))
-        case .f16: return String(Character(UnicodeScalar(NSF16FunctionKey)!))
-        case .f17: return String(Character(UnicodeScalar(NSF17FunctionKey)!))
-        case .f18: return String(Character(UnicodeScalar(NSF18FunctionKey)!))
-        case .f19: return String(Character(UnicodeScalar(NSF19FunctionKey)!))
-        case .f20: return String(Character(UnicodeScalar(NSF20FunctionKey)!))
+        case .up: return functionKeyString(NSUpArrowFunctionKey)
+        case .down: return functionKeyString(NSDownArrowFunctionKey)
+        case .left: return functionKeyString(NSLeftArrowFunctionKey)
+        case .right: return functionKeyString(NSRightArrowFunctionKey)
+        case .home: return functionKeyString(NSHomeFunctionKey)
+        case .end: return functionKeyString(NSEndFunctionKey)
+        case .pageUp: return functionKeyString(NSPageUpFunctionKey)
+        case .pageDown: return functionKeyString(NSPageDownFunctionKey)
+        case .insert: return functionKeyString(NSInsertFunctionKey)
+        case .f1, .f2, .f3, .f4, .f5, .f6, .f7, .f8, .f9, .f10,
+            .f11, .f12, .f13, .f14, .f15, .f16, .f17, .f18, .f19, .f20,
+            .f21, .f22, .f23, .f24, .f25, .f26, .f27, .f28, .f29, .f30,
+            .f31, .f32, .f33, .f34, .f35:
+            guard let number = Int(rawValue.dropFirst()) else { return nil }
+            return functionKeyString(NSF1FunctionKey + (number - 1))
         }
+    }
+
+    private func functionKeyString(_ code: Int) -> String? {
+        UnicodeScalar(code).map { String(Character($0)) }
     }
 }

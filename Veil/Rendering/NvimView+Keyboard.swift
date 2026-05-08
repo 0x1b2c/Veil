@@ -11,7 +11,7 @@ import MessagePack
 /// and therefore main-actor-bound. This matches how `performKeyEquivalent` itself
 /// is invoked, so calling the closure from there is allowed without `await`.
 private struct DefaultKeymapEntry {
-    let spec: ShortcutSpec
+    let spec: Shortcut
     let dispatch: @MainActor (NvimView, NSEvent) -> Void
 }
 
@@ -23,7 +23,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
 
     // Cmd+1 through Cmd+8: switch to tab N.
     for digit in 1...8 {
-        guard let spec = ShortcutSpec.parse("cmd+\(digit)") else { continue }
+        guard let spec = Shortcut.parse("cmd+\(digit)") else { continue }
         entries.append(
             DefaultKeymapEntry(spec: spec) { view, _ in
                 Task { try? await view.channel?.command("tabnext \(digit)") }
@@ -31,7 +31,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     }
 
     // Cmd+9: switch to last tab.
-    if let spec = ShortcutSpec.parse("cmd+9") {
+    if let spec = Shortcut.parse("cmd+9") {
         entries.append(
             DefaultKeymapEntry(spec: spec) { view, _ in
                 Task { try? await view.channel?.command("tablast") }
@@ -39,7 +39,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     }
 
     // Ctrl+Tab: next tab.
-    if let spec = ShortcutSpec.parse("ctrl+tab") {
+    if let spec = Shortcut.parse("ctrl+tab") {
         entries.append(
             DefaultKeymapEntry(spec: spec) { view, _ in
                 Task { try? await view.channel?.command("tabnext") }
@@ -47,7 +47,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     }
 
     // Shift+Ctrl+Tab: previous tab.
-    if let spec = ShortcutSpec.parse("shift+ctrl+tab") {
+    if let spec = Shortcut.parse("shift+ctrl+tab") {
         entries.append(
             DefaultKeymapEntry(spec: spec) { view, _ in
                 Task { try? await view.channel?.command("tabprevious") }
@@ -56,7 +56,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
 
     // Shift+Cmd+}: next tab. (Note: the user presses Shift+Cmd+] which
     // produces `}` via Cocoa's shifted-punctuation behavior.)
-    if let spec = ShortcutSpec.parse("shift+cmd+}") {
+    if let spec = Shortcut.parse("shift+cmd+}") {
         entries.append(
             DefaultKeymapEntry(spec: spec) { view, _ in
                 Task { try? await view.channel?.command("tabnext") }
@@ -64,7 +64,7 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     }
 
     // Shift+Cmd+{: previous tab. (User presses Shift+Cmd+[.)
-    if let spec = ShortcutSpec.parse("shift+cmd+{") {
+    if let spec = Shortcut.parse("shift+cmd+{") {
         entries.append(
             DefaultKeymapEntry(spec: spec) { view, _ in
                 Task { try? await view.channel?.command("tabprevious") }

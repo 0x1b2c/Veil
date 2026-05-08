@@ -143,12 +143,12 @@ struct KeysConfig: Decodable {
         return userValue ?? action.defaultShortcut
     }
 
-    /// Returns the parsed ShortcutSpec for the given action, or `nil` if the
+    /// Returns the parsed Shortcut for the given action, or `nil` if the
     /// user disabled it (empty string) or the string fails to parse.
-    func shortcut(for action: KeyAction) -> ShortcutSpec? {
+    func shortcut(for action: KeyAction) -> Shortcut? {
         let raw = rawShortcut(for: action)
         if raw.isEmpty { return nil }
-        if let spec = ShortcutSpec.parse(raw) { return spec }
+        if let spec = Shortcut.parse(raw) { return spec }
         // Malformed: log and treat as disabled.
         NSLog("Veil: malformed shortcut '\(raw)' for \(action.rawValue); treated as disabled")
         return nil

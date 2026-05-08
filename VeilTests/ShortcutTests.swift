@@ -2,57 +2,57 @@ import AppKit
 import XCTest
 @testable import Veil
 
-final class ShortcutSpecTests: XCTestCase {
+final class ShortcutTests: XCTestCase {
 
     // MARK: - Parse: modifiers
 
     func testParseSingleModifierCmd() {
-        let spec = ShortcutSpec.parse("cmd+n")
+        let spec = Shortcut.parse("cmd+n")
         XCTAssertEqual(spec?.modifiers, .command)
         XCTAssertEqual(spec?.key, .character("n"))
     }
 
     func testParseSingleModifierCtrl() {
-        let spec = ShortcutSpec.parse("ctrl+a")
+        let spec = Shortcut.parse("ctrl+a")
         XCTAssertEqual(spec?.modifiers, .control)
         XCTAssertEqual(spec?.key, .character("a"))
     }
 
     func testParseSingleModifierShift() {
-        let spec = ShortcutSpec.parse("shift+a")
+        let spec = Shortcut.parse("shift+a")
         XCTAssertEqual(spec?.modifiers, .shift)
         XCTAssertEqual(spec?.key, .character("a"))
     }
 
     func testParseSingleModifierAlt() {
-        let spec = ShortcutSpec.parse("alt+a")
+        let spec = Shortcut.parse("alt+a")
         XCTAssertEqual(spec?.modifiers, .option)
         XCTAssertEqual(spec?.key, .character("a"))
     }
 
     func testParseOptionAliasForAlt() {
-        let spec = ShortcutSpec.parse("option+a")
+        let spec = Shortcut.parse("option+a")
         XCTAssertEqual(spec?.modifiers, .option)
     }
 
     func testParseMultipleModifiers() {
-        let spec = ShortcutSpec.parse("cmd+shift+n")
+        let spec = Shortcut.parse("cmd+shift+n")
         XCTAssertEqual(spec?.modifiers, [.command, .shift])
         XCTAssertEqual(spec?.key, .character("n"))
     }
 
     func testParseAllFourModifiers() {
-        let spec = ShortcutSpec.parse("cmd+ctrl+shift+alt+n")
+        let spec = Shortcut.parse("cmd+ctrl+shift+alt+n")
         XCTAssertEqual(spec?.modifiers, [.command, .control, .shift, .option])
     }
 
     func testParseModifiersCaseInsensitive() {
-        XCTAssertEqual(ShortcutSpec.parse("CMD+N")?.modifiers, .command)
-        XCTAssertEqual(ShortcutSpec.parse("Cmd+N")?.modifiers, .command)
+        XCTAssertEqual(Shortcut.parse("CMD+N")?.modifiers, .command)
+        XCTAssertEqual(Shortcut.parse("Cmd+N")?.modifiers, .command)
     }
 
     func testParseWhitespaceTolerance() {
-        let spec = ShortcutSpec.parse("cmd + shift + n")
+        let spec = Shortcut.parse("cmd + shift + n")
         XCTAssertEqual(spec?.modifiers, [.command, .shift])
         XCTAssertEqual(spec?.key, .character("n"))
     }
@@ -60,78 +60,86 @@ final class ShortcutSpecTests: XCTestCase {
     // MARK: - Parse: named keys
 
     func testParseNamedKeyTab() {
-        let spec = ShortcutSpec.parse("cmd+tab")
+        let spec = Shortcut.parse("cmd+tab")
         XCTAssertEqual(spec?.modifiers, .command)
         XCTAssertEqual(spec?.key, .named(.tab))
     }
 
     func testParseNamedKeyReturn() {
-        XCTAssertEqual(ShortcutSpec.parse("return")?.key, .named(.return))
+        XCTAssertEqual(Shortcut.parse("return")?.key, .named(.return))
     }
 
     func testParseNamedKeyEscape() {
-        XCTAssertEqual(ShortcutSpec.parse("escape")?.key, .named(.escape))
+        XCTAssertEqual(Shortcut.parse("escape")?.key, .named(.escape))
     }
 
     func testParseNamedKeyArrows() {
-        XCTAssertEqual(ShortcutSpec.parse("up")?.key, .named(.up))
-        XCTAssertEqual(ShortcutSpec.parse("down")?.key, .named(.down))
-        XCTAssertEqual(ShortcutSpec.parse("left")?.key, .named(.left))
-        XCTAssertEqual(ShortcutSpec.parse("right")?.key, .named(.right))
+        XCTAssertEqual(Shortcut.parse("up")?.key, .named(.up))
+        XCTAssertEqual(Shortcut.parse("down")?.key, .named(.down))
+        XCTAssertEqual(Shortcut.parse("left")?.key, .named(.left))
+        XCTAssertEqual(Shortcut.parse("right")?.key, .named(.right))
     }
 
     func testParseNamedKeyPageUp() {
-        XCTAssertEqual(ShortcutSpec.parse("pageup")?.key, .named(.pageUp))
+        XCTAssertEqual(Shortcut.parse("pageup")?.key, .named(.pageUp))
     }
 
     func testParseNamedKeyF5() {
-        XCTAssertEqual(ShortcutSpec.parse("f5")?.key, .named(.f5))
+        XCTAssertEqual(Shortcut.parse("f5")?.key, .named(.f5))
     }
 
     func testParseNamedKeyF20() {
-        XCTAssertEqual(ShortcutSpec.parse("f20")?.key, .named(.f20))
+        XCTAssertEqual(Shortcut.parse("f20")?.key, .named(.f20))
+    }
+
+    func testParseNamedKeyF35() {
+        XCTAssertEqual(Shortcut.parse("f35")?.key, .named(.f35))
+    }
+
+    func testParseNamedKeyInsert() {
+        XCTAssertEqual(Shortcut.parse("insert")?.key, .named(.insert))
     }
 
     func testParseNamedKeyCaseInsensitive() {
-        XCTAssertEqual(ShortcutSpec.parse("Tab")?.key, .named(.tab))
-        XCTAssertEqual(ShortcutSpec.parse("PAGEUP")?.key, .named(.pageUp))
-        XCTAssertEqual(ShortcutSpec.parse("F5")?.key, .named(.f5))
+        XCTAssertEqual(Shortcut.parse("Tab")?.key, .named(.tab))
+        XCTAssertEqual(Shortcut.parse("PAGEUP")?.key, .named(.pageUp))
+        XCTAssertEqual(Shortcut.parse("F5")?.key, .named(.f5))
     }
 
     // MARK: - Parse: error cases
 
     func testParseEmptyStringReturnsNil() {
-        XCTAssertNil(ShortcutSpec.parse(""))
+        XCTAssertNil(Shortcut.parse(""))
     }
 
     func testParseWhitespaceOnlyReturnsNil() {
-        XCTAssertNil(ShortcutSpec.parse("   "))
+        XCTAssertNil(Shortcut.parse("   "))
     }
 
     func testParseNoKeyReturnsNil() {
-        XCTAssertNil(ShortcutSpec.parse("cmd+shift"))
+        XCTAssertNil(Shortcut.parse("cmd+shift"))
     }
 
     func testParseOnlyModifierShiftReturnsNil() {
-        XCTAssertNil(ShortcutSpec.parse("shift"))
+        XCTAssertNil(Shortcut.parse("shift"))
     }
 
     func testParseOnlyModifierCmdReturnsNil() {
-        XCTAssertNil(ShortcutSpec.parse("cmd"))
+        XCTAssertNil(Shortcut.parse("cmd"))
     }
 
     func testParseMultipleKeysReturnsNil() {
-        XCTAssertNil(ShortcutSpec.parse("cmd+a+b"))
+        XCTAssertNil(Shortcut.parse("cmd+a+b"))
     }
 
     func testParseMultiCharKeyWithoutNamedMatchReturnsNil() {
-        XCTAssertNil(ShortcutSpec.parse("cmd+nope"))
+        XCTAssertNil(Shortcut.parse("cmd+nope"))
     }
 
     func testParseConsecutivePlusParsesAsNormal() {
         // Swift's split(separator:) defaults to omittingEmptySubsequences: true,
         // so "cmd++n" parses the same as "cmd+n". Documenting this behavior.
-        let spec = ShortcutSpec.parse("cmd++n")
+        let spec = Shortcut.parse("cmd++n")
         XCTAssertEqual(spec?.modifiers, .command)
         XCTAssertEqual(spec?.key, .character("n"))
     }
@@ -160,20 +168,20 @@ final class ShortcutSpecTests: XCTestCase {
     }
 
     func testMatchesSimpleCharWithCmd() {
-        let spec = ShortcutSpec.parse("cmd+s")!
+        let spec = Shortcut.parse("cmd+s")!
         let event = makeKeyDown(chars: "s", modifiers: .command)
         XCTAssertTrue(spec.matches(event))
     }
 
     func testDoesNotMatchWhenModifiersDiffer() {
-        let spec = ShortcutSpec.parse("cmd+s")!
+        let spec = Shortcut.parse("cmd+s")!
         let event = makeKeyDown(chars: "s", modifiers: .control)
         XCTAssertFalse(spec.matches(event))
     }
 
     func testMatchesCaseInsensitive() {
         // Spec parsed as lowercase "a", but event has uppercase "A"
-        let spec = ShortcutSpec.parse("cmd+a")!
+        let spec = Shortcut.parse("cmd+a")!
         let event = makeKeyDown(chars: "A", modifiers: .command)
         XCTAssertTrue(spec.matches(event))
     }
@@ -182,7 +190,7 @@ final class ShortcutSpecTests: XCTestCase {
 
     func testMatchesIgnoresFunctionFlag() {
         // F5 events have .function set automatically
-        let spec = ShortcutSpec.parse("f5")!
+        let spec = Shortcut.parse("f5")!
         let event = makeKeyDown(
             chars: String(Character(UnicodeScalar(NSF5FunctionKey)!)),
             modifiers: .function,
@@ -191,7 +199,7 @@ final class ShortcutSpecTests: XCTestCase {
     }
 
     func testMatchesIgnoresNumericPadFlag() {
-        let spec = ShortcutSpec.parse("up")!
+        let spec = Shortcut.parse("up")!
         let event = makeKeyDown(
             chars: String(Character(UnicodeScalar(NSUpArrowFunctionKey)!)),
             modifiers: [.function, .numericPad],
@@ -200,7 +208,7 @@ final class ShortcutSpecTests: XCTestCase {
     }
 
     func testMatchesIgnoresCapsLock() {
-        let spec = ShortcutSpec.parse("cmd+s")!
+        let spec = Shortcut.parse("cmd+s")!
         let event = makeKeyDown(chars: "s", modifiers: [.command, .capsLock])
         XCTAssertTrue(spec.matches(event))
     }
@@ -209,7 +217,7 @@ final class ShortcutSpecTests: XCTestCase {
 
     func testMatchesShiftedPunctuationCloseBrace() {
         // Shift+Cmd+] produces charactersIgnoringModifiers == "}"
-        let spec = ShortcutSpec.parse("shift+cmd+}")!
+        let spec = Shortcut.parse("shift+cmd+}")!
         let event = makeKeyDown(
             chars: "}",
             charsIgnoringMods: "}",
@@ -217,44 +225,98 @@ final class ShortcutSpecTests: XCTestCase {
         XCTAssertTrue(spec.matches(event))
     }
 
-    func testDoesNotMatchUnshiftedVersionWhenShiftedProduced() {
-        // A spec for "shift+cmd+]" does NOT match the event (which produces "}")
-        let spec = ShortcutSpec.parse("shift+cmd+]")!
+    /// The shifted-punctuation workaround: users can write either side of the
+    /// pair and match the same physical key. `shift+cmd+]` should match the
+    /// event even though Cocoa delivered "}" in `charactersIgnoringModifiers`.
+    func testMatchesUnshiftedFormOfShiftedPunctuation() {
+        let spec = Shortcut.parse("shift+cmd+]")!
         let event = makeKeyDown(
             chars: "}",
             charsIgnoringMods: "}",
             modifiers: [.shift, .command])
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    func testMatchesUnshiftedOpenBracket() {
+        let spec = Shortcut.parse("shift+cmd+[")!
+        let event = makeKeyDown(
+            chars: "{",
+            charsIgnoringMods: "{",
+            modifiers: [.shift, .command])
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    func testMatchesUnshiftedDigit() {
+        // Shift+Cmd+1 produces charactersIgnoringModifiers == "!" on US layout.
+        // User writing `shift+cmd+1` should match that.
+        let spec = Shortcut.parse("shift+cmd+1")!
+        let event = makeKeyDown(
+            chars: "!",
+            charsIgnoringMods: "!",
+            modifiers: [.shift, .command])
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    func testShiftedPunctuationRequiresShiftModifier() {
+        // Without shift in the spec, the workaround should NOT kick in.
+        // `cmd+]` must not match an event with "}" (which can't physically
+        // happen without shift, but we defend the logic anyway).
+        let spec = Shortcut.parse("cmd+]")!
+        let event = makeKeyDown(
+            chars: "}",
+            charsIgnoringMods: "}",
+            modifiers: .command)
         XCTAssertFalse(spec.matches(event))
+    }
+
+    // MARK: - Matches: named keys
+
+    func testMatchesF35() {
+        let spec = Shortcut.parse("f35")!
+        let event = makeKeyDown(
+            chars: String(Character(UnicodeScalar(NSF1FunctionKey + 34)!)),
+            modifiers: .function,
+            keyCode: 0)
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    func testMatchesInsert() {
+        let spec = Shortcut.parse("insert")!
+        let event = makeKeyDown(
+            chars: String(Character(UnicodeScalar(NSInsertFunctionKey)!)),
+            modifiers: .function,
+            keyCode: 0)
+        XCTAssertTrue(spec.matches(event))
     }
 
     // MARK: - toMenuKeyEquivalent
 
     func testMenuEquivalentSimpleLetter() {
-        let (key, mask) = ShortcutSpec.parse("cmd+n")!.toMenuKeyEquivalent()!
+        let (key, mask) = Shortcut.parse("cmd+n")!.toMenuKeyEquivalent()!
         XCTAssertEqual(key, "n")
         XCTAssertEqual(mask, .command)
     }
 
     func testMenuEquivalentShiftLetterUsesUppercase() {
-        let (key, mask) = ShortcutSpec.parse("cmd+shift+n")!.toMenuKeyEquivalent()!
+        let (key, mask) = Shortcut.parse("cmd+shift+n")!.toMenuKeyEquivalent()!
         XCTAssertEqual(key, "N")
         XCTAssertEqual(mask, [.command, .shift])
     }
 
     func testMenuEquivalentShiftPunctuationPassthrough() {
-        let (key, mask) = ShortcutSpec.parse("cmd+shift+}")!.toMenuKeyEquivalent()!
+        let (key, mask) = Shortcut.parse("cmd+shift+}")!.toMenuKeyEquivalent()!
         XCTAssertEqual(key, "}")
         XCTAssertEqual(mask, [.command, .shift])
     }
 
     func testMenuEquivalentDigitPassthrough() {
-        let (key, mask) = ShortcutSpec.parse("cmd+1")!.toMenuKeyEquivalent()!
+        let (key, mask) = Shortcut.parse("cmd+1")!.toMenuKeyEquivalent()!
         XCTAssertEqual(key, "1")
         XCTAssertEqual(mask, .command)
     }
 
     func testMenuEquivalentComma() {
-        let (key, mask) = ShortcutSpec.parse("cmd+,")!.toMenuKeyEquivalent()!
+        let (key, mask) = Shortcut.parse("cmd+,")!.toMenuKeyEquivalent()!
         XCTAssertEqual(key, ",")
         XCTAssertEqual(mask, .command)
     }
@@ -288,7 +350,7 @@ final class ShortcutSpecTests: XCTestCase {
     func testKeyActionDefaultShortcutsAllParse() {
         for action in KeyAction.allCases {
             XCTAssertNotNil(
-                ShortcutSpec.parse(action.defaultShortcut),
+                Shortcut.parse(action.defaultShortcut),
                 "Default shortcut '\(action.defaultShortcut)' for \(action.rawValue) failed to parse"
             )
         }

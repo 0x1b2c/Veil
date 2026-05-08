@@ -371,8 +371,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Apply a ShortcutSpec (or nil for disabled) to a menu item.
-    private func applyShortcut(to item: NSMenuItem, spec: ShortcutSpec?) {
+    /// Apply a Shortcut (or nil for disabled) to a menu item.
+    private func applyShortcut(to item: NSMenuItem, spec: Shortcut?) {
         if let spec, let (key, mask) = spec.toMenuKeyEquivalent() {
             item.keyEquivalent = key
             item.keyEquivalentModifierMask = mask
