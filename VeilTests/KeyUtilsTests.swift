@@ -48,4 +48,43 @@ final class KeyUtilsTests: XCTestCase {
         let up = String(Character(UnicodeScalar(NSUpArrowFunctionKey)!))
         XCTAssertEqual(KeyUtils.nvimKey(characters: up, modifiers: .control), "<C-Up>")
     }
+
+    // MARK: - Shifted-punctuation reverse translation
+    //
+    // Cocoa delivers Shift+] as `}` in `charactersIgnoringModifiers`. KeyUtils
+    // reverses that so the nvim key string reflects the physical key the user
+    // pressed, letting mappings be written as `<S-D-]>` rather than `<S-D-}>`.
+
+    func testShiftedPunctuationTranslatesToUnshifted() {
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "}", modifiers: [.command, .shift]),
+            "<S-D-]>")
+    }
+
+    func testShiftedDigitTranslatesToUnshifted() {
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "@", modifiers: [.control, .shift]),
+            "<C-S-2>")
+    }
+
+    func testShiftedPipeTranslatesToBslash() {
+        // `|` reverse-maps to `\`, which then hits the existing Bslash branch.
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "|", modifiers: [.command, .shift]),
+            "<S-D-Bslash>")
+    }
+
+    func testShiftAloneStillTranslatesPunctuation() {
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "?", modifiers: .shift),
+            "<S-/>")
+    }
+
+    func testShiftedLetterIsNotTranslated() {
+        // Letters are not in the punctuation pair table; translation must not
+        // apply, so Shift+Cmd+A continues to produce <S-D-A>.
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "A", modifiers: [.command, .shift]),
+            "<S-D-A>")
+    }
 }

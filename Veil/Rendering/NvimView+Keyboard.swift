@@ -17,7 +17,7 @@ private struct DefaultKeymapEntry {
 
 /// Default vim keymaps that are dispatched from performKeyEquivalent
 /// (as opposed to via menu items). These are the ones that aren't owned
-/// by any menu: Cmd+1-9, Ctrl+Tab, Shift+Ctrl+Tab, Shift+Cmd+{/}.
+/// by any menu: Cmd+1-9, Ctrl+Tab, Shift+Ctrl+Tab, Shift+Cmd+]/[.
 private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
     var entries: [DefaultKeymapEntry] = []
 
@@ -54,17 +54,16 @@ private let nonMenuDefaultKeymaps: [DefaultKeymapEntry] = {
             })
     }
 
-    // Shift+Cmd+}: next tab. (Note: the user presses Shift+Cmd+] which
-    // produces `}` via Cocoa's shifted-punctuation behavior.)
-    if let spec = Shortcut.parse("shift+cmd+}") {
+    // Shift+Cmd+]: next tab.
+    if let spec = Shortcut.parse("shift+cmd+]") {
         entries.append(
             DefaultKeymapEntry(spec: spec) { view, _ in
                 Task { try? await view.channel?.command("tabnext") }
             })
     }
 
-    // Shift+Cmd+{: previous tab. (User presses Shift+Cmd+[.)
-    if let spec = Shortcut.parse("shift+cmd+{") {
+    // Shift+Cmd+[: previous tab.
+    if let spec = Shortcut.parse("shift+cmd+[") {
         entries.append(
             DefaultKeymapEntry(spec: spec) { view, _ in
                 Task { try? await view.channel?.command("tabprevious") }
@@ -85,7 +84,7 @@ extension NvimView {
         //         so we must claim it here in both modes. When
         //         bind_default_neovim_keymaps is true, run the vim command
         //         (tabnext etc.). When false, forward the raw key to nvim
-        //         (<C-Tab>, <D-1>, <S-D-}>, ...) so user mappings on those
+        //         (<C-Tab>, <D-1>, <S-D-]>, ...) so user mappings on those
         //         keys fire.
         for entry in nonMenuDefaultKeymaps {
             if entry.spec.matches(event) {
@@ -122,7 +121,7 @@ extension NvimView {
         // Step 4: Cmd+letter synthesis fallback.
         //         Cocoa does NOT naturally deliver Cmd+letter events to
         //         keyDown, so this branch synthesizes <D-letter> / <D-1> /
-        //         <S-D-}> etc. for any Cmd+ event that no menu claimed.
+        //         <S-D-]> etc. for any Cmd+ event that no menu claimed.
         //         This is how Cmd+P, Cmd+J, and any unbound Cmd+letter
         //         reach nvim. Also how disabled default keymaps reach nvim
         //         when bind_default_neovim_keymaps = false — the menu items

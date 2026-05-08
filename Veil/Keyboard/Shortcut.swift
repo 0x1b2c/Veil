@@ -95,6 +95,23 @@ extension Shortcut {
         "`": "~",
     ]
 
+    /// Returns the unshifted form of a shifted-punctuation character (e.g.,
+    /// `}` → `]`), or nil if the character has no shifted/unshifted pair.
+    /// Used by `KeyUtils` to undo Cocoa's automatic Shift application on
+    /// punctuation before forwarding to nvim, so mappings can be written
+    /// with the physical-key form (`<S-D-]>` instead of `<S-D-}>`).
+    static func unshifted(_ character: Character) -> Character? {
+        unshiftedPunctuation[character]
+    }
+
+    private static let unshiftedPunctuation: [Character: Character] = {
+        var reverse: [Character: Character] = [:]
+        for (unshifted, shifted) in shiftedPunctuation {
+            reverse[shifted] = unshifted
+        }
+        return reverse
+    }()
+
     /// Returns true if the given keyboard event matches this shortcut.
     func matches(_ event: NSEvent) -> Bool {
         // Compare modifiers, ignoring .function, .numericPad, .capsLock, and

@@ -2,7 +2,24 @@ import AppKit
 
 nonisolated enum KeyUtils {
     static func nvimKey(characters: String, modifiers: NSEvent.ModifierFlags) -> String {
-        guard let scalar = characters.unicodeScalars.first else { return "" }
+        // Cocoa's `charactersIgnoringModifiers` applies Shift to punctuation,
+        // so Shift+] arrives as `}`. Whenever Shift is in the modifier set,
+        // translate back to the unshifted form so the key string Veil sends
+        // matches physical-key intuition (`<S-D-]>` rather than `<S-D-}>`) and
+        // lines up with how nvim mappings are usually written. In practice the
+        // call sites that reach this function with Shift always pair it with
+        // Ctrl/Option/Cmd; plain Shift+punctuation typing goes through IME and
+        // never reaches `nvimKey`.
+        let resolvedCharacters: String = {
+            guard modifiers.contains(.shift),
+                characters.count == 1,
+                let first = characters.first,
+                let unshifted = Shortcut.unshifted(first)
+            else { return characters }
+            return String(unshifted)
+        }()
+
+        guard let scalar = resolvedCharacters.unicodeScalars.first else { return "" }
         let code = Int(scalar.value)
 
         if let name = specialKeyName(code) {
@@ -13,12 +30,12 @@ nonisolated enum KeyUtils {
         if code == 0x09 { return wrapWithModifiers("Tab", modifiers: modifiers) }
         if code == 0x0D { return wrapWithModifiers("CR", modifiers: modifiers) }
         if code == 0x20 { return wrapWithModifiers("Space", modifiers: modifiers) }
-        if characters == "<" { return wrapWithModifiers("lt", modifiers: modifiers) }
-        if characters == "\\" { return wrapWithModifiers("Bslash", modifiers: modifiers) }
+        if resolvedCharacters == "<" { return wrapWithModifiers("lt", modifiers: modifiers) }
+        if resolvedCharacters == "\\" { return wrapWithModifiers("Bslash", modifiers: modifiers) }
 
         let relevantModifiers = modifiers.intersection([.control, .option, .command, .shift])
-        if relevantModifiers.isEmpty { return characters }
-        return wrapWithModifiers(characters, modifiers: modifiers)
+        if relevantModifiers.isEmpty { return resolvedCharacters }
+        return wrapWithModifiers(resolvedCharacters, modifiers: modifiers)
     }
 
     private static func wrapWithModifiers(_ key: String, modifiers: NSEvent.ModifierFlags) -> String

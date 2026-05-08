@@ -68,8 +68,8 @@ The full set of macOS shortcuts Veil pre-binds to Neovim:
 | `cmd+9`            | `:tablast`             | `<D-9>`                    |
 | `ctrl+tab`         | `:tabnext`             | `<C-Tab>`                  |
 | `shift+ctrl+tab`   | `:tabprevious`         | `<C-S-Tab>`                |
-| `shift+cmd+]`      | `:tabnext`             | `<S-D-}>`                  |
-| `shift+cmd+[`      | `:tabprevious`         | `<S-D-{>`                  |
+| `shift+cmd+]`      | `:tabnext`             | `<S-D-]>`                  |
+| `shift+cmd+[`      | `:tabprevious`         | `<S-D-[>`                  |
 
 The "Sent to nvim" column uses Vim's notation for modifier-prefixed keys: `C` is Ctrl, `S` is Shift, `M` is Alt, `D` is Cmd, written in the canonical `C-S-M-D` order. So `<D-s>` is `cmd+s` and `<S-D-z>` is `shift+cmd+z`.
 
@@ -99,8 +99,8 @@ end
 vim.keymap.set('n', '<D-9>', ':tablast<CR>')
 vim.keymap.set('n', '<C-Tab>', 'gt')
 vim.keymap.set('n', '<C-S-Tab>', 'gT')
-vim.keymap.set('n', '<S-D-}>', 'gt')  -- Shift+Cmd+]
-vim.keymap.set('n', '<S-D-{>', 'gT')  -- Shift+Cmd+[
+vim.keymap.set('n', '<S-D-]>', 'gt')
+vim.keymap.set('n', '<S-D-[>', 'gT')
 ```
 
 There is no per-key disable. The toggle is intentionally all-or-nothing because the value of these keymaps lies in their consistency: a partially-bound set creates more confusion than either extreme.

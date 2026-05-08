@@ -361,13 +361,15 @@ final class ShortcutTests: XCTestCase {
     /// Verify that KeyUtils.nvimKey produces the Vim notation the migration
     /// cheatsheet promises. These are the notations nvim receives in step 3
     /// of `performKeyEquivalent` when `bind_default_neovim_keymaps = false`.
+    /// KeyUtils reverses Cocoa's shifted-punctuation translation so that the
+    /// Vim notation reflects the physical key the user pressed.
     func testKeyUtilsNvimKeyForShiftedPunctuation() {
         XCTAssertEqual(
             KeyUtils.nvimKey(characters: "}", modifiers: [.shift, .command]),
-            "<S-D-}>")
+            "<S-D-]>")
         XCTAssertEqual(
             KeyUtils.nvimKey(characters: "{", modifiers: [.shift, .command]),
-            "<S-D-{>")
+            "<S-D-[>")
     }
 
     func testKeyUtilsNvimKeyForShiftedLetter() {
