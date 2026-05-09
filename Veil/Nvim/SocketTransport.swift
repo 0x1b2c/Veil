@@ -4,6 +4,8 @@ import Network
 /// TCP transport for connecting to a remote nvim instance via
 /// Network.framework's NWConnection.
 final class SocketTransport: RpcTransport, @unchecked Sendable {
+    private let host: String
+    private let port: UInt16
     private let connection: NWConnection
     private let streamContinuation: AsyncStream<Data>.Continuation
 
@@ -15,6 +17,8 @@ final class SocketTransport: RpcTransport, @unchecked Sendable {
     /// Create a transport for the given host and port. The connection is not
     /// started until `waitUntilReady()` is called.
     nonisolated init(host: String, port: UInt16) {
+        self.host = host
+        self.port = port
         let nwHost = NWEndpoint.Host(host)
         let nwPort = NWEndpoint.Port(rawValue: port)!
         self.connection = NWConnection(host: nwHost, port: nwPort, using: .tcp)
@@ -27,7 +31,12 @@ final class SocketTransport: RpcTransport, @unchecked Sendable {
     /// Start the TCP connection and block until it is established or fails.
     /// Sets the state handler before calling start() to avoid a race where
     /// the connection reaches .ready before the handler is installed.
+    /// Clearing the handler in each terminal case ensures the continuation
+    /// is resumed exactly once. Session-level timeout (covering RPC handshake
+    /// after .ready) lives in the caller, not here.
     func waitUntilReady() async throws {
+        let host = self.host
+        let port = self.port
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             connection.stateUpdateHandler = { [weak self] state in
                 switch state {
@@ -37,11 +46,28 @@ final class SocketTransport: RpcTransport, @unchecked Sendable {
                     cont.resume()
                 case .failed(let error):
                     self?.connection.stateUpdateHandler = nil
-                    cont.resume(throwing: error)
+                    cont.resume(
+                        throwing: RemoteConnectionError(
+                            body: """
+                                \(host):\(port): \(error.localizedDescription).
+
+                                Make sure the remote nvim is running and listening on the expected port.
+                                """))
+                case .waiting(let error):
+                    // Interactive connect: surface the network error immediately
+                    // instead of letting NWConnection retry until kernel TCP timeout.
+                    self?.connection.stateUpdateHandler = nil
+                    self?.connection.cancel()
+                    cont.resume(
+                        throwing: RemoteConnectionError(
+                            body: """
+                                \(host):\(port): \(error.localizedDescription).
+
+                                Check the address and that the host is reachable. If you're tunneling over SSH, make sure the tunnel is up.
+                                """))
                 case .cancelled:
                     self?.connection.stateUpdateHandler = nil
-                    cont.resume(
-                        throwing: NWError.posix(.ECANCELED))
+                    cont.resume(throwing: NWError.posix(.ECANCELED))
                 default:
                     break
                 }
@@ -106,4 +132,10 @@ final class SocketTransport: RpcTransport, @unchecked Sendable {
         connection.cancel()
         streamContinuation.finish()
     }
+}
+
+struct RemoteConnectionError: LocalizedError {
+    let body: String
+    var errorDescription: String? { "Connection failed" }
+    var recoverySuggestion: String? { body }
 }

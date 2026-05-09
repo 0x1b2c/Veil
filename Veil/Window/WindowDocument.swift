@@ -87,19 +87,61 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         titleReady = true
         do {
             let (host, port) = try Self.parseAddress(address)
-            try await channel.connectRemote(host: host, port: port)
             guard let nvimView else { return }
             let gridSize = nvimView.gridSizeForViewSize(nvimView.bounds.size)
-            try await channel.uiAttach(
-                width: gridSize.cols, height: gridSize.rows,
-                nativeTabs: VeilConfig.current.native_tabs)
+            let nativeTabs = VeilConfig.current.native_tabs
+            try await runRemoteSetupWithTimeout(
+                host: host, port: port, gridSize: gridSize, nativeTabs: nativeTabs)
             startEventLoop()
             await setupNvimIntegration()
             nvimView.remoteAddress = address
             windowController?.updateTitle("Veil [remote: \(address)]")
             try? await channel.command("set title")
         } catch {
+            await channel.stop()
             presentStartupError(error)
+        }
+    }
+
+    /// Race the TCP connect plus initial uiAttach against a 5 s wall-clock
+    /// timeout. SocketTransport alone can't detect the case where TCP
+    /// completes (.ready) but the peer never sends data — e.g. a firewall
+    /// that accepts the SYN handshake then blackholes the payload. Wrapping
+    /// the whole RPC handshake gives us one cutoff that covers both
+    /// pre-.ready and post-.ready hangs. On timeout the socket is closed
+    /// explicitly so the in-flight RPC task unblocks; the flag ensures the
+    /// timeout message wins regardless of which task throws first.
+    private func runRemoteSetupWithTimeout(
+        host: String, port: UInt16, gridSize: GridSize, nativeTabs: Bool
+    ) async throws {
+        let channel = self.channel!
+        let timedOut = TimeoutFlag()
+        let timeoutError = RemoteConnectionError(
+            body: """
+                Connection to \(host):\(port) timed out after 5 seconds.
+
+                Check that the remote nvim is listening on the expected address, and that your SSH tunnel is established if you're using one.
+                """)
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    try await channel.connectRemote(host: host, port: port)
+                    try await channel.uiAttach(
+                        width: gridSize.cols, height: gridSize.rows,
+                        nativeTabs: nativeTabs)
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 5_000_000_000)
+                    await timedOut.set()
+                    await channel.stop()
+                    throw timeoutError
+                }
+                try await group.next()
+                group.cancelAll()
+            }
+        } catch {
+            if await timedOut.isSet { throw timeoutError }
+            throw error
         }
     }
 
@@ -110,7 +152,12 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         guard let host = url?.host, !host.isEmpty, let port = url?.port,
             let port = UInt16(exactly: port)
         else {
-            throw NvimChannelError.rpcError("Invalid address format. Expected host:port")
+            throw RemoteConnectionError(
+                body: """
+                    Invalid address: \(input)
+
+                    Expected host:port (e.g. 127.0.0.1:6666).
+                    """)
         }
         return (host, port)
     }
@@ -421,11 +468,14 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     /// run loop. Painting the message into the already-visible window
     /// sidesteps the activation rules entirely.
     private func presentStartupError(_ error: Error) {
-        let title =
-            (error as? LocalizedError)?.errorDescription
-            ?? error.localizedDescription
-        let body = (error as? LocalizedError)?.recoverySuggestion
-        windowController?.showStartupError(title: title, body: body)
+        let localized = error as? LocalizedError
+        let summary = localized?.errorDescription ?? error.localizedDescription
+        let detail = localized?.recoverySuggestion
+        if let detail, !detail.isEmpty {
+            windowController?.showStartupError(title: summary, body: detail)
+        } else {
+            windowController?.showStartupError(title: "Error", body: summary)
+        }
     }
 
     func nvimViewNeedsDisplay(_ view: NvimView) {
@@ -487,4 +537,9 @@ private func displayLinkCallback(
         ctx.document?.displayLinkFired()
     }
     return kCVReturnSuccess
+}
+
+private actor TimeoutFlag {
+    private(set) var isSet = false
+    func set() { isSet = true }
 }

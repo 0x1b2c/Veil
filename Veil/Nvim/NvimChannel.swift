@@ -40,11 +40,19 @@ actor NvimChannel {
     }
 
     /// Connect to a remote nvim instance over TCP. No local process is spawned.
+    /// The transport is stored on `self` before awaiting `.ready` so that an
+    /// outside caller (e.g. a session-level timeout) can `stop()` the channel
+    /// mid-handshake and force the in-flight socket to abort.
     func connectRemote(host: String, port: UInt16) async throws {
         isRemote = true
         let socketTransport = SocketTransport(host: host, port: port)
-        try await socketTransport.waitUntilReady()
         self.transport = socketTransport
+        do {
+            try await socketTransport.waitUntilReady()
+        } catch {
+            self.transport = nil
+            throw error
+        }
         startRpcEventLoop(transport: socketTransport)
     }
 

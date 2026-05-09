@@ -115,8 +115,10 @@ class WindowController: NSWindowController, NSWindowDelegate {
         // colors over a dark background, and the selected text is unreadable.
         let appearanceName: NSAppearance.Name = Self.isDark(rgb: cachedBg) ? .darkAqua : .aqua
         errorOverlayStack?.appearance = NSAppearance(named: appearanceName)
+
         errorOverlayTitle?.stringValue = title
         errorOverlayTitle?.textColor = fgColor.withAlphaComponent(0.5)
+
         if let body, !body.isEmpty {
             errorOverlayBody?.stringValue = body
             errorOverlayBody?.textColor = fgColor.withAlphaComponent(0.35)
