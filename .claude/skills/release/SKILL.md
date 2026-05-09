@@ -24,10 +24,18 @@ Required: version number (e.g., `/release 0.5`).
    - English, concise, describes what changed from the user's perspective
    - Features first, then fixes (prefix fixes with "Fix")
 5. Show the release notes to the user and **wait for confirmation** before proceeding
-6. Run `make release V=<version>` — this bumps `MARKETING_VERSION` in the Xcode project and commits
-7. Create an annotated tag. The tag message is **only** the bullet list — no title line, because the CI release job sets the GitHub Release title to `Veil v<version>` automatically:
+6. Write the confirmed bullet list to a temp file and call `make release` to atomically bump `MARKETING_VERSION`, commit, and create the annotated tag in one step. The tag message is **only** the bullet list — no title line, because the CI release job sets the GitHub Release title to `Veil v<version>` automatically:
    ```
-   git tag -a v<version> -m "<bullet list>"
+   notes_file=$(mktemp -t veil-release-notes)
+   cat > "$notes_file" <<'NOTES'
+   <bullet list>
+   NOTES
+   make release V=<version> NOTES_FILE="$notes_file"
+   rm -f "$notes_file"
+   ```
+7. Verify the tag commit is exactly HEAD before pushing — catches any drift between the pbxproj bump commit and the tag:
+   ```
+   [ "$(git describe --tags --exact-match HEAD)" = "v<version>" ] || { echo "ERROR: HEAD is not the v<version> tag commit"; exit 1; }
    ```
 8. Push:
    ```

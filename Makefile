@@ -78,12 +78,29 @@ zip: build-universal
 lsp:
 	xcode-build-server config -project $(PROJECT) -scheme $(SCHEME) --build_root $(DERIVED)
 
-# Usage: make release V=0.2
+# Usage: make release V=0.2 NOTES_FILE=/path/to/notes.md
+# Bumps MARKETING_VERSION, commits, and creates an annotated tag in one
+# atomic step so the tag commit physically carries the matching pbxproj
+# value. Verifies the sed actually landed before committing — if pbxproj's
+# format ever changes and the substitution silently no-ops, the build
+# would otherwise ship with the old version stamped into Info.plist.
 release:
 ifndef V
-	$(error Usage: make release V=x.y)
+	$(error Usage: make release V=x.y NOTES_FILE=/path/to/notes.md)
 endif
+ifndef NOTES_FILE
+	$(error Usage: make release V=x.y NOTES_FILE=/path/to/notes.md)
+endif
+	@test -f "$(NOTES_FILE)" || { echo "ERROR: NOTES_FILE not found: $(NOTES_FILE)"; exit 1; }
 	sed -i '' 's/MARKETING_VERSION = [^;]*/MARKETING_VERSION = $(V)/' $(PROJECT)/project.pbxproj
+	@total=$$(grep -cE 'MARKETING_VERSION = ' $(PROJECT)/project.pbxproj); \
+	ok=$$(grep -cE 'MARKETING_VERSION = $(V);' $(PROJECT)/project.pbxproj); \
+	if [ "$$total" != "$$ok" ] || [ "$$total" -eq 0 ]; then \
+		echo "ERROR: sed left $$ok of $$total MARKETING_VERSION lines at $(V); reverting pbxproj"; \
+		git checkout -- $(PROJECT)/project.pbxproj; \
+		exit 1; \
+	fi
 	git add $(PROJECT)/project.pbxproj
 	git commit -m "Release v$(V)"
-	@echo "Version set to $(V) and committed. Now tag and push."
+	git tag -a v$(V) -F "$(NOTES_FILE)"
+	@echo "Tagged v$(V). To publish: git push origin master --tags"
