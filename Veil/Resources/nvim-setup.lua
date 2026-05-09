@@ -1,9 +1,12 @@
 -- Registers all nvim-side state Veil depends on for one connection lifetime:
 -- the VeilApp augroup (BufEnter/TabEnter notifications), the VeilAppDebug
 -- and VeilAppVersion user commands, and, in remote mode only, a g:clipboard
--- provider that routes yank/paste through Veil's RPC channel back to the
--- local Mac pasteboard. Local nvim does not need this: the system's
--- pbcopy/pbpaste provider already talks to the Mac pasteboard directly.
+-- provider. On yank the provider dual-writes: through Veil's RPC channel to
+-- the local Mac pasteboard, and (when a clipboard tool is detected) to the
+-- remote machine's own clipboard, so paste works on either side. Paste
+-- always reads from the Mac pasteboard via RPC. Local nvim does not need
+-- this: the system's pbcopy/pbpaste provider already talks to the Mac
+-- pasteboard directly.
 --
 -- Varargs from Swift:
 --   chan_id   (number)  Veil's RPC channel id; baked into every
@@ -47,24 +50,42 @@ if is_remote then
   -- targets the current channel.
   local has_user_provider = vim.g.clipboard ~= nil and vim.g.VeilAppClipboardInjected ~= true
   if not has_user_provider then
+    -- Detect a clipboard tool on the remote machine so yank lands in both
+    -- the local Mac pasteboard (via RPC) and the remote machine's clipboard.
+    -- Detection order mirrors nvim's own provider/clipboard.vim. Falls back
+    -- to RPC-only if nothing is available (headless servers, etc.).
+    local remote_copy_cmd
+    if vim.fn.executable('pbcopy') == 1 then
+      remote_copy_cmd = { 'pbcopy' }
+    elseif vim.fn.executable('wl-copy') == 1 then
+      remote_copy_cmd = { 'wl-copy', '--type', 'text/plain' }
+    elseif vim.fn.executable('xclip') == 1 then
+      remote_copy_cmd = { 'xclip', '-selection', 'clipboard' }
+    elseif vim.fn.executable('xsel') == 1 then
+      remote_copy_cmd = { 'xsel', '--clipboard', '--input' }
+    end
+
+    local function copy(lines, regtype)
+      vim.rpcrequest(chan_id, 'VeilAppClipboardSet', lines, regtype)
+      if remote_copy_cmd then
+        vim.fn.system(remote_copy_cmd, table.concat(lines, '\n'))
+      end
+    end
+
+    local function paste()
+      return vim.rpcrequest(chan_id, 'VeilAppClipboardGet')
+    end
+
     vim.g.VeilAppClipboardInjected = true
     vim.g.clipboard = {
       name = 'VeilClipboard',
       copy = {
-        ['+'] = function(lines, regtype)
-          vim.rpcrequest(chan_id, 'VeilAppClipboardSet', lines, regtype)
-        end,
-        ['*'] = function(lines, regtype)
-          vim.rpcrequest(chan_id, 'VeilAppClipboardSet', lines, regtype)
-        end,
+        ['+'] = copy,
+        ['*'] = copy,
       },
       paste = {
-        ['+'] = function()
-          return vim.rpcrequest(chan_id, 'VeilAppClipboardGet')
-        end,
-        ['*'] = function()
-          return vim.rpcrequest(chan_id, 'VeilAppClipboardGet')
-        end,
+        ['+'] = paste,
+        ['*'] = paste,
       },
     }
     -- Force reload clipboard provider so it picks up the new g:clipboard
