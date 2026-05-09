@@ -187,6 +187,10 @@ final class Grid {
         dirtyRows.removeAll()
     }
 
+    func markAllRowsDirty() {
+        dirtyRows = IndexSet(0..<size.rows)
+    }
+
     // MARK: - Event dispatch
 
     func apply(_ event: NvimEvent) {

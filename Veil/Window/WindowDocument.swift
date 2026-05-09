@@ -417,7 +417,8 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     }
 
     func nvimViewNeedsDisplay(_ view: NvimView) {
-        view.render(grid: grid)
+        grid.markAllRowsDirty()
+        needsRender = true
     }
 
     func redraw() {
@@ -426,7 +427,8 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         // fires before neovim sends grid_resize, and the empty grid defaults
         // to a white background which cause white flash.
         guard grid.size != .zero else { return }
-        nvimView?.render(grid: grid)
+        grid.markAllRowsDirty()
+        needsRender = true
     }
 
     func windowDidResize(to size: NSSize) {
