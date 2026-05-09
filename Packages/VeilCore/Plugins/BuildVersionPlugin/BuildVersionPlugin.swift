@@ -10,6 +10,13 @@ struct BuildVersionPlugin: BuildToolPlugin {
         let outputDirectory = context.pluginWorkDirectoryURL
         let outputFile = outputDirectory.appending(path: "BuildVersion.swift")
         let workDir = context.package.directoryURL.path
+        // SwiftPM prebuild commands run with an empty environment by default,
+        // so VEIL_BUILD_VERSION must be forwarded explicitly for the fallback
+        // path to see it.
+        var environment: [String: String] = [:]
+        if let fallback = ProcessInfo.processInfo.environment["VEIL_BUILD_VERSION"] {
+            environment["VEIL_BUILD_VERSION"] = fallback
+        }
         // Prebuild ensures the script runs every build. Git state can shift
         // (new commits, dirty worktree, branch switch) without any tracked
         // source file changing, so a dependency-based buildCommand would
@@ -24,23 +31,29 @@ struct BuildVersionPlugin: BuildToolPlugin {
                     set -eu
                     work_dir="\(workDir)"
                     output="\(outputFile.path)"
-                    raw=$(git -C "$work_dir" describe --tags --dirty)
-                    raw="${raw#v}"
-                    case "$raw" in
-                      *-*-g*)
-                        tag="${raw%%-*}"
-                        hash="${raw#*-*-g}"
-                        version="${tag}+${hash}"
-                        ;;
-                      *)
-                        version="$raw"
-                        ;;
-                    esac
-                    branch=$(git -C "$work_dir" branch --show-current)
-                    if [ -n "$branch" ] && [ "$branch" != "master" ]; then
-                        branch_tag=" [$branch]"
+                    branch_tag=""
+                    if raw=$(git -C "$work_dir" describe --tags --dirty 2>/dev/null); then
+                        raw="${raw#v}"
+                        case "$raw" in
+                          *-*-g*)
+                            tag="${raw%%-*}"
+                            hash="${raw#*-*-g}"
+                            version="${tag}+${hash}"
+                            ;;
+                          *)
+                            version="$raw"
+                            ;;
+                        esac
+                        branch=$(git -C "$work_dir" branch --show-current)
+                        if [ -n "$branch" ] && [ "$branch" != "master" ]; then
+                            branch_tag=" [$branch]"
+                        fi
+                    elif [ -n "${VEIL_BUILD_VERSION:-}" ]; then
+                        version="${VEIL_BUILD_VERSION#v}"
                     else
-                        branch_tag=""
+                        echo "BuildVersionPlugin: git describe failed and VEIL_BUILD_VERSION is unset." >&2
+                        echo "Set VEIL_BUILD_VERSION (e.g. VEIL_BUILD_VERSION=0.7.0) to build outside a tagged git checkout." >&2
+                        exit 1
                     fi
                     cat > "$output" <<SWIFT
                     public enum BuildVersion {
@@ -58,6 +71,7 @@ struct BuildVersionPlugin: BuildToolPlugin {
                     SWIFT
                     """,
                 ],
+                environment: environment,
                 outputFilesDirectory: outputDirectory
             )
         ]
