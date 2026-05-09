@@ -44,7 +44,7 @@ nonisolated final class NvimProcess: @unchecked Sendable {
         process.standardError = stderrPipe
         process.currentDirectoryURL = URL(fileURLWithPath: cwd)
         process.qualityOfService = .userInteractive
-        let binary = resolveNvimBinary()
+        let binary = try resolveNvimBinary()
         resolvedNvimPath = binary
         process.executableURL = URL(fileURLWithPath: binary)
         var env = customEnv ?? Self.cachedEnv
@@ -165,7 +165,7 @@ nonisolated final class NvimProcess: @unchecked Sendable {
     ///    result is cached for all future launches.
     /// 4. Well-known paths — last resort if both shells fail (e.g. broken
     ///    shell config). Checks Homebrew (ARM/Intel) and MacPorts locations.
-    private func resolveNvimBinary() -> String {
+    private func resolveNvimBinary() throws -> String {
         // Explicit path from caller
         if !nvimPath.isEmpty, FileManager.default.isExecutableFile(atPath: nvimPath) {
             return nvimPath
@@ -203,7 +203,7 @@ nonisolated final class NvimProcess: @unchecked Sendable {
                 return candidate
             }
         }
-        return "/usr/local/bin/nvim"
+        throw NvimProcessError.binaryNotFound
     }
 
     private static func cacheNvimPath(_ path: String) {
@@ -219,4 +219,22 @@ nonisolated final class NvimProcess: @unchecked Sendable {
         return nil
     }
 
+}
+
+nonisolated enum NvimProcessError: Error, LocalizedError {
+    case binaryNotFound
+
+    var errorDescription: String? {
+        switch self {
+        case .binaryNotFound: return "Neovim not found"
+        }
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .binaryNotFound:
+            return
+                "Couldn't find `nvim` in your shell PATH or the standard install locations. Install Neovim with `brew install neovim`, or set `nvim_path` in `~/.config/veil/veil.toml` to point to an existing installation."
+        }
+    }
 }
