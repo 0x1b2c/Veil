@@ -7,6 +7,9 @@ final class SocketTransport: RpcTransport, @unchecked Sendable {
     private let connection: NWConnection
     private let streamContinuation: AsyncStream<Data>.Continuation
 
+    private let finishLock = NSLock()
+    nonisolated(unsafe) private var isFinished = false
+
     let dataStream: AsyncStream<Data>
 
     /// Create a transport for the given host and port. The connection is not
@@ -53,8 +56,7 @@ final class SocketTransport: RpcTransport, @unchecked Sendable {
     }
 
     nonisolated func close() {
-        connection.cancel()
-        streamContinuation.finish()
+        finishStream()
     }
 
     // MARK: - Private
@@ -67,10 +69,41 @@ final class SocketTransport: RpcTransport, @unchecked Sendable {
                 self.streamContinuation.yield(content)
             }
             if isComplete || error != nil {
-                self.streamContinuation.finish()
+                self.finishStream()
                 return
+            }
+            // Defensive: NWConnection should not deliver empty data without
+            // isComplete or error set, but if it does, treat as EOF rather
+            // than re-scheduling into a tight loop.
+            if content?.isEmpty != false {
+                self.finishStream()
+                return
+            }
+            switch self.connection.state {
+            case .cancelled, .failed:
+                self.finishStream()
+                return
+            default:
+                break
             }
             self.scheduleReceive()
         }
+    }
+
+    /// Idempotent termination: cancels the underlying connection and
+    /// finishes the stream exactly once. Setting the flag before cancelling
+    /// prevents reentrancy if cancellation synchronously delivers a final
+    /// receive callback on the same queue.
+    nonisolated private func finishStream() {
+        finishLock.lock()
+        if isFinished {
+            finishLock.unlock()
+            return
+        }
+        isFinished = true
+        finishLock.unlock()
+
+        connection.cancel()
+        streamContinuation.finish()
     }
 }
