@@ -12,6 +12,9 @@ class WindowController: NSWindowController, NSWindowDelegate {
     let nvimView = NvimView(frame: .zero)
     let tablineView = TablineView(frame: .zero)
     private(set) var customTitleLabel: NSTextField?
+    private var errorOverlayStack: NSStackView?
+    private var errorOverlayTitle: NSTextField?
+    private var errorOverlayBody: NSTextField?
 
     convenience init() {
         let window = NSWindow(
@@ -91,6 +94,81 @@ class WindowController: NSWindowController, NSWindowDelegate {
     func updateTitle(_ title: String) {
         customTitleLabel?.stringValue = title
         window?.title = title
+    }
+
+    /// Render a startup-failure message inside the window itself, instead of
+    /// using a modal alert. Background-launched apps (e.g. CLI cold-start)
+    /// cannot bring modal windows to the foreground under macOS 14+
+    /// cooperative activation, so any modal would be invisible. Painting the
+    /// message into the existing visible window bypasses the activation rules
+    /// entirely.
+    func showStartupError(title: String, body: String?) {
+        ensureErrorOverlay()
+        let defaults = UserDefaults.standard
+        let cachedFg = defaults.object(forKey: "VeilDefaultFg") as? Int ?? 0xCCCCCC
+        let cachedBg = defaults.object(forKey: "VeilDefaultBg") as? Int ?? 0x1E1E2E
+        let fgColor = NSColor(rgb: cachedFg)
+        // Force appearance to match the cached background brightness so the
+        // field editor's selection-highlight colors come from the right
+        // palette (darkAqua on dark bg, aqua on light bg). Otherwise a user in
+        // system Light Mode with a dark colorscheme gets light-mode selection
+        // colors over a dark background, and the selected text is unreadable.
+        let appearanceName: NSAppearance.Name = Self.isDark(rgb: cachedBg) ? .darkAqua : .aqua
+        errorOverlayStack?.appearance = NSAppearance(named: appearanceName)
+        errorOverlayTitle?.stringValue = title
+        errorOverlayTitle?.textColor = fgColor.withAlphaComponent(0.5)
+        if let body, !body.isEmpty {
+            errorOverlayBody?.stringValue = body
+            errorOverlayBody?.textColor = fgColor.withAlphaComponent(0.35)
+            errorOverlayBody?.isHidden = false
+        } else {
+            errorOverlayBody?.isHidden = true
+        }
+        errorOverlayStack?.isHidden = false
+    }
+
+    private static func isDark(rgb: Int) -> Bool {
+        let r = CGFloat((rgb >> 16) & 0xFF) / 255
+        let g = CGFloat((rgb >> 8) & 0xFF) / 255
+        let b = CGFloat(rgb & 0xFF) / 255
+        // Rec. 709 luma
+        return (0.2126 * r + 0.7152 * g + 0.0722 * b) < 0.5
+    }
+
+    /// Two separate labels (title + body) instead of one with attributed text:
+    /// when an NSTextField is selectable, clicking activates a field editor
+    /// that renders text using the field's own `font`/`textColor` and ignores
+    /// `attributedStringValue`, which collapses bold/size distinctions in a
+    /// mixed-attribute string. Splitting into two single-font fields keeps
+    /// each label visually consistent in both rendered and selected states.
+    private func ensureErrorOverlay() {
+        if errorOverlayStack != nil { return }
+        guard let container = window?.contentView else { return }
+        let overlayWidth: CGFloat = 600
+        let titleLabel = NSTextField(wrappingLabelWithString: "")
+        titleLabel.font = .monospacedSystemFont(ofSize: 48, weight: .bold)
+        titleLabel.alignment = .left
+        titleLabel.preferredMaxLayoutWidth = overlayWidth
+        titleLabel.isSelectable = false
+        let bodyLabel = NSTextField(wrappingLabelWithString: "")
+        bodyLabel.font = .monospacedSystemFont(ofSize: 22, weight: .regular)
+        bodyLabel.alignment = .left
+        bodyLabel.preferredMaxLayoutWidth = overlayWidth
+        bodyLabel.isSelectable = true
+        let stack = NSStackView(views: [titleLabel, bodyLabel])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 24
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            stack.widthAnchor.constraint(equalToConstant: overlayWidth),
+        ])
+        errorOverlayStack = stack
+        errorOverlayTitle = titleLabel
+        errorOverlayBody = bodyLabel
     }
 
     func updateTitleBarColors(fg: Int, bg: Int) {

@@ -99,8 +99,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             windowController?.updateTitle("Veil [remote: \(address)]")
             try? await channel.command("set title")
         } catch {
-            NSAlert(error: error).runModal()
-            close()
+            presentStartupError(error)
         }
     }
 
@@ -143,8 +142,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             // Enable nvim title. set_title events will be ignored until first BufEnter.
             try? await channel.command("set title")
         } catch {
-            NSAlert(error: error).runModal()
-            close()
+            presentStartupError(error)
         }
     }
 
@@ -414,6 +412,20 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         eventLoopTask?.cancel()
         Task { await channel.stop() }
         super.close()
+    }
+
+    /// Render a startup-failure message into the document window itself.
+    /// Modal alerts (NSAlert / sheet) are unreliable here: under macOS 14+
+    /// cooperative activation, a CLI cold-started app cannot bring any of its
+    /// windows to the foreground, leaving modals invisible and blocking the
+    /// run loop. Painting the message into the already-visible window
+    /// sidesteps the activation rules entirely.
+    private func presentStartupError(_ error: Error) {
+        let title =
+            (error as? LocalizedError)?.errorDescription
+            ?? error.localizedDescription
+        let body = (error as? LocalizedError)?.recoverySuggestion
+        windowController?.showStartupError(title: title, body: body)
     }
 
     func nvimViewNeedsDisplay(_ view: NvimView) {

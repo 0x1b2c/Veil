@@ -233,8 +233,11 @@ nonisolated enum NvimProcessError: Error, LocalizedError {
     var recoverySuggestion: String? {
         switch self {
         case .binaryNotFound:
-            return
-                "Couldn't find `nvim` in your shell PATH or the standard install locations. Install Neovim with `brew install neovim`, or set `nvim_path` in `~/.config/veil/veil.toml` to point to an existing installation."
+            return """
+                Couldn't find `nvim` in your shell PATH or the standard install locations.
+
+                Install Neovim with `brew install neovim`, or set `nvim_path` in `~/.config/veil/veil.toml` to point to an existing installation.
+                """
         }
     }
 }
