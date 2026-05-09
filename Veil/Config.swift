@@ -189,11 +189,16 @@ struct VeilConfig: Decodable {
 
     static var current: VeilConfig = load()
 
-    static func load() -> VeilConfig {
-        let configPath = FileManager.default.homeDirectoryForCurrentUser
+    static var userConfigPath: URL {
+        FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config/veil/veil.toml")
+    }
 
-        guard let data = try? String(contentsOf: configPath, encoding: .utf8) else {
+    static func load() -> VeilConfig {
+        let path = userConfigPath
+        seedFromTemplateIfMissing(at: path)
+
+        guard let data = try? String(contentsOf: path, encoding: .utf8) else {
             return VeilConfig()
         }
 
@@ -202,5 +207,17 @@ struct VeilConfig: Decodable {
         } catch {
             return VeilConfig()
         }
+    }
+
+    private static func seedFromTemplateIfMissing(at destination: URL) {
+        let fm = FileManager.default
+        guard !fm.fileExists(atPath: destination.path) else { return }
+        guard let sample = Bundle.main.url(forResource: "veil.sample.toml", withExtension: nil)
+        else { return }
+        try? fm.createDirectory(
+            at: destination.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try? fm.copyItem(at: sample, to: destination)
     }
 }

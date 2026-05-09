@@ -274,31 +274,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Settings
 
     @IBAction func openSettings(_ sender: Any?) {
-        let configPath = ensureConfigFileExists()
         let doc = WindowDocument()
         doc.preferredRenderer = preferredRenderer
-        doc.nvimArgs = [configPath]
+        doc.nvimArgs = [VeilConfig.userConfigPath.path]
         NSDocumentController.shared.addDocument(doc)
         doc.makeWindowControllers()
         doc.showWindows()
-    }
-
-    /// Returns the path to `~/.config/veil/veil.toml`, creating the directory
-    /// and copying the bundled sample config if the file doesn't exist yet.
-    private func ensureConfigFileExists() -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let configDir = home.appendingPathComponent(".config/veil")
-        let configFile = configDir.appendingPathComponent("veil.toml")
-        let fm = FileManager.default
-
-        if !fm.fileExists(atPath: configFile.path) {
-            try? fm.createDirectory(at: configDir, withIntermediateDirectories: true)
-            if let sample = Bundle.main.url(forResource: "veil.sample", withExtension: "toml") {
-                try? fm.copyItem(at: sample, to: configFile)
-            }
-        }
-
-        return configFile.path
     }
 
     // MARK: - Menu Setup
