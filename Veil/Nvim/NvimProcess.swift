@@ -122,7 +122,12 @@ nonisolated final class NvimProcess: @unchecked Sendable {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shellPath)
         let marker = UUID().uuidString
-        process.arguments = shellArgs + ["-c", "echo \(marker) && env"]
+        // `+m` disables job control. Without it, an interactive shell tries to
+        // take terminal foreground via tcsetpgrp and stops on SIGTTOU when we've
+        // inherited a terminal session we can't claim (CLI cold-start). POSIX
+        // shells (zsh, bash, ksh, dash) all accept this flag; non-POSIX shells
+        // hit the timeout fallback below.
+        process.arguments = shellArgs + ["+m", "-c", "echo \(marker) && env"]
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
