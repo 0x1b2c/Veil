@@ -169,6 +169,12 @@ class WindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    func windowDidChangeOcclusionState(_ notification: Notification) {
+        guard let window else { return }
+        let isVisible = window.occlusionState.contains(.visible)
+        (document as? WindowDocument)?.windowDidChangeVisibility(isVisible: isVisible)
+    }
+
     private func saveWindowFrame() {
         guard let frame = window?.frame else { return }
         UserDefaults.standard.set(NSStringFromRect(frame), forKey: "VeilWindowFrame")

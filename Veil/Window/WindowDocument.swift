@@ -340,6 +340,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     /// The callback dispatches to main thread where we check needsRender
     /// and render at most once per vsync, coalescing multiple flushes.
     private func startDisplayLink() {
+        guard displayLink == nil else { return }
         var link: CVDisplayLink?
         CVDisplayLinkCreateWithActiveCGDisplays(&link)
         guard let link else { return }
@@ -433,6 +434,17 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         let gridSize = nvimView.gridSizeForViewSize(size)
         guard gridSize.rows > 0, gridSize.cols > 0 else { return }
         Task { await channel.uiTryResize(width: gridSize.cols, height: gridSize.rows) }
+    }
+
+    /// Pause the display link when the window is fully occluded, minimized,
+    /// or on a different Space. Otherwise the callback wakes the main thread
+    /// at refresh rate to discover there is nothing to render.
+    func windowDidChangeVisibility(isVisible: Bool) {
+        if isVisible {
+            startDisplayLink()
+        } else {
+            stopDisplayLink()
+        }
     }
 }
 
