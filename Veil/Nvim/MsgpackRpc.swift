@@ -13,6 +13,7 @@ actor MsgpackRpc {
         [UInt32: CheckedContinuation<(error: MessagePackValue, result: MessagePackValue), Never>] =
             [:]
     private var eventContinuation: AsyncStream<RpcMessage>.Continuation?
+    private var isClosed = false
 
     private let transport: RpcTransport
 
@@ -47,6 +48,10 @@ actor MsgpackRpc {
                 }
             }
         }
+        // Latch closed BEFORE draining so any caller awaiting actor entry
+        // after this point fails fast instead of queueing into pendingRequests
+        // with no one left to resolve them.
+        isClosed = true
         eventContinuation?.finish()
         for (_, continuation) in pendingRequests {
             continuation.resume(returning: (error: .string("channel closed"), result: .nil))
@@ -57,6 +62,9 @@ actor MsgpackRpc {
     func request(method: String, params: [MessagePackValue]) async -> (
         error: MessagePackValue, result: MessagePackValue
     ) {
+        if isClosed {
+            return (error: .string("channel closed"), result: .nil)
+        }
         let msgid = nextMsgid
         nextMsgid += 1
         let data = Self.encodeRequest(msgid: msgid, method: method, params: params)
