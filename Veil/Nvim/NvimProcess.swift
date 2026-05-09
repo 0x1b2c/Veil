@@ -129,9 +129,22 @@ nonisolated final class NvimProcess: @unchecked Sendable {
         process.currentDirectoryURL = URL(fileURLWithPath: NSHomeDirectory())
         do {
             try process.run()
-            process.waitUntilExit()
         } catch {
             return ProcessInfo.processInfo.environment
+        }
+        // Bound the wait. The shell's interactive startup can hang
+        // indefinitely in some spawn contexts (notably CLI cold-start, where
+        // the inherited controlling terminal trips zsh's job-control
+        // initialization); a 5 s ceiling at least gets the user a
+        // "Neovim not found" error instead of a permanently frozen window.
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            process.waitUntilExit()
+            done.signal()
+        }
+        if done.wait(timeout: .now() + 5) == .timedOut {
+            if process.isRunning { process.terminate() }
+            done.wait()
         }
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         guard let output = String(data: data, encoding: .utf8),
