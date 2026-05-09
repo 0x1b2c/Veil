@@ -65,7 +65,7 @@ test-verbose:
 clean:
 	$(XCODEBUILD) clean -quiet
 	/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -u $(APP) 2>/dev/null || true
-	rm -rf $(DERIVED)
+	rm -rf $(DERIVED) Packages/VeilCore/.build Packages/veil/.build
 
 install: build
 	rsync -a "$(APP)/" "$(INSTALL_DIR)/Veil.app/"
