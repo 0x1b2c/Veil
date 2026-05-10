@@ -7,6 +7,10 @@ private let veilAppBundleIdentifier = "org.1b2c.Veil"
 @main
 struct VeilCLI {
     static func main() {
+        if CommandLine.arguments.dropFirst().contains("--version") {
+            print("Veil \(BuildVersion.displayVersion)")
+            exit(0)
+        }
         let invocationName = URL(fileURLWithPath: CommandLine.arguments[0]).lastPathComponent
         let appURL = resolveAppURL()
         var launchArguments = Array(CommandLine.arguments.dropFirst())
