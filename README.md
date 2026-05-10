@@ -75,21 +75,31 @@ For Neovim/editor LSP support, run `make lsp` after cloning to generate `buildSe
 
 ## Usage
 
-Veil reads your existing Neovim configuration (`~/.config/nvim/`). We recommend [Maple Mono](https://github.com/subframe7536/maple-font) for its excellent CJK support and Nerd Font icons:
+Veil reads your existing Neovim configuration (`~/.config/nvim/`) for editor behavior. Veil's own settings (font, keyboard shortcuts, remote bookmarks, and a few other options) live in `~/.config/veil/veil.toml`, separate from nvim's config. All fields are optional and have sensible defaults; see [`veil.sample.toml`](veil.sample.toml) for the full reference. Changes take effect on the next new window.
+
+### Font
+
+We recommend [Maple Mono](https://github.com/subframe7536/maple-font) for its excellent CJK support and Nerd Font icons:
 
 ```bash
 brew install font-maple-mono-nf-cn    # or font-maple-mono-nf without CJK
 ```
 
 ```lua
-vim.o.guifont = 'Maple Mono NF CN:h16'
+vim.o.guifont = 'Maple Mono NF CN:h16'    -- or 'Maple Mono NF:h16' without CJK
 ```
 
-Setting a [Nerd Font](https://www.nerdfonts.com/) as your `guifont` is the most reliable way to get statusline icons and devicons working. If you don't, Veil will automatically search for any installed Nerd Font on your system and use it as a fallback for icon glyphs, similar to how terminals like WezTerm and Kitty handle font fallback.
+If your primary font isn't a [Nerd Font](https://www.nerdfonts.com/), Veil automatically searches for any installed Nerd Font on your system and uses it as a fallback for icon glyphs, similar to how terminals like WezTerm and Kitty handle font fallback.
 
-### Configuration
+When you connect to a remote nvim, the remote machine's `guifont` is what controls the font Veil renders. That rarely matches your local Mac's font preferences (which families are installed, what's readable on this monitor). For the remote case, override with `~/.config/veil/veil.toml`:
 
-Veil's own settings live in `~/.config/veil/veil.toml`, separate from your Neovim configuration. All fields are optional and have sensible defaults. See [`veil.sample.toml`](veil.sample.toml) for the full reference. Changes take effect on the next new window.
+```toml
+[font]
+family = "Maple Mono NF CN"    # or "Maple Mono NF" without CJK
+size = 16.0
+```
+
+Either field is optional and overrides the corresponding nvim `guifont` field. See [FONT.md](FONT.md) for full details.
 
 ### Keyboard
 

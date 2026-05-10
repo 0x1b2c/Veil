@@ -282,7 +282,7 @@ final class NvimView: NSView {
     func parseAndSetGuifont(_ guifont: String) {
         let parts = guifont.split(separator: ":")
         guard let fontName = parts.first.map(String.init) else { return }
-        var size: CGFloat = 16
+        var size: CGFloat?
         for part in parts.dropFirst() {
             if part.hasPrefix("h"), let s = Double(part.dropFirst()) {
                 size = CGFloat(s)
@@ -290,11 +290,41 @@ final class NvimView: NSView {
         }
         let cleanName = fontName.replacingOccurrences(of: "\\ ", with: " ")
             .replacingOccurrences(of: "_", with: " ")
-        if let font = NSFont(name: cleanName, size: size) {
-            gridFont = font  // triggers didSet → updateFont
-        } else {
-            gridFont = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        gridFont = NvimView.effectiveFont(nvimFamily: cleanName, nvimSize: size)
+    }
+
+    /// Apply any startup font derived from the user's `[font]` config. With no
+    /// `family`/`size` set, leaves the default font in place so the eventual
+    /// nvim `guifont` event drives both fields. With one or both fields set,
+    /// the field-by-field merge in `effectiveFont(nvimFamily:nvimSize:)` fills
+    /// in the unset fields from the system default.
+    func applyConfiguredFont() {
+        let config = VeilConfig.current.font
+        guard config?.family != nil || config?.size != nil else { return }
+        gridFont = NvimView.effectiveFont(nvimFamily: nil, nvimSize: nil)
+    }
+
+    /// Field-by-field merge of nvim-derived font candidates with the user's
+    /// `[font]` config. User config wins per-field; for fields the user did not
+    /// set, the nvim-derived value is used; if nvim has not provided one yet
+    /// (startup), the system monospaced default fills in.
+    ///
+    /// Failure handling: if `family` resolves to an uninstalled face, the
+    /// system monospaced font replaces just that field and a warning is
+    /// logged.
+    static func effectiveFont(nvimFamily: String?, nvimSize: CGFloat?) -> NSFont {
+        let config = VeilConfig.current.font
+        let size = config?.size ?? nvimSize ?? 16
+        let family = config?.family ?? nvimFamily
+        guard let family, !family.isEmpty else {
+            return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
         }
+        if let font = NSFont(name: family, size: size) {
+            return font
+        }
+        NSLog(
+            "Veil: font family '%@' not found; using system monospaced", family)
+        return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
     }
 
     func updateFont(_ newFont: NSFont) {
@@ -395,7 +425,13 @@ final class NvimView: NSView {
         }
         let fontName = gridFont.displayName ?? gridFont.fontName
         lines.append(
-            "Font (vim.o.guifont): \(fontName) \(String(format: "%.0f", gridFont.pointSize))pt")
+            "Font: \(fontName) \(String(format: "%.0f", gridFont.pointSize))pt")
+        var overrides: [String] = []
+        if VeilConfig.current.font?.family != nil { overrides.append("family") }
+        if VeilConfig.current.font?.size != nil { overrides.append("size") }
+        if !overrides.isEmpty {
+            lines.append("Font override: \(overrides.joined(separator: ", "))")
+        }
         lines.append("Nerd Font: \(FontFallback.nerdFontName ?? "none")")
         return lines.joined(separator: "\n")
     }

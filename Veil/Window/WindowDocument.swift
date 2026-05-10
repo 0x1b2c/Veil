@@ -68,6 +68,11 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         controller.nvimView.setupLayers()
         controller.nvimView.delegate = self
         controller.nvimView.channel = channel
+        // Apply any `[font]` fields the user set so the local Mac's choice is
+        // visible before nvim attaches. Fields the user did not set fall
+        // through to the eventual nvim `guifont` event via the per-field merge
+        // in `effectiveFont`.
+        controller.nvimView.applyConfiguredFont()
         addWindowController(controller)
         if isRemote, let remoteAddress {
             Task { await startRemoteNvim(address: remoteAddress) }
@@ -304,6 +309,9 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                         NSSound.beep()
                     case .optionSet(let name, let value):
                         if name == "guifont", let fontStr = value.stringValue, !fontStr.isEmpty {
+                            // Always parse the event; per-field overrides from
+                            // `[font]` are applied inside `effectiveFont`, so
+                            // unset fields still follow nvim's guifont.
                             nvimView?.parseAndSetGuifont(fontStr)
                             if let nvimView {
                                 let newGridSize = nvimView.gridSizeForViewSize(nvimView.bounds.size)

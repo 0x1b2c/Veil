@@ -36,6 +36,16 @@
 # update_check = true
 
 
+# Font. See https://github.com/0x1b2c/Veil/blob/master/FONT.md for full
+# documentation. Either field is optional; set only what you want to
+# override and the rest follows the connected nvim's `guifont`. An empty
+# [font] block has no effect.
+#
+# [font]
+# family = "Menlo"
+# size = 16.0
+
+
 # Keyboard shortcuts. See https://github.com/0x1b2c/Veil/blob/master/KEYBOARD.md
 # for full documentation. To enable any of the options below, leave [keyboard]
 # uncommented and uncomment the specific lines you want to override.

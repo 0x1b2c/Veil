@@ -157,6 +157,21 @@ struct KeyboardConfig: Decodable {
     init() {}
 }
 
+// MARK: - FontConfig
+
+/// Client-side font configuration. Each field is independently optional and
+/// overlays nvim's `guifont` per-field: a set field wins, an unset field falls
+/// through to whatever `guifont` provides. The point is to keep font choice
+/// tied to the local Mac (installed families, display, accessibility) rather
+/// than whatever the connected nvim's config happens to specify, especially in
+/// remote mode. An empty `[font]` block has no effect.
+struct FontConfig: Decodable {
+    var family: String?
+    var size: CGFloat?
+
+    init() {}
+}
+
 // MARK: - VeilConfig
 
 struct VeilConfig: Decodable {
@@ -180,6 +195,8 @@ struct VeilConfig: Decodable {
     var update_check: Bool
 
     var remote: [RemoteEntry]?
+
+    var font: FontConfig?
 
     var keyboard: KeyboardConfig?
 
