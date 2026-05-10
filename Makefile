@@ -14,7 +14,7 @@ NO_PROFILING = CLANG_ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO
 XCODEBUILD = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST)'
 XCODEBUILD_UNIVERSAL = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST_UNIVERSAL)'
 
-.PHONY: build build-universal debug test test-verbose clean install zip release lsp
+.PHONY: build build-universal cli debug test test-verbose clean install zip release lsp
 
 build:
 	$(XCODEBUILD) -configuration Release -derivedDataPath $(DERIVED) $(NO_PROFILING) -quiet
@@ -23,6 +23,10 @@ build:
 build-universal:
 	$(XCODEBUILD_UNIVERSAL) -configuration Release -derivedDataPath $(DERIVED) $(UNIVERSAL) $(NO_PROFILING) -quiet
 	@echo "Built (universal): $(APP)"
+
+cli:
+	swift build --package-path Packages/veil -c release --product veil
+	@echo "Built: Packages/veil/.build/release/veil"
 
 debug:
 	$(XCODEBUILD) -configuration Debug -derivedDataPath $(DERIVED) -quiet
