@@ -8,7 +8,8 @@ private let veilAppBundleIdentifier = "org.1b2c.Veil"
 struct VeilCLI {
     static func main() {
         if CommandLine.arguments.dropFirst().contains("--version") {
-            print("Veil \(BuildVersion.displayVersion)")
+            let variant = bundledVariantSuffix()
+            print("Veil \(BuildVersion.displayVersion)\(variant)")
             exit(0)
         }
         let invocationName = URL(fileURLWithPath: CommandLine.arguments[0]).lastPathComponent
@@ -39,14 +40,11 @@ struct VeilCLI {
     }
 
     private static func resolveAppURL() -> URL {
-        let executable = URL(fileURLWithPath: CommandLine.arguments[0])
-            .resolvingSymlinksInPath()
-        let bundledAppURL =
-            executable
+        let bundledAppURL = runningExecutableURL()?
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        if isVeilAppBundle(bundledAppURL) {
+        if let bundledAppURL, isVeilAppBundle(bundledAppURL) {
             return bundledAppURL
         }
 
@@ -59,7 +57,14 @@ struct VeilCLI {
             return spotlightAppURL
         }
 
-        return bundledAppURL
+        return bundledAppURL ?? standardAppURL
+    }
+
+    /// Returns the absolute path to the running executable with symlinks
+    /// resolved. Uses `_NSGetExecutablePath()` internally so it stays
+    /// correct when argv[0] is just "veil" from a bare PATH lookup.
+    private static func runningExecutableURL() -> URL? {
+        Bundle.main.executableURL?.resolvingSymlinksInPath()
     }
 
     private static func findRunningApp(appURL: URL) -> NSRunningApplication? {
@@ -145,6 +150,31 @@ struct VeilCLI {
                 stderr)
             return false
         }
+    }
+
+    /// Returns " (default-editor)" when the running CLI lives inside a Veil.app
+    /// whose Info.plist stamps LSHandlerRank = Default on the document types
+    /// (the takeover build), and "" otherwise (polite build, or running outside
+    /// a bundle as during `swift run`). Plist read errors are treated as polite.
+    private static func bundledVariantSuffix() -> String {
+        guard let executable = runningExecutableURL() else { return "" }
+        let bundleURL =
+            executable
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        guard isVeilAppBundle(bundleURL) else { return "" }
+
+        let infoURL = bundleURL.appendingPathComponent("Contents/Info.plist")
+        guard let data = try? Data(contentsOf: infoURL),
+            let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
+            let info = plist as? [String: Any],
+            let documentTypes = info["CFBundleDocumentTypes"] as? [[String: Any]],
+            let firstType = documentTypes.first,
+            let rank = firstType["LSHandlerRank"] as? String,
+            rank == "Default"
+        else { return "" }
+        return " (default-editor)"
     }
 
     private static func isVeilAppBundle(_ url: URL) -> Bool {

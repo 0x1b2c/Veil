@@ -10,6 +10,8 @@
 			<string>Document</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>public.data</string>
@@ -21,6 +23,8 @@
 			<string>Text File</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>public.plain-text</string>
@@ -67,6 +71,8 @@
 			<string>Source File</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
 			<key>CFBundleTypeExtensions</key>
 			<array>
 				<!-- Text and documentation -->

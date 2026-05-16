@@ -43,7 +43,10 @@ jobs:
       - name: Package app
         run: |
           APP_PATH="build/Build/Products/Release/Veil.app"
-          ditto -c -k --keepParent "$APP_PATH" Veil.zip
+          ditto -c -k --keepParent "$APP_PATH" Veil-default-editor.zip
+
+      - name: Package polite variant
+        run: Tools/build-polite-variant.sh
 
       - name: Extract tag annotation
         id: tag_msg
@@ -58,5 +61,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Veil ${{ github.ref_name }}
-          files: Veil.zip
+          files: |
+            Veil.zip
+            Veil-default-editor.zip
           body: ${{ steps.tag_msg.outputs.body }}
