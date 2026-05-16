@@ -14,7 +14,7 @@ NO_PROFILING = CLANG_ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO
 XCODEBUILD = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST)'
 XCODEBUILD_UNIVERSAL = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST_UNIVERSAL)'
 
-.PHONY: build build-universal cli debug test test-verbose clean install zip zip-polite release lsp
+.PHONY: build build-universal cli debug test test-verbose clean install install-polite zip zip-polite release lsp
 
 build:
 	$(XCODEBUILD) -configuration Release -derivedDataPath $(DERIVED) $(NO_PROFILING) -quiet
@@ -76,12 +76,22 @@ install: build
 	rsync -a "$(APP)/" "$(INSTALL_DIR)/Veil.app/"
 	@echo "Installed to $(INSTALL_DIR)/Veil.app"
 
+install-polite: build
+	Tools/make-bundle-polite.sh "$(APP)"
+	rsync -a "$(APP)/" "$(INSTALL_DIR)/Veil.app/"
+	@echo "Installed polite variant to $(INSTALL_DIR)/Veil.app"
+
 zip: build-universal
 	ditto -c -k --keepParent --norsrc --noextattr --noacl "$(APP)" Veil-default-editor.zip
 	@echo "Packaged: Veil-default-editor.zip"
 
-zip-polite: zip
-	Tools/build-polite-variant.sh
+zip-polite: build-universal
+	WORK=$$(mktemp -d) && \
+	ditto "$(APP)" "$$WORK/Veil.app" && \
+	Tools/make-bundle-polite.sh "$$WORK/Veil.app" && \
+	ditto -c -k --keepParent --norsrc --noextattr --noacl "$$WORK/Veil.app" Veil.zip && \
+	rm -rf "$$WORK"
+	@echo "Packaged: Veil.zip"
 
 lsp:
 	xcode-build-server config -project $(PROJECT) -scheme $(SCHEME) --build_root $(DERIVED)

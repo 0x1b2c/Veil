@@ -89,8 +89,9 @@ make                # Release build (arm-only, fast)
 make debug          # Debug build
 make test           # Run unit tests
 make install        # Build + install to /Applications
+make install-polite # Build + install + strip LSHandlerRank from /Applications/Veil.app
 make zip            # Universal build + package as Veil-default-editor.zip
-make zip-polite     # Post-process Veil-default-editor.zip into Veil.zip (polite variant)
+make zip-polite     # Universal build + package as Veil.zip (polite variant)
 make clean          # Clean build artifacts
 make lsp            # Generate buildServer.json for SourceKit-LSP
 ```

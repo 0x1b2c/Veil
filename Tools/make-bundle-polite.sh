@@ -1,33 +1,29 @@
 #!/bin/sh
 set -eu
 
-# Post-processes Veil-default-editor.zip into Veil.zip by stripping
-# LSHandlerRank = Default from every CFBundleDocumentTypes entry in
+# Converts a Veil .app bundle into the "polite" variant in-place by
+# stripping LSHandlerRank from every CFBundleDocumentTypes entry in
 # Info.plist, then re-signing the bundle ad-hoc. Same binary, same
 # bundle ID, same name; only the plist differs. Without LSHandlerRank,
 # LaunchServices treats Veil as a non-default candidate for the
 # registered file types; it appears in "Open With" but never claims
 # the default association.
 
-PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd -P)"
-SOURCE_ZIP="$PROJECT_DIR/Veil-default-editor.zip"
-OUTPUT_ZIP="$PROJECT_DIR/Veil.zip"
-
-if [ ! -f "$SOURCE_ZIP" ]; then
-    echo "ERROR: $SOURCE_ZIP not found. Run 'make zip' first." >&2
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <path-to-Veil.app>" >&2
     exit 1
 fi
 
-WORK_DIR="$(mktemp -d)"
-trap 'rm -rf "$WORK_DIR"' EXIT
-
-ditto -x -k "$SOURCE_ZIP" "$WORK_DIR"
-
-APP="$WORK_DIR/Veil.app"
+APP="$1"
 INFO="$APP/Contents/Info.plist"
 
+if [ ! -d "$APP" ]; then
+    echo "ERROR: $APP not found." >&2
+    exit 1
+fi
+
 if [ ! -f "$INFO" ]; then
-    echo "ERROR: Info.plist not found at $INFO after extraction." >&2
+    echo "ERROR: Info.plist not found at $INFO." >&2
     exit 1
 fi
 
@@ -49,7 +45,4 @@ fi
 # ad-hoc; the project does not use Developer ID.
 codesign --force --sign - --deep "$APP"
 
-rm -f "$OUTPUT_ZIP"
-ditto -c -k --keepParent --norsrc --noextattr --noacl "$APP" "$OUTPUT_ZIP"
-
-echo "Packaged: $OUTPUT_ZIP ($i CFBundleDocumentTypes processed)"
+echo "Stripped LSHandlerRank from $i CFBundleDocumentTypes entries in $APP"
