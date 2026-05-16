@@ -90,13 +90,13 @@ We recommend [Maple Mono](https://github.com/subframe7536/maple-font) for its ex
 brew install font-maple-mono-nf-cn    # or font-maple-mono-nf without CJK
 ```
 
+Set it in nvim:
+
 ```lua
 vim.o.guifont = 'Maple Mono NF CN:h16'    -- or 'Maple Mono NF:h16' without CJK
 ```
 
-If your primary font isn't a [Nerd Font](https://www.nerdfonts.com/), Veil automatically searches for any installed Nerd Font on your system and uses it as a fallback for icon glyphs, similar to how terminals like WezTerm and Kitty handle font fallback.
-
-When you connect to a remote nvim, the remote machine's `guifont` is what controls the font Veil renders. That rarely matches your local Mac's font preferences (which families are installed, what's readable on this monitor). For the remote case, override with `~/.config/veil/veil.toml`:
+Or in `~/.config/veil/veil.toml` (recommended for remote nvim connections, where the remote machine's `guifont` rarely matches your local Mac):
 
 ```toml
 [font]
@@ -104,7 +104,7 @@ family = "Maple Mono NF CN"    # or "Maple Mono NF" without CJK
 size = 16.0
 ```
 
-Either field is optional and overrides the corresponding nvim `guifont` field. See [FONT.md](FONT.md) for full details.
+See [FONT.md](FONT.md) for precedence rules, the `force` option, and Nerd Font fallback details.
 
 ### Keyboard
 

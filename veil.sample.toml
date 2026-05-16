@@ -37,13 +37,18 @@
 
 
 # Font. See https://github.com/0x1b2c/Veil/blob/master/FONT.md for full
-# documentation. Either field is optional; set only what you want to
-# override and the rest follows the connected nvim's `guifont`. An empty
-# [font] block has no effect.
+# documentation. On a local connection Veil reads each field from nvim's
+# `guifont`, with the values below as fallback. On a remote connection
+# Veil uses the values below directly (the remote machine's `guifont`
+# rarely makes sense locally). Set `force = true` to use the values
+# below on local connections too; the trade-off is losing per-profile
+# font differentiation, which is fine if you want a simpler setup.
+# All fields are optional; an empty [font] block has no effect.
 #
 # [font]
 # family = "Menlo"
 # size = 16.0
+# force = false
 
 
 # Keyboard shortcuts. See https://github.com/0x1b2c/Veil/blob/master/KEYBOARD.md

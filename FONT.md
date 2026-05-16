@@ -11,9 +11,15 @@ Veil reads font configuration from `~/.config/veil/veil.toml`. Changes apply to 
 
 ## Relationship to `vim.o.guifont`
 
-By default Veil reads the font from nvim's `vim.o.guifont`, the same way every classic Vim GUI does. The `[font]` block in `veil.toml` exists for cases where reading from nvim isn't appropriate. The most important such case is remote mode: when Veil connects to a remote nvim, that nvim's `guifont` reflects the remote machine's preferences (its installed families, its display) rather than your local Mac's, and the named font may not even exist locally.
+On a local connection Veil reads the font from nvim's `vim.o.guifont`, the same way every classic Vim GUI does. The `[font]` block in `veil.toml` exists as a fallback for the cases where nvim doesn't supply a usable value, and as an authoritative override for the cases where reading from nvim isn't appropriate.
 
-When `[font]` is present, the merge is per-field. A field set in `[font]` overrides the corresponding field from `guifont`; an unset field falls through. Setting only `family` means nvim's `guifont` still controls size; setting only `size` means it still controls family. An empty `[font]` block has no effect at all. The merge runs at window startup and on every `guifont` event from nvim.
+The decision rules:
+
+- **Local connection** (default): Veil reads each field from `vim.o.guifont`. Any field nvim doesn't provide (or whose value can't be resolved on this Mac) falls back to the matching field in `[font]`, then to the system monospaced default.
+- **Remote connection**: Veil uses `[font]` directly. The remote nvim's `guifont` reflects the remote machine's installed families and display, which rarely matches the local Mac; using `[font]` keeps font choice tied to where the rendering actually happens.
+- **Local connection with `force = true`**: nvim's `guifont` is ignored, just as on a remote connection. Set this when you'd rather have Veil use `[font]` on local connections too. The trade-off is that all windows share the same font regardless of which Neovim configuration they run; recommended if you want to simplify your setup and don't need per-profile font differentiation.
+
+An empty `[font]` block has no effect.
 
 ## Configuring the font
 
@@ -21,16 +27,18 @@ When `[font]` is present, the merge is per-field. A field set in `[font]` overri
 [font]
 family = "Maple Mono NF CN"
 size = 16.0
+# force = true     # use [font] on local connections too (no per-profile font)
 ```
 
-| Field    | Type   | Description                                                         |
-| -------- | ------ | ------------------------------------------------------------------- |
-| `family` | string | macOS family display name (e.g. `Menlo`, `SF Mono`), not PostScript |
-| `size`   | float  | Font size in points                                                 |
+| Field    | Type   | Description                                                              |
+| -------- | ------ | ------------------------------------------------------------------------ |
+| `family` | string | macOS family display name (e.g. `Menlo`, `SF Mono`), not PostScript      |
+| `size`   | float  | Font size in points                                                      |
+| `force`  | bool   | If `true`, Veil uses `[font]` on local connections too (default `false`). See trade-off above. |
 
 `family` is the name as it appears in Font Book (so `SF Mono`, not `SFMono-Regular`). If the named family isn't installed, Veil falls back to the system monospaced font and logs a warning to the system log.
 
-Both fields are independently optional; either or both may be omitted.
+All fields are independently optional; any may be omitted.
 
 ## Recommended font family
 

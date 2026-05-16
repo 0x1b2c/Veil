@@ -65,13 +65,14 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     override func makeWindowControllers() {
         let controller = WindowController()
         controller.nvimView.preferredRenderer = preferredRenderer
+        controller.nvimView.isRemote = isRemote
         controller.nvimView.setupLayers()
         controller.nvimView.delegate = self
         controller.nvimView.channel = channel
-        // Apply any `[font]` fields the user set so the local Mac's choice is
-        // visible before nvim attaches. Fields the user did not set fall
-        // through to the eventual nvim `guifont` event via the per-field merge
-        // in `effectiveFont`.
+        // Seed the font from `[font]` so the local Mac's choice is visible
+        // before nvim attaches. On a local non-force connection the
+        // eventual nvim `guifont` event will take over per-field; on a
+        // remote connection or with `force = true`, this stays put.
         controller.nvimView.applyConfiguredFont()
         addWindowController(controller)
         if isRemote, let remoteAddress {
@@ -309,9 +310,10 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                         NSSound.beep()
                     case .optionSet(let name, let value):
                         if name == "guifont", let fontStr = value.stringValue, !fontStr.isEmpty {
-                            // Always parse the event; per-field overrides from
-                            // `[font]` are applied inside `effectiveFont`, so
-                            // unset fields still follow nvim's guifont.
+                            // Always parse the event. `effectiveFont` decides
+                            // whether to honor or bypass it based on the
+                            // connection mode and the `[font].force` flag,
+                            // so the event path stays uniform.
                             nvimView?.parseAndSetGuifont(fontStr)
                             if let nvimView {
                                 let newGridSize = nvimView.gridSizeForViewSize(nvimView.bounds.size)
