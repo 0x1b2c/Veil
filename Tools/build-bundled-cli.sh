@@ -3,12 +3,11 @@ set -eu
 
 # Fallbacks let the script run standalone (without xcodebuild) for timing,
 # debugging, or A/B comparisons. When invoked as a Run Script build phase
-# Xcode supplies all five variables and overrides every default below.
+# Xcode supplies all four variables and overrides every default below.
 : "${SRCROOT:=$(cd "$(dirname "$0")/.." && pwd)}"
 : "${ARCHS:=$(uname -m)}"
 : "${BUILT_PRODUCTS_DIR:=/tmp/veil-cli-standalone}"
 : "${CONTENTS_FOLDER_PATH:=Veil.app/Contents}"
-: "${EXPANDED_CODE_SIGN_IDENTITY:=-}"
 
 mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin"
 
@@ -48,11 +47,11 @@ fi
 cp "${src_bin}" "${cli_bin}"
 chmod +x "${cli_bin}"
 
-if [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]; then
-    codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --timestamp=none "${cli_bin}"
-else
-    codesign --force --sign - --timestamp=none "${cli_bin}"
-fi
+# `swift build` leaves the binary with a linker-applied ad-hoc signature,
+# the same form as the xcodebuild-produced Veil binary. Don't run
+# `codesign` here: it would mutate the embedded identifier and add an
+# extra ~50KB without functional benefit. (See Tools/make-bundle-polite.sh
+# for the same rationale on the app bundle.)
 
 ln -sf veil "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/gvim"
 ln -sf veil "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/gvimdiff"

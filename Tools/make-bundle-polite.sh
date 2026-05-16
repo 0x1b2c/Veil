@@ -3,11 +3,15 @@ set -eu
 
 # Converts a Veil .app bundle into the "polite" variant in-place by
 # stripping LSHandlerRank from every CFBundleDocumentTypes entry in
-# Info.plist, then re-signing the bundle ad-hoc. Same binary, same
-# bundle ID, same name; only the plist differs. Without LSHandlerRank,
-# LaunchServices treats Veil as a non-default candidate for the
-# registered file types; it appears in "Open With" but never claims
-# the default association.
+# Info.plist. Same binary, same bundle ID, same name; only the plist
+# differs. Without LSHandlerRank, LaunchServices treats Veil as a
+# non-default candidate for the registered file types; it appears in
+# "Open With" but never claims the default association.
+#
+# The bundle is left with its original linker-applied ad-hoc signature
+# (consistent with how Veil has shipped since v0.6). Running `codesign`
+# here would mutate the binary's embedded identifier and balloon its
+# size by ~50KB for no functional benefit.
 
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <path-to-Veil.app>" >&2
@@ -40,9 +44,5 @@ if [ "$i" -eq 0 ]; then
     echo "ERROR: No CFBundleDocumentTypes entries found in $INFO." >&2
     exit 1
 fi
-
-# Patching Info.plist invalidates the original code signature. Re-sign
-# ad-hoc; the project does not use Developer ID.
-codesign --force --sign - --deep "$APP"
 
 echo "Stripped LSHandlerRank from $i CFBundleDocumentTypes entries in $APP"

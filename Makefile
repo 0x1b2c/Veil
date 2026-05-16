@@ -10,6 +10,12 @@ APP = $(DERIVED)/Build/Products/Release/Veil.app
 INSTALL_DIR = /Applications
 UNIVERSAL = ONLY_ACTIVE_ARCH=NO
 NO_PROFILING = CLANG_ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO
+# Match CI behavior so locally-built zips have the same linker-applied
+# ad-hoc signature as what ships on Releases. Without this, xcodebuild
+# falls back to "Sign to Run Locally" and produces a binary with
+# hardened runtime and a CFBundleIdentifier-derived code identity,
+# which diverges from the released artifact.
+NO_SIGNING = CODE_SIGNING_ALLOWED=NO
 
 XCODEBUILD = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST)'
 XCODEBUILD_UNIVERSAL = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST_UNIVERSAL)'
@@ -17,11 +23,11 @@ XCODEBUILD_UNIVERSAL = xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destina
 .PHONY: build build-universal cli debug test test-verbose clean install install-polite zip zip-polite release lsp
 
 build:
-	$(XCODEBUILD) -configuration Release -derivedDataPath $(DERIVED) $(NO_PROFILING) -quiet
+	$(XCODEBUILD) -configuration Release -derivedDataPath $(DERIVED) $(NO_PROFILING) $(NO_SIGNING) -quiet
 	@echo "Built: $(APP)"
 
 build-universal:
-	$(XCODEBUILD_UNIVERSAL) -configuration Release -derivedDataPath $(DERIVED) $(UNIVERSAL) $(NO_PROFILING) -quiet
+	$(XCODEBUILD_UNIVERSAL) -configuration Release -derivedDataPath $(DERIVED) $(UNIVERSAL) $(NO_PROFILING) $(NO_SIGNING) -quiet
 	@echo "Built (universal): $(APP)"
 
 cli:
@@ -40,7 +46,7 @@ debug:
 test:
 	@swift test --package-path Packages/VeilCore --quiet
 	@out=$(DERIVED)/test.log; mkdir -p $(DERIVED); \
-	$(XCODEBUILD) -derivedDataPath $(DERIVED) -only-testing:VeilTests CODE_SIGNING_ALLOWED=NO test -quiet > $$out 2>&1; \
+	$(XCODEBUILD) -derivedDataPath $(DERIVED) -only-testing:VeilTests $(NO_SIGNING) test -quiet > $$out 2>&1; \
 	status=$$?; \
 	passed=$$(grep -cE "^Test case .* passed" $$out || true); \
 	failed=$$(grep -cE "^Test case .* failed" $$out || true); \
@@ -64,7 +70,7 @@ test:
 
 test-verbose:
 	swift test --package-path Packages/VeilCore
-	$(XCODEBUILD) -derivedDataPath $(DERIVED) -only-testing:VeilTests CODE_SIGNING_ALLOWED=NO test -quiet
+	$(XCODEBUILD) -derivedDataPath $(DERIVED) -only-testing:VeilTests $(NO_SIGNING) test -quiet
 
 clean:
 	$(XCODEBUILD) clean -quiet
