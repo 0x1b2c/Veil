@@ -126,5 +126,9 @@ endif
 	fi
 	git add $(PROJECT)/project.pbxproj
 	git commit -m "Release v$(V)"
-	git tag -a v$(V) -F "$(NOTES_FILE)"
+	# --cleanup=verbatim preserves Markdown section headers like `## Features`
+	# in the tag annotation. Git's default cleanup mode treats `#` as a comment
+	# leader and strips those lines, which would silently drop the section
+	# structure that the GitHub Release body inherits from the tag.
+	git tag -a v$(V) -F "$(NOTES_FILE)" --cleanup=verbatim
 	@echo "Tagged v$(V). To publish: git push origin master --tags"
