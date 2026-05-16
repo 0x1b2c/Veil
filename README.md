@@ -40,41 +40,21 @@ Veil communicates with Neovim via its stable msgpack-RPC and `ext_linegrid` UI p
 
 ## Install
 
+Veil has two variants: the standard build, and a `default-editor` build that claims file associations on install (so double-clicking source files in Finder opens Veil).
+
 ### Homebrew
 
 ```bash
 brew tap 0x1b2c/veil
-brew install --cask veil
+brew install --cask veil                  # standard
+brew install --cask veil-default-editor   # claims file associations
 ```
 
 This installs `Veil.app` to `/Applications` and symlinks the `veil`, `gvim`, and `gvimdiff` CLI commands to your Homebrew bin directory.
 
-### Default editor variant
-
-By default `brew install --cask veil` ships a conservative variant that does not claim file associations on install. If you want Veil to be the default editor for the source code and text file types it registers (so double-clicking them in Finder opens Veil), install the alternate cask instead:
-
-```bash
-brew install --cask veil-default-editor
-```
-
-Both casks ship the same binary; the only difference is `LSHandlerRank = Default` in `Info.plist`. Concretely:
-
-- For file types no installed app currently claims, Veil becomes the default.
-- For types where you have already chosen another app via Finder's Get Info, Open With, or Change All, your choice stands.
-- For types where another app declares itself the owner (e.g. Xcode for `.swift`), that app keeps priority.
-
-To switch between variants:
-
-```bash
-brew uninstall --cask veil
-brew install --cask veil-default-editor
-```
-
-> **Do not use `brew uninstall --zap`.** Both variants share the same bundle identifier and therefore the same `UserDefaults`; `--zap` would erase your Veil preferences along with the app.
-
 ### Manual
 
-Download `Veil.zip` from [Releases](https://github.com/0x1b2c/Veil/releases), unzip, and move `Veil.app` to `/Applications`. Then remove the quarantine attribute so macOS doesn't block it:
+Download `Veil.zip` (standard) or `Veil-default-editor.zip` (claims file associations) from [Releases](https://github.com/0x1b2c/Veil/releases), unzip, and move `Veil.app` to `/Applications`. Then remove the quarantine attribute so macOS doesn't block it:
 
 ```bash
 xattr -cr /Applications/Veil.app
