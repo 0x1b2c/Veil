@@ -152,10 +152,11 @@ struct VeilCLI {
         }
     }
 
-    /// Returns " (default-editor)" when the running CLI lives inside a Veil.app
-    /// whose Info.plist stamps LSHandlerRank = Default on the document types
-    /// (the takeover build), and "" otherwise (polite build, or running outside
-    /// a bundle as during `swift run`). Plist read errors are treated as polite.
+    /// Locates the Veil.app bundle that contains the running CLI and asks
+    /// `VeilBundleVariant` to interpret its Info.plist. Returns "" when the
+    /// CLI is not running from inside a Veil.app (e.g. `swift run`) or the
+    /// plist cannot be read; the variant interpretation itself lives in
+    /// `VeilBundleVariant.versionSuffix(from:)`.
     private static func bundledVariantSuffix() -> String {
         guard let executable = runningExecutableURL() else { return "" }
         let bundleURL =
@@ -168,13 +169,9 @@ struct VeilCLI {
         let infoURL = bundleURL.appendingPathComponent("Contents/Info.plist")
         guard let data = try? Data(contentsOf: infoURL),
             let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
-            let info = plist as? [String: Any],
-            let documentTypes = info["CFBundleDocumentTypes"] as? [[String: Any]],
-            let firstType = documentTypes.first,
-            let rank = firstType["LSHandlerRank"] as? String,
-            rank == "Default"
+            let info = plist as? [String: Any]
         else { return "" }
-        return " (default-editor)"
+        return VeilBundleVariant.versionSuffix(from: info)
     }
 
     private static func isVeilAppBundle(_ url: URL) -> Bool {

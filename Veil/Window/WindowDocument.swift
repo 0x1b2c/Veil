@@ -349,7 +349,8 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     private static func versionLines(nvimVersion: String? = nil) -> [String] {
         var lines: [String] = []
         if let nvimVersion { lines.append(nvimVersion) }
-        lines.append("Veil \(BuildVersion.displayVersion)")
+        let variant = VeilBundleVariant.versionSuffix(from: Bundle.main.infoDictionary)
+        lines.append("Veil \(BuildVersion.displayVersion)\(variant)")
 
         if hasUpdate(), let latest = UpdateChecker.latestVersion {
             lines.append("")
