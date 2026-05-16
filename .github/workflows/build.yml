@@ -43,10 +43,16 @@ jobs:
       - name: Package app
         run: |
           APP_PATH="build/Build/Products/Release/Veil.app"
-          ditto -c -k --keepParent "$APP_PATH" Veil-default-editor.zip
+          ditto -c -k --keepParent --norsrc --noextattr --noacl "$APP_PATH" Veil-default-editor.zip
 
       - name: Package polite variant
-        run: Tools/build-polite-variant.sh
+        run: |
+          APP_PATH="build/Build/Products/Release/Veil.app"
+          WORK=$(mktemp -d)
+          ditto "$APP_PATH" "$WORK/Veil.app"
+          Tools/make-bundle-polite.sh "$WORK/Veil.app"
+          ditto -c -k --keepParent --norsrc --noextattr --noacl "$WORK/Veil.app" Veil.zip
+          rm -rf "$WORK"
 
       - name: Extract tag annotation
         id: tag_msg
