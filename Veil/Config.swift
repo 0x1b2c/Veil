@@ -43,6 +43,7 @@ extension DecodableDefault {
     enum LetterSpacing: Source { static var defaultValue: CGFloat { 1.0 } }
     enum TitleBarBrightness: Source { static var defaultValue: CGFloat { -0.08 } }
     enum TabBarBrightness: Source { static var defaultValue: CGFloat { 0.05 } }
+    enum OptionAsMetaNone: Source { static var defaultValue: OptionAsMeta { .none } }
 }
 
 // MARK: - KeyAction
@@ -107,11 +108,57 @@ struct RemoteEntry: Decodable {
     let address: String
 }
 
+// MARK: - OptionAsMeta
+
+/// Which Option key, if any, acts as Meta. A Meta Option key sends its
+/// combinations to nvim as `<M-...>`; a non-Meta Option key goes through the
+/// macOS text input system, so layout-defined characters (`#` on Option+3 in
+/// the UK layout, brackets on the German layout) and dead-key composition
+/// keep working. Unknown config values decode as `.none` so a typo degrades
+/// to the default instead of discarding the whole config.
+enum OptionAsMeta: String, Decodable {
+    case none
+    case left
+    case right
+    case both
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try? container.decode(String.self)
+        self = raw.flatMap(OptionAsMeta.init(rawValue:)) ?? .none
+    }
+
+    /// Device-dependent NSEvent modifier bits distinguishing the two Option
+    /// keys (NX_DEVICELALTKEYMASK / NX_DEVICERALTKEYMASK).
+    private static let leftOptionDeviceBit: UInt = 0x20
+    private static let rightOptionDeviceBit: UInt = 0x40
+
+    /// Whether an Option-modified key press should act as Meta, judged from
+    /// the event's raw modifier flags. Synthetic events carry no left/right
+    /// device bits; under `left`/`right` those are treated as Meta so
+    /// programmatic `<M-...>` input keeps working.
+    func treatsAsMeta(rawModifierFlags: UInt) -> Bool {
+        switch self {
+        case .none:
+            return false
+        case .both:
+            return true
+        case .left, .right:
+            let left = rawModifierFlags & Self.leftOptionDeviceBit != 0
+            let right = rawModifierFlags & Self.rightOptionDeviceBit != 0
+            if !left && !right { return true }
+            return self == .left ? left : right
+        }
+    }
+}
+
 // MARK: - KeyboardConfig
 
 struct KeyboardConfig: Decodable {
     @DecodableDefault.Wrapper<DecodableDefault.True>
     var bind_default_neovim_keymaps: Bool
+    @DecodableDefault.Wrapper<DecodableDefault.OptionAsMetaNone>
+    var option_as_meta: OptionAsMeta
 
     var new_window: String?
     var new_window_with_profile: String?

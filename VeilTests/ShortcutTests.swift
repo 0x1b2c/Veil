@@ -347,6 +347,50 @@ final class ShortcutTests: XCTestCase {
         XCTAssertNil(config.shortcut(for: .newWindow))
     }
 
+    // MARK: - option_as_meta
+
+    /// Decodes KeyboardConfig from JSON. JSONDecoder exercises the same
+    /// Decodable path as the TOML decoder used in production, without
+    /// requiring the TOML module in the test target.
+    private func decodeKeyboardConfig(_ json: String) throws -> KeyboardConfig {
+        try JSONDecoder().decode(KeyboardConfig.self, from: Data(json.utf8))
+    }
+
+    func testOptionAsMetaDefaultsToNone() throws {
+        XCTAssertEqual(KeyboardConfig().option_as_meta, OptionAsMeta.none)
+        let config = try decodeKeyboardConfig("{}")
+        XCTAssertEqual(config.option_as_meta, OptionAsMeta.none)
+    }
+
+    func testOptionAsMetaDecodesAllValues() throws {
+        let expectations: [(String, OptionAsMeta)] = [
+            ("none", .none), ("left", .left), ("right", .right), ("both", .both),
+        ]
+        for (raw, expected) in expectations {
+            let config = try decodeKeyboardConfig(#"{"option_as_meta": "\#(raw)"}"#)
+            XCTAssertEqual(config.option_as_meta, expected, "for value '\(raw)'")
+        }
+    }
+
+    func testOptionAsMetaUnknownValueFallsBackToNone() throws {
+        let config = try decodeKeyboardConfig(#"{"option_as_meta": "middle"}"#)
+        XCTAssertEqual(config.option_as_meta, OptionAsMeta.none)
+    }
+
+    func testOptionAsMetaTreatsAsMeta() {
+        let leftBit: UInt = 0x20
+        let rightBit: UInt = 0x40
+        XCTAssertFalse(OptionAsMeta.none.treatsAsMeta(rawModifierFlags: leftBit))
+        XCTAssertTrue(OptionAsMeta.both.treatsAsMeta(rawModifierFlags: leftBit))
+        XCTAssertTrue(OptionAsMeta.left.treatsAsMeta(rawModifierFlags: leftBit))
+        XCTAssertFalse(OptionAsMeta.left.treatsAsMeta(rawModifierFlags: rightBit))
+        XCTAssertTrue(OptionAsMeta.right.treatsAsMeta(rawModifierFlags: rightBit))
+        XCTAssertFalse(OptionAsMeta.right.treatsAsMeta(rawModifierFlags: leftBit))
+        // Synthetic events carry no device bits: left/right fall back to Meta.
+        XCTAssertTrue(OptionAsMeta.left.treatsAsMeta(rawModifierFlags: 0))
+        XCTAssertTrue(OptionAsMeta.right.treatsAsMeta(rawModifierFlags: 0))
+    }
+
     func testKeyActionDefaultShortcutsAllParse() {
         for action in KeyAction.allCases {
             XCTAssertNotNil(

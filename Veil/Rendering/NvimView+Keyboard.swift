@@ -164,8 +164,22 @@ extension NvimView {
             return
         }
 
+        // Ctrl- and Cmd-modified keys always go straight to nvim. Option does
+        // so only when configured as Meta via option_as_meta; otherwise it
+        // falls through so the macOS text input system can apply the layout
+        // translation (# on Option+3 in the UK layout, dead-key accents).
+        // Option + non-printing keys (arrows, F-keys) still reach
+        // sendKeyDirectly via the special-key check below, so <M-Up> etc.
+        // work regardless of option_as_meta.
         let modifiers = event.modifierFlags.intersection([.control, .option, .command])
-        if !modifiers.isEmpty {
+        if !modifiers.isDisjoint(with: [.control, .command]) {
+            sendKeyDirectly(event)
+            return
+        }
+        if modifiers.contains(.option),
+            VeilConfig.current.keyboardOrDefault.option_as_meta
+                .treatsAsMeta(rawModifierFlags: event.modifierFlags.rawValue)
+        {
             sendKeyDirectly(event)
             return
         }

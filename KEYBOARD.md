@@ -7,6 +7,7 @@ Veil reads keyboard configuration from `~/.config/veil/veil.toml`. Changes apply
 - [App shortcuts and Neovim keymaps](#app-shortcuts-and-neovim-keymaps)
 - [Customizing app shortcuts](#customizing-app-shortcuts)
 - [Customizing Neovim keymaps](#customizing-neovim-keymaps)
+- [Option key behavior](#option-key-behavior)
 - [Shortcut syntax](#shortcut-syntax)
 
 ## App shortcuts and Neovim keymaps
@@ -108,6 +109,30 @@ vim.keymap.set('n', '<S-D-[>', 'gT')
 There is no per-key disable. The toggle is intentionally all-or-nothing because the value of these keymaps lies in their consistency: a partially-bound set creates more confusion than either extreme.
 
 **Caveat for `cmd+v`**: the Lua mapping above calls `vim.paste`, the same API Veil uses internally. Veil's version is still more reliable and faster because it reads the system clipboard directly instead of going through Neovim's clipboard provider. If you paste a lot of multi-line content, keeping `bind_default_neovim_keymaps = true` is the safer choice.
+
+## Option key behavior
+
+macOS keyboard layouts use Option to type characters: `#` is Option+3 on the UK layout, `{` `}` `[` `]` `|` require Option on the German layout, and dead-key accents (Option+E then E for `é` on the US layout) are Option sequences. Vim users may want Option to act as Meta instead, so that Option+X reaches nvim as `<M-x>`.
+
+`option_as_meta` chooses between the two:
+
+```toml
+[keyboard]
+option_as_meta = "none"
+```
+
+| Value     | Behavior                                                          |
+| --------- | ----------------------------------------------------------------- |
+| `"none"`  | Option types characters via the macOS text input system (default) |
+| `"both"`  | Both Option keys act as Meta: Option+X is sent as `<M-x>`         |
+| `"left"`  | Left Option acts as Meta; right Option types characters           |
+| `"right"` | Right Option acts as Meta; left Option types characters           |
+
+The default is `"none"` because Option's primary role on macOS is character input; making it Meta unconditionally breaks layout-defined characters and dead-key composition. The left/right split serves both needs at once: dedicate one Option key to `<M-...>` mappings and keep the other for typing.
+
+Option combined with non-printing keys (arrows, function keys, Home/End, ...) always reaches nvim as `<M-Up>`, `<M-F5>`, etc. regardless of this setting, since those keys never produce characters.
+
+Unrecognized values are treated as `"none"`.
 
 ## Shortcut syntax
 

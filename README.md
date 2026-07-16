@@ -110,7 +110,7 @@ See [FONT.md](FONT.md) for precedence rules, the `force` option, and Nerd Font f
 
 ### Keyboard
 
-Veil's keybindings split into two categories: **app shortcuts** for Veil's own actions (new window, close tab, open settings, etc.) and **Neovim keymaps** for macOS-style shortcuts pre-bound to Neovim commands (`cmd+s` → `:w`, `cmd+1`-`9` → switch tabs, etc.). Both are configurable, and the Neovim keymaps can be disabled wholesale to free those keys for your own nvim mappings. See [KEYBOARD.md](KEYBOARD.md) for the full list and string format.
+Veil's keybindings split into two categories: **app shortcuts** for Veil's own actions (new window, close tab, open settings, etc.) and **Neovim keymaps** for macOS-style shortcuts pre-bound to Neovim commands (`cmd+s` → `:w`, `cmd+1`-`9` → switch tabs, etc.). Both are configurable, and the Neovim keymaps can be disabled wholesale to free those keys for your own nvim mappings. The Option key defaults to typing layout-defined characters (UK `#`, German brackets, dead-key accents); set `option_as_meta` to make one or both Option keys send `<M-...>` to nvim instead. See [KEYBOARD.md](KEYBOARD.md) for the full list and string format.
 
 Quick reference:
 

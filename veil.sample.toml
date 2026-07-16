@@ -62,6 +62,13 @@
 # <C-Tab>, etc. You can then map them yourself in your nvim config.
 # bind_default_neovim_keymaps = true
 
+# Whether the Option key acts as Meta (Option+X reaches nvim as <M-x>) or
+# types characters through the macOS text input system (# on Option+3 in
+# the UK layout, dead-key accents). One of "none" (default), "both",
+# "left", "right". With "left" or "right", only that Option key acts as
+# Meta while the other keeps typing characters.
+# option_as_meta = "none"
+
 # Rebind Veil's GUI actions. Set to "" to disable a shortcut
 # (the menu item remains and stays clickable).
 # new_window = "cmd+n"
