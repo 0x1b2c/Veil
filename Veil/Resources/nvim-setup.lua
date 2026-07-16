@@ -31,13 +31,35 @@ vim.api.nvim_create_autocmd({ 'BufEnter', 'TabEnter' }, {
   end,
 })
 
-vim.api.nvim_create_user_command('VeilAppDebugToggle', function()
-  vim.rpcnotify(chan_id, 'VeilAppDebugToggle')
-end, {})
-
-vim.api.nvim_create_user_command('VeilAppDebugCopy', function()
-  vim.rpcnotify(chan_id, 'VeilAppDebugCopy')
-end, {})
+-- One :VeilAppDebug command with a subcommand argument. Plain `:VeilAppDebug`
+-- defaults to toggle (the common case); `:VeilAppDebug copy` writes the
+-- overlay's current contents to the system clipboard. A single name lets
+-- `:VeilAppD<Tab>` complete uniquely; with two sibling commands sharing a
+-- prefix the user has to type past the divergence point before completion
+-- helps.
+vim.api.nvim_create_user_command('VeilAppDebug', function(opts)
+  local sub = opts.fargs[1] or 'toggle'
+  if sub == 'toggle' then
+    vim.rpcnotify(chan_id, 'VeilAppDebugToggle')
+  elseif sub == 'copy' then
+    vim.rpcnotify(chan_id, 'VeilAppDebugCopy')
+  else
+    vim.notify(
+      "VeilAppDebug: unknown subcommand '" .. sub .. "' (expected 'toggle' or 'copy')",
+      vim.log.levels.ERROR
+    )
+  end
+end, {
+  nargs = '?',
+  -- Lua complete functions follow customlist semantics: nvim does not
+  -- filter candidates against what the user has already typed, so the
+  -- function must filter by arglead itself.
+  complete = function(arglead)
+    return vim.tbl_filter(function(c)
+      return vim.startswith(c, arglead)
+    end, { 'toggle', 'copy' })
+  end,
+})
 
 vim.api.nvim_create_user_command('VeilAppVersion', function(opts)
   vim.rpcnotify(chan_id, 'VeilAppVersion', opts.bang and '!' or '')
