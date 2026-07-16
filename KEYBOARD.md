@@ -1,6 +1,6 @@
 # Keyboard Configuration
 
-Veil reads keyboard configuration from `~/.config/veil/veil.toml`. Changes apply to windows opened after the file is saved.
+Veil reads keyboard configuration from `~/.config/veil/veil.toml`. Changes take effect the next time a window is opened, and then apply to all windows, including existing ones.
 
 ## Contents
 
