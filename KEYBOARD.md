@@ -4,13 +4,13 @@ Veil reads keyboard configuration from `~/.config/veil/veil.toml`. Changes apply
 
 ## Contents
 
-- [App shortcuts and Neovim keymaps](#app-shortcuts-and-neovim-keymaps)
-- [Customizing app shortcuts](#customizing-app-shortcuts)
-- [Customizing Neovim keymaps](#customizing-neovim-keymaps)
+- [Shortcuts](#shortcuts)
+  - [Customizing app shortcuts](#customizing-app-shortcuts)
+  - [Customizing Neovim keymaps](#customizing-neovim-keymaps)
+  - [Shortcut syntax](#shortcut-syntax)
 - [Option key behavior](#option-key-behavior)
-- [Shortcut syntax](#shortcut-syntax)
 
-## App shortcuts and Neovim keymaps
+## Shortcuts
 
 Veil's keybindings split into two categories that differ in ownership and configuration.
 
@@ -18,9 +18,9 @@ Veil's keybindings split into two categories that differ in ownership and config
 
 **Neovim keymaps** are macOS-style shortcuts that Veil pre-binds to Neovim commands so the editor behaves like a native Mac app by default. `cmd+s` runs `:w`, `cmd+z` runs `u`, `cmd+1` through `cmd+9` switch tabs. They form a single all-or-nothing set, controlled by `bind_default_neovim_keymaps`: when `true` (the default), every key is bound to its Neovim action; when `false`, every key passes through to Neovim verbatim (`<D-s>`, `<D-z>`, `<D-1>`, ...) for you to map in your nvim config.
 
-Veil ships sensible defaults in both categories so it works well without any configuration. The two sections below cover how to change either.
+Veil ships sensible defaults in both categories so it works well without any configuration. The next two sections cover how to change either.
 
-## Customizing app shortcuts
+### Customizing app shortcuts
 
 Every app shortcut has a config key under `[keyboard]`. Assign a shortcut string to rebind, or `""` to disable.
 
@@ -54,7 +54,7 @@ Full list of app shortcuts:
 
 **Not configurable**: `Cmd+backtick` (window cycling) is handled by macOS's built-in Window menu, not by Veil.
 
-## Customizing Neovim keymaps
+### Customizing Neovim keymaps
 
 The full set of macOS shortcuts Veil pre-binds to Neovim:
 
@@ -110,31 +110,7 @@ There is no per-key disable. The toggle is intentionally all-or-nothing because 
 
 **Caveat for `cmd+v`**: the Lua mapping above calls `vim.paste`, the same API Veil uses internally. Veil's version is still more reliable and faster because it reads the system clipboard directly instead of going through Neovim's clipboard provider. If you paste a lot of multi-line content, keeping `bind_default_neovim_keymaps = true` is the safer choice.
 
-## Option key behavior
-
-macOS keyboard layouts use Option to type characters: `#` is Option+3 on the UK layout, `{` `}` `[` `]` `|` require Option on the German layout, and dead-key accents (Option+E then E for `é` on the US layout) are Option sequences. Vim users may want Option to act as Meta instead, so that Option+X reaches nvim as `<M-x>`.
-
-`option_as_meta` chooses between the two:
-
-```toml
-[keyboard]
-option_as_meta = "none"
-```
-
-| Value     | Behavior                                                          |
-| --------- | ----------------------------------------------------------------- |
-| `"none"`  | Option types characters via the macOS text input system (default) |
-| `"both"`  | Both Option keys act as Meta: Option+X is sent as `<M-x>`         |
-| `"left"`  | Left Option acts as Meta; right Option types characters           |
-| `"right"` | Right Option acts as Meta; left Option types characters           |
-
-The default is `"none"` because Option's primary role on macOS is character input; making it Meta unconditionally breaks layout-defined characters and dead-key composition. The left/right split serves both needs at once: dedicate one Option key to `<M-...>` mappings and keep the other for typing.
-
-Option combined with non-printing keys (arrows, function keys, Home/End, ...) always reaches nvim as `<M-Up>`, `<M-F5>`, etc. regardless of this setting, since those keys never produce characters.
-
-Unrecognized values are treated as `"none"`.
-
-## Shortcut syntax
+### Shortcut syntax
 
 A shortcut is one or more modifiers followed by exactly one key, joined by `+`:
 
@@ -180,3 +156,27 @@ custom        = "cmd+`"
 | Function   | `f1` through `f35`                                            |
 
 `backspace` is the main ⌫ Delete key (top-right of the alpha block, produces `0x7F`). `delete` is the ⌦ Forward Delete key found on full-size keyboards.
+
+## Option key behavior
+
+macOS keyboard layouts use Option to type characters: `#` is Option+3 on the UK layout, `{` `}` `[` `]` `|` require Option on the German layout, and dead-key accents (Option+E then E for `é` on the US layout) are Option sequences. Vim users may want Option to act as Meta instead, so that Option+X reaches nvim as `<M-x>`.
+
+`option_as_meta` chooses between the two:
+
+```toml
+[keyboard]
+option_as_meta = "none"
+```
+
+| Value     | Behavior                                                          |
+| --------- | ----------------------------------------------------------------- |
+| `"none"`  | Option types characters via the macOS text input system (default) |
+| `"both"`  | Both Option keys act as Meta: Option+X is sent as `<M-x>`         |
+| `"left"`  | Left Option acts as Meta; right Option types characters           |
+| `"right"` | Right Option acts as Meta; left Option types characters           |
+
+The default is `"none"` because Option's primary role on macOS is character input; making it Meta unconditionally breaks layout-defined characters and dead-key composition. The left/right split serves both needs at once: dedicate one Option key to `<M-...>` mappings and keep the other for typing.
+
+Option combined with non-printing keys (arrows, function keys, Home/End, ...) always reaches nvim as `<M-Up>`, `<M-F5>`, etc. regardless of this setting, since those keys never produce characters.
+
+Unrecognized values are treated as `"none"`.
