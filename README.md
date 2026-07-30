@@ -60,6 +60,20 @@ Download `Veil.zip` (standard) or `Veil-default-editor.zip` (claims file associa
 xattr -cr /Applications/Veil.app
 ```
 
+### Signing and macOS permissions
+
+Veil deliberately has no Apple Developer certificate. Obtaining one means accepting a central authority's approval over who may distribute software, and this project declines that arrangement. Release artifacts instead carry an ad-hoc signature whose designated requirement is `identifier "org.1b2c.Veil"`. macOS ties permission grants (folder access, Full Disk Access) to that requirement, so grants persist across updates instead of being invalidated by each new binary.
+
+The trade-off: ad-hoc signatures have no certificate anchor, so any other program running on your Mac can sign itself with Veil's identifier and inherit the permissions you granted to Veil. Grant permissions with that in mind.
+
+If you prefer the stricter binding, re-sign the installed app:
+
+```bash
+codesign -fs - /Applications/Veil.app
+```
+
+This replaces the signature with a default ad-hoc one bound to the exact binary, removing the impersonation exposure for grants made afterwards. Grants made before re-signing keep the identifier-based requirement TCC recorded at grant time; revoke and re-grant them to complete the switch. The cost is that every Veil update invalidates your grants and you must grant them again.
+
 ## Build
 
 Open `Veil.xcodeproj` in Xcode and run, or:

@@ -48,10 +48,11 @@ cp "${src_bin}" "${cli_bin}"
 chmod +x "${cli_bin}"
 
 # `swift build` leaves the binary with a linker-applied ad-hoc signature,
-# the same form as the xcodebuild-produced Veil binary. Don't run
-# `codesign` here: it would mutate the embedded identifier and add an
-# extra ~50KB without functional benefit. (See Tools/make-bundle-polite.sh
-# for the same rationale on the app bundle.)
+# which is only a placeholder: Tools/sign-adhoc.sh re-signs the CLI (and
+# the whole bundle) with the identifier-based designated requirement at
+# packaging/install time. Don't run `codesign` here; a signature applied
+# now would be replaced anyway, and signing must happen after the bundle
+# contents are final.
 
 ln -sf veil "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/gvim"
 ln -sf veil "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/gvimdiff"

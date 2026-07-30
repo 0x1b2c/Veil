@@ -40,9 +40,13 @@ jobs:
       - name: Build Release
         run: xcodebuild build -project Veil.xcodeproj -scheme Veil -destination 'platform=macOS' -configuration Release -derivedDataPath build CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=NO CLANG_ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO
 
+      # Sign with the identifier-based designated requirement so TCC
+      # permission grants survive upgrades (see Tools/sign-adhoc.sh).
+      # Ad-hoc signing needs no certificate or keychain.
       - name: Package app
         run: |
           APP_PATH="build/Build/Products/Release/Veil.app"
+          Tools/sign-adhoc.sh "$APP_PATH"
           ditto -c -k --keepParent --norsrc --noextattr --noacl "$APP_PATH" Veil-default-editor.zip
 
       - name: Package polite variant
@@ -51,6 +55,7 @@ jobs:
           WORK=$(mktemp -d)
           ditto "$APP_PATH" "$WORK/Veil.app"
           Tools/make-bundle-polite.sh "$WORK/Veil.app"
+          Tools/sign-adhoc.sh "$WORK/Veil.app"
           ditto -c -k --keepParent --norsrc --noextattr --noacl "$WORK/Veil.app" Veil.zip
           rm -rf "$WORK"
 

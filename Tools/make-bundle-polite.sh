@@ -8,10 +8,10 @@ set -eu
 # non-default candidate for the registered file types; it appears in
 # "Open With" but never claims the default association.
 #
-# The bundle is left with its original linker-applied ad-hoc signature
-# (consistent with how Veil has shipped since v0.6). Running `codesign`
-# here would mutate the binary's embedded identifier and balloon its
-# size by ~50KB for no functional benefit.
+# Editing Info.plist invalidates the bundle's signature, so this script
+# must never be the last step: the calling Makefile targets and the CI
+# release workflow run Tools/sign-adhoc.sh afterwards to re-seal the
+# bundle with its identifier-based designated requirement.
 
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <path-to-Veil.app>" >&2

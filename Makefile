@@ -78,16 +78,26 @@ clean:
 	rm -rf $(DERIVED) Packages/VeilCore/.build Packages/veil/.build
 	rm -f Veil.zip Veil-default-editor.zip
 
+# TCC binds permission grants (Full Disk Access, folder access) to the
+# app's designated requirement, and linker-signed builds have no DR at
+# all, so grants fail outright on current macOS. Tools/sign-adhoc.sh
+# re-signs the bundle with an identifier-based DR that every future
+# build satisfies, keeping user grants valid across upgrades. It runs
+# at packaging/install time, after any Info.plist edits (which would
+# break an earlier seal), never inside build/build-universal.
 install: build
-	rsync -a "$(APP)/" "$(INSTALL_DIR)/Veil.app/"
+	Tools/sign-adhoc.sh "$(APP)"
+	rsync -a --delete "$(APP)/" "$(INSTALL_DIR)/Veil.app/"
 	@echo "Installed to $(INSTALL_DIR)/Veil.app"
 
 install-polite: build
 	Tools/make-bundle-polite.sh "$(APP)"
-	rsync -a "$(APP)/" "$(INSTALL_DIR)/Veil.app/"
+	Tools/sign-adhoc.sh "$(APP)"
+	rsync -a --delete "$(APP)/" "$(INSTALL_DIR)/Veil.app/"
 	@echo "Installed polite variant to $(INSTALL_DIR)/Veil.app"
 
 zip: build-universal
+	Tools/sign-adhoc.sh "$(APP)"
 	ditto -c -k --keepParent --norsrc --noextattr --noacl "$(APP)" Veil-default-editor.zip
 	@echo "Packaged: Veil-default-editor.zip"
 
@@ -95,6 +105,7 @@ zip-polite: build-universal
 	WORK=$$(mktemp -d) && \
 	ditto "$(APP)" "$$WORK/Veil.app" && \
 	Tools/make-bundle-polite.sh "$$WORK/Veil.app" && \
+	Tools/sign-adhoc.sh "$$WORK/Veil.app" && \
 	ditto -c -k --keepParent --norsrc --noextattr --noacl "$$WORK/Veil.app" Veil.zip && \
 	rm -rf "$$WORK"
 	@echo "Packaged: Veil.zip"
