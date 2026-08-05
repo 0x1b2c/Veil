@@ -21,6 +21,13 @@ final class KeyUtilsTests: XCTestCase {
         XCTAssertEqual(KeyUtils.nvimKey(characters: "\u{7F}", modifiers: []), "<BS>")
     }
     func testTab() { XCTAssertEqual(KeyUtils.nvimKey(characters: "\t", modifiers: []), "<Tab>") }
+    func testBackTabTranslatesToTab() {
+        // Shift+Tab arrives as U+0019 (back-tab); the Shift flag supplies the
+        // `S-` prefix, so mapping the character to "Tab" yields <S-Tab>.
+        XCTAssertEqual(KeyUtils.nvimKey(characters: "\u{19}", modifiers: [.shift]), "<S-Tab>")
+        XCTAssertEqual(
+            KeyUtils.nvimKey(characters: "\u{19}", modifiers: [.control, .shift]), "<C-S-Tab>")
+    }
     func testSpace() { XCTAssertEqual(KeyUtils.nvimKey(characters: " ", modifiers: []), "<Space>") }
     func testArrowKeys() {
         let up = String(Character(UnicodeScalar(NSUpArrowFunctionKey)!))

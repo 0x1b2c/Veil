@@ -28,6 +28,9 @@ nonisolated enum KeyUtils {
         if code == 0x1B { return wrapWithModifiers("Esc", modifiers: modifiers) }
         if code == 0x7F { return wrapWithModifiers("BS", modifiers: modifiers) }
         if code == 0x09 { return wrapWithModifiers("Tab", modifiers: modifiers) }
+        // Shift+Tab arrives as U+0019 (back-tab); the Shift flag already
+        // contributes the `S-` prefix, so mapping to "Tab" yields <S-Tab>.
+        if code == 0x19 { return wrapWithModifiers("Tab", modifiers: modifiers) }
         if code == 0x0D { return wrapWithModifiers("CR", modifiers: modifiers) }
         if code == 0x20 { return wrapWithModifiers("Space", modifiers: modifiers) }
         if resolvedCharacters == "<" { return wrapWithModifiers("lt", modifiers: modifiers) }

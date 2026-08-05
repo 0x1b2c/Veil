@@ -271,6 +271,41 @@ final class ShortcutTests: XCTestCase {
 
     // MARK: - Matches: named keys
 
+    /// Shift+Tab arrives as U+0019 (back-tab) in `charactersIgnoringModifiers`,
+    /// which strips Option only, not Shift's character transformation. The
+    /// `tab` named key must accept it so `shift+ctrl+tab` specs match.
+    func testMatchesShiftCtrlTabAsBackTab() {
+        let spec = Shortcut.parse("shift+ctrl+tab")!
+        let event = makeKeyDown(
+            chars: "\u{19}",
+            charsIgnoringMods: "\u{19}",
+            modifiers: [.control, .shift],
+            keyCode: 48)
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    func testMatchesCtrlTabAsPlainTab() {
+        let spec = Shortcut.parse("ctrl+tab")!
+        let event = makeKeyDown(
+            chars: "\t",
+            charsIgnoringMods: "\t",
+            modifiers: .control,
+            keyCode: 48)
+        XCTAssertTrue(spec.matches(event))
+    }
+
+    func testShiftCtrlTabDoesNotMatchCtrlOnlyTab() {
+        // Modifier exactness: a spec with shift must not match an event
+        // without shift, even though the key character matches.
+        let spec = Shortcut.parse("shift+ctrl+tab")!
+        let event = makeKeyDown(
+            chars: "\t",
+            charsIgnoringMods: "\t",
+            modifiers: .control,
+            keyCode: 48)
+        XCTAssertFalse(spec.matches(event))
+    }
+
     func testMatchesF35() {
         let spec = Shortcut.parse("f35")!
         let event = makeKeyDown(

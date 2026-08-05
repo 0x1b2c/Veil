@@ -156,7 +156,9 @@ extension Shortcut {
         case .pageDown: return code == NSPageDownFunctionKey
         case .insert: return code == NSInsertFunctionKey
         case .delete: return code == NSDeleteFunctionKey
-        case .tab: return code == 0x09
+        // Shift+Tab arrives as U+0019 (back-tab) in `charactersIgnoringModifiers`,
+        // which strips Option only, not Shift's character transformation.
+        case .tab: return code == 0x09 || code == 0x19
         case .return: return code == 0x0D
         case .escape: return code == 0x1B
         case .space: return code == 0x20
