@@ -74,6 +74,10 @@ codesign -fs - /Applications/Veil.app
 
 This replaces the signature with a default ad-hoc one bound to the exact binary, removing the impersonation exposure for grants made afterwards. Grants made before re-signing keep the identifier-based requirement TCC recorded at grant time; revoke and re-grant them to complete the switch. The cost is that every Veil update invalidates your grants and you must grant them again.
 
+### Updates
+
+Veil never prompts you to upgrade. This is by design: an update is something you ask about, not something the app announces, let alone forces on you. Run `:VeilAppVersion` when you want to know: it shows the current version, and if a newer release exists, its release notes and how to upgrade (`brew upgrade veil`, or the Releases page for manual installs). The update check runs once at app launch; restart Veil to refresh it.
+
 ## Build
 
 Open `Veil.xcodeproj` in Xcode and run, or:
