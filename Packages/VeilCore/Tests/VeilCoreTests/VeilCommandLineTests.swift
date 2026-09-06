@@ -115,4 +115,56 @@ struct VeilCommandLineTests {
         let result = VeilCommandLine.parse(["/path/to/Veil", "--veil-unknown", "file.txt"])
         #expect(result.nvimArgs == ["file.txt"])
     }
+
+    @Test func connectWithWorkspace() {
+        let result = VeilCommandLine.parse([
+            "/path/to/veil", "--connect", "2b.example.ts.net:7001", "--workspace", "myproject",
+        ])
+        #expect(result.remoteAddress == "2b.example.ts.net:7001")
+        #expect(result.workspace == "myproject")
+        #expect(result.nvimArgs.isEmpty)
+    }
+
+    @Test func connectWithoutWorkspace() {
+        let result = VeilCommandLine.parse(["/path/to/veil", "--connect", "host:6666"])
+        #expect(result.remoteAddress == "host:6666")
+        #expect(result.workspace == nil)
+        #expect(result.nvimArgs.isEmpty)
+    }
+
+    @Test func connectEqualsSign() {
+        let result = VeilCommandLine.parse([
+            "/path/to/veil", "--connect=host:6666", "--workspace=proj",
+        ])
+        #expect(result.remoteAddress == "host:6666")
+        #expect(result.workspace == "proj")
+        #expect(result.nvimArgs.isEmpty)
+    }
+
+    @Test func connectMixedWithFiles() {
+        let result = VeilCommandLine.parse([
+            "/path/to/veil", "--connect", "host:6666", "file.txt",
+        ])
+        #expect(result.remoteAddress == "host:6666")
+        #expect(result.nvimArgs == ["file.txt"])
+    }
+
+    @Test func connectMissingValue() {
+        let result = VeilCommandLine.parse(["/path/to/veil", "--connect"])
+        #expect(result.remoteAddress == nil)
+        #expect(result.nvimArgs.isEmpty)
+    }
+
+    @Test func workspaceOnly() {
+        let result = VeilCommandLine.parse(["/path/to/veil", "--workspace", "proj"])
+        #expect(result.remoteAddress == nil)
+        #expect(result.workspace == "proj")
+        #expect(result.nvimArgs.isEmpty)
+    }
+
+    @Test func defaultHasNoRemote() {
+        let result = VeilCommandLine.parse(["/path/to/veil", "file.txt"])
+        #expect(result.remoteAddress == nil)
+        #expect(result.workspace == nil)
+    }
 }

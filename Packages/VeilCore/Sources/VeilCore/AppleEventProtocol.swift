@@ -38,17 +38,28 @@ public struct VeilOpenRequest: Codable {
     public var env: [String: String]?
     public var renderer: VeilRendererOption?
     public var nvimAppName: String?
+    /// Remote nvim address ("host:port") for scriptable connections
+    /// (CLI --connect). When set, the GUI connects or activates the
+    /// window for this address instead of opening a local window.
+    public var remoteAddress: String?
+    /// Workspace name (project-root basename) identifying the remote
+    /// instance; used for window titling.
+    public var workspace: String?
 
     public init(
         nvimArgs: [String],
         env: [String: String]? = nil,
         renderer: VeilRendererOption? = nil,
-        nvimAppName: String? = nil
+        nvimAppName: String? = nil,
+        remoteAddress: String? = nil,
+        workspace: String? = nil
     ) {
         self.nvimArgs = nvimArgs
         self.env = env
         self.renderer = renderer
         self.nvimAppName = nvimAppName
+        self.remoteAddress = remoteAddress
+        self.workspace = workspace
     }
 }
 

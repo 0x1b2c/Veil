@@ -190,6 +190,8 @@ address = "127.0.0.1:6667"
 
 > _I don't always code, but when I do, I code in ~~production~~._
 
+Connections can also be scripted through the CLI: `veil --connect host:port --workspace name` connects to that address, or just activates the window already connected to it. `--workspace` names the window while the connection is being established.
+
 Clipboard integrates seamlessly with your local Mac. Yank/paste with `+` and `*` registers in the remote session operates on your local pasteboard.
 
 ### Commands

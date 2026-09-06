@@ -13,6 +13,10 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     var isRemote = false
     /// Address for remote connections (e.g. "192.168.1.100:6666").
     var remoteAddress: String?
+    /// Workspace name (project-root basename) for scriptable remote
+    /// connections; distinguishes window titles when several remote
+    /// workspaces are open at once.
+    var workspaceName: String?
 
     var channel: NvimChannel!
     private let grid = Grid()
@@ -102,7 +106,8 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             startEventLoop()
             await setupNvimIntegration()
             nvimView.remoteAddress = address
-            windowController?.updateTitle("Veil [remote: \(address)]")
+            windowController?.updateTitle(
+                workspaceName.map { "Veil [\($0)]" } ?? "Veil [remote: \(address)]")
             try? await channel.command("set title")
         } catch {
             await channel.stop()
@@ -263,6 +268,8 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                         if titleReady {
                             // Replace nvim's hardcoded "- Nvim" suffix with
                             // "- Veil" or "- Veil [Remote]" depending on mode.
+                            // The workspace name would be redundant here: nvim's
+                            // titlestring already carries the project path.
                             let suffix = isRemote ? " - Veil [Remote]" : " - Veil"
                             let displayTitle: String
                             if title.trimmingCharacters(in: .whitespaces).isEmpty {

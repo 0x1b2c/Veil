@@ -9,6 +9,10 @@ public enum VeilCommandLine {
     public struct ParsedArguments {
         public var nvimArgs: [String] = []
         public var renderer: VeilRendererOption = .metal
+        /// Remote nvim address from --connect ("host:port").
+        public var remoteAddress: String?
+        /// Workspace name from --workspace; pairs with --connect.
+        public var workspace: String?
     }
 
     public static func parse(_ rawArgs: [String]) -> ParsedArguments {
@@ -23,6 +27,21 @@ public enum VeilCommandLine {
                 // a following flag like `--veil-renderer` is not lost.
                 if let next = remaining.first, !next.hasPrefix("-") {
                     _ = remaining.popFirst()
+                }
+                continue
+            }
+            // Veil-owned flags for scriptable remote connections. Consumed
+            // here so they never leak into nvimArgs; nvim has no flags with
+            // these names.
+            if arg == "--connect" || arg.hasPrefix("--connect=")
+                || arg == "--workspace" || arg.hasPrefix("--workspace=")
+            {
+                let parts = splitFlag(arg)
+                let value = parts.value ?? remaining.popFirst()
+                switch parts.name {
+                case "--connect": result.remoteAddress = value
+                case "--workspace": result.workspace = value
+                default: break
                 }
                 continue
             }

@@ -60,7 +60,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Defer default window creation — if openFiles: is called (Finder launch),
         // a window will already exist, so we skip the default one.
         DispatchQueue.main.async {
-            if NSDocumentController.shared.documents.isEmpty {
+            if let address = self.parsedArgs.remoteAddress {
+                // Cold start via `veil --connect`: open the remote window
+                // instead of a default local one.
+                self.connectOrActivateRemoteWindow(
+                    address: address, workspace: self.parsedArgs.workspace)
+            } else if NSDocumentController.shared.documents.isEmpty {
                 self.createWindow(profile: self.profileFromEnvironment())
             }
         }
@@ -192,12 +197,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Forward NVIM_APPNAME so the existing instance opens the window
         // with the correct nvim profile (e.g. NVIM_APPNAME=nvim-nvchad gvim).
         let nvimAppName = ProcessInfo.processInfo.environment["NVIM_APPNAME"]
-        if !initialNvimArgs.isEmpty || nvimAppName != nil {
+        if !initialNvimArgs.isEmpty || nvimAppName != nil || parsedArgs.remoteAddress != nil {
             let request = VeilOpenRequest(
                 nvimArgs: initialNvimArgs,
                 env: ProcessInfo.processInfo.environment,
                 renderer: parsedArgs.renderer,
-                nvimAppName: nvimAppName)
+                nvimAppName: nvimAppName,
+                remoteAddress: parsedArgs.remoteAddress,
+                workspace: parsedArgs.workspace)
             if let data = try? JSONEncoder().encode(request),
                 let json = String(data: data, encoding: .utf8)
             {
@@ -252,6 +259,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let env = request.env
         if let env {
             NvimProcess.updateCachedEnv(from: env)
+        }
+        if let address = request.remoteAddress {
+            connectOrActivateRemoteWindow(address: address, workspace: request.workspace)
+            setOpenEventReply(reply, ok: true)
+            return
         }
         // Use forwarded NVIM_APPNAME to select the correct nvim profile,
         // falling back to default if not specified.
@@ -424,16 +436,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         openRemoteConnection(to: address)
     }
 
-    private func openRemoteConnection(to address: String) {
+    private func openRemoteConnection(to address: String, workspace: String? = nil) {
         VeilConfig.current = VeilConfig.load()
         applyConfiguredKeyEquivalents()
         let doc = WindowDocument()
         doc.preferredRenderer = preferredRenderer
         doc.isRemote = true
         doc.remoteAddress = address
+        doc.workspaceName = workspace
         NSDocumentController.shared.addDocument(doc)
         doc.makeWindowControllers()
         doc.showWindows()
+    }
+
+    /// Scriptable remote entry (CLI --connect). Idempotent per address: if a
+    /// window is already connected to this address, activate it; otherwise
+    /// open a new remote window. Address matching is exact string comparison —
+    /// the launcher contract guarantees a single canonical form (MagicDNS
+    /// hostname), so no normalization is needed.
+    func connectOrActivateRemoteWindow(address: String, workspace: String?) {
+        let existing = NSDocumentController.shared.documents
+            .compactMap { $0 as? WindowDocument }
+            .first { $0.isRemote && $0.remoteAddress == address }
+        if let existing {
+            existing.showWindows()
+        } else {
+            openRemoteConnection(to: address, workspace: workspace)
+        }
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func addConnectRemoteMenuItem() {

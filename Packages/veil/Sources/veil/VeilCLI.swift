@@ -22,7 +22,9 @@ struct VeilCLI {
         }
 
         let nvimAppName = ProcessInfo.processInfo.environment["NVIM_APPNAME"]
-        let hasOpenRequest = !arguments.nvimArgs.isEmpty || nvimAppName != nil
+        let hasOpenRequest =
+            !arguments.nvimArgs.isEmpty || nvimAppName != nil
+            || arguments.remoteAddress != nil
 
         if let running = findRunningApp(appURL: appURL) {
             // Hot start: the CLI is the Apple Event client. This avoids
@@ -109,7 +111,9 @@ struct VeilCLI {
             nvimArgs: arguments.nvimArgs,
             env: ProcessInfo.processInfo.environment,
             renderer: arguments.renderer,
-            nvimAppName: nvimAppName)
+            nvimAppName: nvimAppName,
+            remoteAddress: arguments.remoteAddress,
+            workspace: arguments.workspace)
         guard let data = try? JSONEncoder().encode(request),
             let json = String(data: data, encoding: .utf8)
         else {
