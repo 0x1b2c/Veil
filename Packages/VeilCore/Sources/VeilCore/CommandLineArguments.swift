@@ -13,6 +13,8 @@ public enum VeilCommandLine {
         public var remoteAddress: String?
         /// Workspace name from --workspace; pairs with --connect.
         public var workspace: String?
+        /// --workspaces: list registered workspace servers and exit.
+        public var listWorkspaces = false
     }
 
     public static func parse(_ rawArgs: [String]) -> ParsedArguments {
@@ -33,6 +35,10 @@ public enum VeilCommandLine {
             // Veil-owned flags for scriptable remote connections. Consumed
             // here so they never leak into nvimArgs; nvim has no flags with
             // these names.
+            if arg == "--workspaces" {
+                result.listWorkspaces = true
+                continue
+            }
             if arg == "--connect" || arg.hasPrefix("--connect=")
                 || arg == "--workspace" || arg.hasPrefix("--workspace=")
             {

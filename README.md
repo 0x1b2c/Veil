@@ -193,6 +193,8 @@ address = "127.0.0.1:6667"
 
 Connections can also be scripted through the CLI: `veil --connect host:port --workspace name` connects to that address, or just activates the window already connected to it. `--workspace` names the window while the connection is being established.
 
+With a wezterm mux setup, the same `veil foo.txt` you type locally also works from a machine attached over SSH — no separate command. Veil asks wezterm which attached client's keyboard just issued the command; when that client is on another machine, instead of opening a window on the mux host it maintains one headless nvim per project root (spawned on demand, tracked in `~/.local/state/veil/registry.json`), sends the files into it, and emits a `veil-edit` user var that wezterm broadcasts to attached clients. A small `user-var-changed` handler in `wezterm.lua` on each machine running Veil checks the payload's `viewer` field against its own hostname and reacts with `veil --connect host:port --workspace name`. Closing the Veil window only detaches; the workspace ends with `:qa` (or Cmd+Ctrl+Shift+W). `veil --workspaces` lists the registered workspaces and whether each server is still alive.
+
 Clipboard integrates seamlessly with your local Mac. Yank/paste with `+` and `*` registers in the remote session operates on your local pasteboard.
 
 ### Commands

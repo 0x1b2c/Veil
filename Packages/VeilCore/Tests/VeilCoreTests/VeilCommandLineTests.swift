@@ -166,5 +166,12 @@ struct VeilCommandLineTests {
         let result = VeilCommandLine.parse(["/path/to/veil", "file.txt"])
         #expect(result.remoteAddress == nil)
         #expect(result.workspace == nil)
+        #expect(!result.listWorkspaces)
+    }
+
+    @Test func workspacesFlag() {
+        let result = VeilCommandLine.parse(["/path/to/veil", "--workspaces"])
+        #expect(result.listWorkspaces)
+        #expect(result.nvimArgs.isEmpty)
     }
 }
