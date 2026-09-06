@@ -38,26 +38,32 @@ public enum WorkspaceViewer {
         case remote(host: String)
     }
 
+    /// The keystroke that launched this command is itself client input, so
+    /// in any genuine invocation the winning client's idle time is near
+    /// zero. A stale winner means nobody just typed this (say, a script in
+    /// a pane firing long after the last human input), and the detection
+    /// result cannot be trusted.
+    static let maxTrustedRemoteIdleSecs: UInt64 = 5
+
     /// wezterm decorates non-local client hostnames ("A2.local (via proxy
-    /// pid 13754)") and macOS reports the local host as "2B" or "2B.local"
-    /// depending on the API. Reduce both to a comparable core: cut at the
-    /// first space or "(", lowercase, drop a trailing ".local".
+    /// pid 13754)") and the same machine may report itself as "2B",
+    /// "2B.local", or a FQDN like "2b.tail1234.ts.net" depending on the
+    /// API. Compare first labels only: cut at the first space, "(", or ".",
+    /// then lowercase.
     public static func normalize(hostname: String) -> String {
         var core = hostname
-        if let cut = core.firstIndex(where: { $0 == " " || $0 == "(" }) {
+        if let cut = core.firstIndex(where: { $0 == " " || $0 == "(" || $0 == "." }) {
             core = String(core[..<cut])
         }
-        core = core.trimmingCharacters(in: .whitespaces).lowercased()
-        if core.hasSuffix(".local") {
-            core.removeLast(".local".count)
-        }
-        return core
+        return core.trimmingCharacters(in: .whitespaces).lowercased()
     }
 
     /// Where the freshest-input client of `wezterm cli list-clients
     /// --format json` sits relative to this machine. Returns nil when the
-    /// answer cannot be determined (unparseable or empty client list);
-    /// callers must then fall back to plain local behavior.
+    /// answer cannot be determined (unparseable or empty client list, or a
+    /// remote winner whose idle time exceeds the trust threshold); callers
+    /// must then fall back to plain local behavior. A local winner needs no
+    /// threshold — falling back would mean the same thing.
     public static func location(
         ofFreshestClientIn json: Data, localHostname: String
     ) -> Location? {
@@ -67,7 +73,9 @@ public enum WorkspaceViewer {
             })
         else { return nil }
         let host = normalize(hostname: freshest.hostname)
-        return host == normalize(hostname: localHostname) ? .local : .remote(host: host)
+        if host == normalize(hostname: localHostname) { return .local }
+        guard freshest.idleTime.secs < maxTrustedRemoteIdleSecs else { return nil }
+        return .remote(host: host)
     }
 }
 

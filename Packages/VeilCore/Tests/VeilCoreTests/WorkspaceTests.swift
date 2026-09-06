@@ -35,14 +35,32 @@ struct WorkspaceViewerTests {
 
     @Test func remoteClientFreshest() {
         let location = WorkspaceViewer.location(
-            ofFreshestClientIn: clientsJSON(localIdleSecs: 2055, remoteIdleSecs: 10),
+            ofFreshestClientIn: clientsJSON(localIdleSecs: 2055, remoteIdleSecs: 1),
             localHostname: "2B.local")
         #expect(location == .remote(host: "a2"))
+    }
+
+    @Test func staleRemoteWinnerIsUndecidable() {
+        // Nobody typed this recently (a delayed script, not a keystroke):
+        // a remote winner past the trust threshold must not divert.
+        let location = WorkspaceViewer.location(
+            ofFreshestClientIn: clientsJSON(localIdleSecs: 2055, remoteIdleSecs: 10),
+            localHostname: "2B.local")
+        #expect(location == nil)
     }
 
     @Test func localClientFreshest() {
         let location = WorkspaceViewer.location(
             ofFreshestClientIn: clientsJSON(localIdleSecs: 0, remoteIdleSecs: 3600),
+            localHostname: "2B.local")
+        #expect(location == .local)
+    }
+
+    @Test func staleLocalWinnerStaysLocal() {
+        // The threshold guards only remote diversion; a stale local winner
+        // and the fallback mean the same thing, so decide .local outright.
+        let location = WorkspaceViewer.location(
+            ofFreshestClientIn: clientsJSON(localIdleSecs: 3600, remoteIdleSecs: 7200),
             localHostname: "2B.local")
         #expect(location == .local)
     }
@@ -67,14 +85,21 @@ struct WorkspaceViewerTests {
         #expect(location == nil)
     }
 
-    @Test func normalizeStripsDecorationAndLocalSuffix() {
+    @Test func normalizeComparesFirstLabelOnly() {
         #expect(WorkspaceViewer.normalize(hostname: "A2.local (via proxy pid 13754)") == "a2")
         #expect(WorkspaceViewer.normalize(hostname: "2B") == "2b")
         #expect(WorkspaceViewer.normalize(hostname: "2B.local") == "2b")
         #expect(WorkspaceViewer.normalize(hostname: "Foo.Local") == "foo")
         #expect(WorkspaceViewer.normalize(hostname: "a2 (proxy)") == "a2")
-        #expect(
-            WorkspaceViewer.normalize(hostname: "host.tail1234.ts.net") == "host.tail1234.ts.net")
+        #expect(WorkspaceViewer.normalize(hostname: "2b.tail1234.ts.net") == "2b")
+    }
+
+    @Test func fqdnAndLocalSuffixNameTheSameMachine() {
+        // The same host may call itself "2B.local" (macOS) or a Tailscale
+        // FQDN; both must compare equal to each other and unequal to a2.
+        let fqdn = WorkspaceViewer.normalize(hostname: "2b.tail1234.ts.net")
+        #expect(fqdn == WorkspaceViewer.normalize(hostname: "2B.local"))
+        #expect(fqdn != WorkspaceViewer.normalize(hostname: "A2.local (via proxy pid 13754)"))
     }
 }
 
