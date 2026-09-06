@@ -81,6 +81,7 @@
 # toggle_fullscreen = "cmd+ctrl+f"
 # open_settings = "cmd+,"
 # connect_remote = "cmd+ctrl+shift+n"
+# quit_workspace = "cmd+ctrl+shift+w"
 
 
 # Saved remote nvim connections. Start nvim on the remote host with

@@ -145,6 +145,7 @@ Quick reference:
 | `Cmd+1` – `Cmd+9`  | Switch tab                            |
 | `Cmd+,`            | Open settings (veil.toml)             |
 | `Cmd+Ctrl+Shift+N` | Connect to remote nvim                |
+| `Cmd+Ctrl+Shift+W` | Close window and quit its Neovim (terminates a remote server) |
 
 Each of these stays at the granularity macOS users expect: `Cmd+W` closes one tab, `Cmd+Shift+W` closes the window, `Cmd+Q` quits the entire app. Unsaved-buffer prompts route through Neovim's `:confirm qa`.
 

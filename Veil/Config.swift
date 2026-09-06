@@ -60,6 +60,7 @@ enum KeyAction: String, CaseIterable {
     case toggleFullscreen = "toggle_fullscreen"
     case openSettings = "open_settings"
     case connectRemote = "connect_remote"
+    case quitWorkspace = "quit_workspace"
 
     /// The selector that this action's menu item uses. Used by AppDelegate's
     /// post-construction pass to locate the right menu item.
@@ -81,6 +82,7 @@ enum KeyAction: String, CaseIterable {
         case .toggleFullscreen: return NSSelectorFromString("toggleFullScreen:")
         case .openSettings: return NSSelectorFromString("openSettings:")
         case .connectRemote: return NSSelectorFromString("connectToRemote:")
+        case .quitWorkspace: return NSSelectorFromString("quitWorkspace:")
         }
     }
 
@@ -97,6 +99,7 @@ enum KeyAction: String, CaseIterable {
         case .toggleFullscreen: return "cmd+ctrl+f"
         case .openSettings: return "cmd+,"
         case .connectRemote: return "cmd+ctrl+shift+n"
+        case .quitWorkspace: return "cmd+ctrl+shift+w"
         }
     }
 }
@@ -170,6 +173,7 @@ struct KeyboardConfig: Decodable {
     var toggle_fullscreen: String?
     var open_settings: String?
     var connect_remote: String?
+    var quit_workspace: String?
 
     /// Returns the user's value for the given action, or the built-in default
     /// if the user didn't specify one.
@@ -186,6 +190,7 @@ struct KeyboardConfig: Decodable {
         case .toggleFullscreen: userValue = toggle_fullscreen
         case .openSettings: userValue = open_settings
         case .connectRemote: userValue = connect_remote
+        case .quitWorkspace: userValue = quit_workspace
         }
         return userValue ?? action.defaultShortcut
     }

@@ -47,6 +47,7 @@ Full list of app shortcuts:
 | `toggle_fullscreen`       | `cmd+ctrl+f`       | Toggle full screen                            |
 | `open_settings`           | `cmd+,`            | Open `veil.toml` for editing                  |
 | `connect_remote`          | `cmd+ctrl+shift+n` | Connect to a remote nvim instance over TCP    |
+| `quit_workspace`          | `cmd+ctrl+shift+w` | Close the window and quit its nvim (`:confirm qa`); on a remote connection this terminates the server, unlike `close_window`, which only disconnects |
 
 **Conflict with Neovim keymaps**: when `bind_default_neovim_keymaps = true` (the default), every key listed in [Customizing Neovim keymaps](#customizing-neovim-keymaps) is claimed by Veil. Rebinding an app shortcut to one of those keys is silently shadowed. Either pick a different key or set `bind_default_neovim_keymaps = false` to free the entire set.
 

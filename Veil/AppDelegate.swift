@@ -53,6 +53,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         addProfilePickerMenuItem()
         addConnectRemoteMenuItem()
+        addQuitWorkspaceMenuItem()
         addDebugOverlayMenuItem()
         applyConfiguredKeyEquivalents()
         NSApp.activate(ignoringOtherApps: true)
@@ -485,6 +486,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         remoteItem.keyEquivalentModifierMask = [.command, .shift, .control]
         remoteItem.target = self
         fileMenu.insertItem(remoteItem, at: profileItemIndex + 1)
+    }
+
+    private func addQuitWorkspaceMenuItem() {
+        guard let mainMenu = NSApp.mainMenu,
+            let fileMenu = mainMenu.items.first(where: { $0.title == "File" })?.submenu
+        else { return }
+
+        // Insert after the "Close Window" item.
+        let closeWindowIndex =
+            fileMenu.items.firstIndex(where: {
+                $0.action == NSSelectorFromString("closeWindow:")
+            }) ?? fileMenu.items.count - 1
+
+        let quitItem = NSMenuItem(
+            title: "Quit Workspace",
+            action: NSSelectorFromString("quitWorkspace:"),
+            keyEquivalent: "w"
+        )
+        quitItem.keyEquivalentModifierMask = [.command, .shift, .control]
+        // No target: dispatch through the responder chain to the key
+        // window's NvimView, like the other per-window actions.
+        fileMenu.insertItem(quitItem, at: closeWindowIndex + 1)
     }
 
     private func addProfilePickerMenuItem() {

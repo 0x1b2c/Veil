@@ -349,6 +349,21 @@ extension NvimView {
         window?.performClose(nil)
     }
 
+    /// Close the window AND terminate the nvim behind it, in both modes.
+    /// Locally this is what closing the window already does. Remotely,
+    /// closing the window only detaches the UI, so this sends `:confirm qa`
+    /// to the server instead; the window then closes when the connection
+    /// drops. Going through `:confirm qa` (rather than closing the window
+    /// first) means cancelling nvim's unsaved-buffer prompt keeps the
+    /// window open.
+    @objc func quitWorkspace(_ sender: Any?) {
+        if isRemote {
+            Task { try? await channel?.command("confirm qa") }
+        } else {
+            window?.performClose(nil)
+        }
+    }
+
     // MARK: - Standard Edit actions
 
     @objc func undo(_ sender: Any?) {
