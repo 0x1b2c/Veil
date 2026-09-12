@@ -50,7 +50,7 @@ brew install --cask veil                  # standard
 brew install --cask veil-default-editor   # claims file associations
 ```
 
-This installs `Veil.app` to `/Applications` and symlinks the `veil`, `gvim`, and `gvimdiff` CLI commands to your Homebrew bin directory.
+This installs `Veil.app` to `/Applications` and symlinks the `veil`, `gvim`, and `gvimdiff` CLI commands to your Homebrew bin directory. If another program (typically MacVim) already owns the `gvim` or `gvimdiff` name, Veil leaves it untouched; the install output shows how to claim it by hand.
 
 ### Manual
 
