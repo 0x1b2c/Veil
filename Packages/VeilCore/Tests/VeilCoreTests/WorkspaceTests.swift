@@ -85,6 +85,26 @@ struct WorkspaceViewerTests {
         #expect(location == nil)
     }
 
+    @Test func localHostnameSharesItsSourceWithOtherTools() throws {
+        // Scenario: editing while sitting at this machine opens a local
+        // window. That only holds if our idea of "this machine" is the very
+        // name wezterm reports for its local client, which it reads from
+        // gethostname(). Pin the source by comparing against `hostname`,
+        // which reads the same place; a Mac whose computer name was
+        // customized reports something else entirely elsewhere.
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/hostname")
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        try process.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        let expected = String(decoding: data, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(!expected.isEmpty)
+        #expect(WorkspaceViewer.localHostname() == expected)
+    }
+
     @Test func normalizeComparesFirstLabelOnly() {
         #expect(WorkspaceViewer.normalize(hostname: "A2.local (via proxy pid 13754)") == "a2")
         #expect(WorkspaceViewer.normalize(hostname: "2B") == "2b")

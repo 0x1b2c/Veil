@@ -23,9 +23,10 @@ enum WorkspaceLauncher {
                 "/usr/bin/env", ["wezterm", "cli", "list-clients", "--format", "json"],
                 timeout: 2),
             result.status == 0,
+            let localHostname = WorkspaceViewer.localHostname(),
             case .remote(let host) = WorkspaceViewer.location(
                 ofFreshestClientIn: result.stdout,
-                localHostname: ProcessInfo.processInfo.hostName) ?? .local
+                localHostname: localHostname) ?? .local
         else { return nil }
         return host
     }

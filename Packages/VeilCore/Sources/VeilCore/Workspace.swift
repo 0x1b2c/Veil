@@ -58,6 +58,26 @@ public enum WorkspaceViewer {
         return core.trimmingCharacters(in: .whitespaces).lowercased()
     }
 
+    /// This machine's name as `gethostname()` reports it, which is the
+    /// same source wezterm reads for the client metadata compared above.
+    ///
+    /// Deliberately not `ProcessInfo.hostName`: that one comes from
+    /// SystemConfiguration's LocalHostName, a different name that a Mac
+    /// with a customized computer name sets independently. A host whose
+    /// `gethostname()` is "2B" can report "example-mac.local" there,
+    /// and the comparison then never matches, so the machine the user is
+    /// sitting at looks remote to itself.
+    ///
+    /// nil when the call fails, which callers must read as "cannot tell"
+    /// rather than "not this machine".
+    public static func localHostname() -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+        guard gethostname(&buffer, buffer.count - 1) == 0 else { return nil }
+        buffer[buffer.count - 1] = 0
+        let name = String(cString: buffer)
+        return name.isEmpty ? nil : name
+    }
+
     /// Where the freshest-input client of `wezterm cli list-clients
     /// --format json` sits relative to this machine. Returns nil when the
     /// answer cannot be determined (unparseable or empty client list, or a
