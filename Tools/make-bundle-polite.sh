@@ -9,7 +9,7 @@ set -eu
 # "Open With" but never claims the default association.
 #
 # Editing Info.plist invalidates the bundle's signature, so this script
-# must never be the last step: the calling Makefile targets and the CI
+# must never be the last step: the calling justfile recipes and the CI
 # release workflow run Tools/sign-adhoc.sh afterwards to re-seal the
 # bundle with its identifier-based designated requirement.
 

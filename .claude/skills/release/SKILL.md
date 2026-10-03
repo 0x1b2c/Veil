@@ -1,7 +1,7 @@
 ---
 name: release
 description: Release a new version of Veil — bump version, write release notes, create annotated tag, and push to trigger CI. Use when the user says "发布", "release", or "/release 0.5".
-allowed-tools: Bash(git:*) Bash(make:*) Bash(gh:*) Read Edit
+allowed-tools: Bash(git:*) Bash(just:*) Bash(gh:*) Read Edit
 ---
 
 # Release a New Version
@@ -24,13 +24,13 @@ Required: version number (e.g., `/release 0.5`).
    - English, concise, describes what changed from the user's perspective
    - Features first, then fixes (prefix fixes with "Fix")
 5. Show the release notes to the user and **wait for confirmation** before proceeding
-6. Write the confirmed bullet list to a temp file and call `make release` to atomically bump `MARKETING_VERSION`, commit, and create the annotated tag in one step. The tag message is **only** the bullet list — no title line, because the CI release job sets the GitHub Release title to `Veil v<version>` automatically:
+6. Write the confirmed bullet list to a temp file and call `just release` to atomically bump `MARKETING_VERSION`, commit, and create the annotated tag in one step. The tag message is **only** the bullet list — no title line, because the CI release job sets the GitHub Release title to `Veil v<version>` automatically:
    ```
    notes_file=$(mktemp -t veil-release-notes)
    cat > "$notes_file" <<'NOTES'
    <bullet list>
    NOTES
-   make release V=<version> NOTES_FILE="$notes_file"
+   just release <version> "$notes_file"
    rm -f "$notes_file"
    ```
 7. Verify the tag commit is exactly HEAD before pushing — catches any drift between the pbxproj bump commit and the tag:

@@ -80,21 +80,23 @@ Veil never prompts you to upgrade. This is by design: an update is something you
 
 ## Build
 
-Open `Veil.xcodeproj` in Xcode and run, or:
+Open `Veil.xcodeproj` in Xcode and run, or use [just](https://github.com/casey/just) (`brew install just`):
 
 ```
-make                # Release build (arm-only, fast)
-make debug          # Debug build
-make test           # Run unit tests
-make install        # Build + install to /Applications
-make install-polite # Build + install + strip LSHandlerRank from /Applications/Veil.app
-make zip            # Universal build + package as Veil-default-editor.zip
-make zip-polite     # Universal build + package as Veil.zip (polite variant)
-make clean          # Clean build artifacts
-make lsp            # Generate buildServer.json for SourceKit-LSP
+just                # Release build (arm-only, fast)
+just debug          # Debug build
+just test           # Run unit tests
+just install        # Build + install to /Applications
+just install-polite # Build + install + strip LSHandlerRank from /Applications/Veil.app
+just zip            # Universal build + package as Veil-default-editor.zip
+just zip-polite     # Universal build + package as Veil.zip (polite variant)
+just clean          # Clean build artifacts
+just lsp            # Generate buildServer.json for SourceKit-LSP
 ```
 
-For Neovim/editor LSP support, run `make lsp` after cloning to generate `buildServer.json` (requires [xcode-build-server](https://github.com/nicklockwood/xcode-build-server)).
+`just --list` shows every recipe with a one-line description.
+
+For Neovim/editor LSP support, run `just lsp` after cloning to generate `buildServer.json` (requires [xcode-build-server](https://github.com/nicklockwood/xcode-build-server)).
 
 ## Usage
 
