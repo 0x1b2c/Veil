@@ -217,7 +217,7 @@ veil -d file1.txt file2.txt     # diff mode
 gvimdiff file1.txt file2.txt    # same as veil -d
 ```
 
-If Veil is already running, the CLI forwards arguments to the existing instance (opens a new window) instead of launching a second copy.
+If Veil is already running, the CLI forwards arguments to the existing instance (opens a new window) instead of launching a second copy. Forwarding uses Apple Events, so the first time you do this from a given terminal, macOS asks whether that terminal may control Veil; allow it. If you declined, re-enable it in System Settings > Privacy & Security > Automation.
 
 ### Multiple nvim configs
 

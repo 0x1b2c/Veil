@@ -128,10 +128,31 @@ struct VeilCLI {
             NSAppleEventDescriptor(string: json),
             forKeyword: VeilAppleEventProtocol.jsonParamKey)
 
+        // `.neverInteract` below also keeps macOS from asking for Automation
+        // consent, so a terminal that was never granted it would be refused
+        // forever. Ask explicitly first: macOS shows its standard prompt once
+        // and remembers the answer. procNotFound (Veil quit in between) falls
+        // through to the send, which reports it.
+        let consent = AEDeterminePermissionToAutomateTarget(
+            target.aeDesc, VeilAppleEventProtocol.eventClass,
+            VeilAppleEventProtocol.openEventID, true)
+        if Int(consent) == errAEEventNotPermitted {
+            fputs("veil: \(VeilAppleEventProtocol.failureMessage(forStatus: consent))\n", stderr)
+            return false
+        }
+
         do {
             let reply = try event.sendEvent(
                 options: [.waitForReply, .neverInteract],
                 timeout: VeilAppleEventProtocol.replyTimeout)
+            // A refused or failed delivery comes back as a system reply that
+            // carries only an error number, never Veil's JSON.
+            if let status = reply.paramDescriptor(forKeyword: keyErrorNumber)?.int32Value,
+                status != noErr
+            {
+                fputs("veil: \(VeilAppleEventProtocol.failureMessage(forStatus: status))\n", stderr)
+                return false
+            }
             guard
                 let replyJSON = reply.paramDescriptor(
                     forKeyword: VeilAppleEventProtocol.jsonParamKey)?.stringValue,
