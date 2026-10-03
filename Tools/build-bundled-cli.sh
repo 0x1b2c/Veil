@@ -16,32 +16,57 @@ rm -f "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/bin/veil-client"
 
 pkg_dir="${SRCROOT}/Packages/veil"
 
+# Runs on every build with no input/output declarations: the CLI embeds
+# `git describe` through BuildVersionPlugin, so a new commit changes the
+# binary even when no source file does, and only swift build can tell.
+
+# Build one architecture into its own scratch directory and print the
+# path of the resulting binary. Each arch gets a separate scratch path
+# because the build system behind recent toolchains (Swift Build) writes
+# every arch of a configuration to the same Products directory, so a
+# second arch would overwrite the first; separate directories also keep
+# each arch's incremental state, so alternating single-arch and universal
+# builds never forces a rebuild. The output location is asked from
+# SwiftPM rather than assumed: its layout differs between build systems,
+# and a guessed path can silently point at a stale binary left over from
+# an older toolchain.
+build_arch() {
+    arch="$1"
+    scratch="${pkg_dir}/.build/cli-${arch}"
+    swift build \
+        --package-path "${pkg_dir}" \
+        --scratch-path "${scratch}" \
+        -c release \
+        --product veil \
+        --arch "${arch}" >&2 || return 1
+    bin_dir=$(swift build \
+        --package-path "${pkg_dir}" \
+        --scratch-path "${scratch}" \
+        -c release \
+        --product veil \
+        --arch "${arch}" \
+        --show-bin-path) || return 1
+    printf '%s/veil\n' "${bin_dir}"
+}
+
 set -- ${ARCHS}
 if [ $# -gt 1 ]; then
-    # `swift build --arch arm64 --arch x86_64` routes through Xcode's
-    # build system (xcbuild), which mis-resolves plugin target GUIDs
-    # across local-package dependencies and aborts with
-    # "missing target with GUID 'PACKAGE-TARGET:BuildVersionPlugin@N'".
-    # Per-arch invocations use LLBuild and work, so build each arch
-    # separately and lipo them together for the universal binary.
+    # Build each arch separately and lipo the slices together. On older
+    # toolchains (Xcode 16, CI's macos-15 runner) a single
+    # `swift build --arch arm64 --arch x86_64` routes through xcbuild,
+    # which mis-resolves plugin target GUIDs across local-package
+    # dependencies and aborts. Swift Build (Xcode 27) builds a universal
+    # binary in one invocation; once CI runs on such a toolchain this
+    # branch can collapse into that single call.
     slices=""
     for arch in "$@"; do
-        swift build \
-            --package-path "${pkg_dir}" \
-            -c release \
-            --product veil \
-            --arch "${arch}"
-        slices="${slices} ${pkg_dir}/.build/${arch}-apple-macosx/release/veil"
+        slice=$(build_arch "${arch}") || exit 1
+        slices="${slices} ${slice}"
     done
     src_bin="${pkg_dir}/.build/veil-universal"
     lipo -create ${slices} -output "${src_bin}"
 else
-    swift build \
-        --package-path "${pkg_dir}" \
-        -c release \
-        --product veil \
-        --arch "$1"
-    src_bin="${pkg_dir}/.build/$1-apple-macosx/release/veil"
+    src_bin=$(build_arch "$1") || exit 1
 fi
 
 cp "${src_bin}" "${cli_bin}"
