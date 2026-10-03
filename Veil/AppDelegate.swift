@@ -211,6 +211,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 event.setParam(
                     NSAppleEventDescriptor(string: json),
                     forKeyword: VeilAppleEventProtocol.jsonParamKey)
+                // `.noReply` never prompts for Automation consent, so ask
+                // explicitly; without it the event would be dropped silently.
+                // This path runs from a terminal, where stderr is what the
+                // user sees. Other statuses (such as Veil quitting in between)
+                // keep the best-effort send.
+                let consent = AEDeterminePermissionToAutomateTarget(
+                    target.aeDesc, VeilAppleEventProtocol.eventClass,
+                    VeilAppleEventProtocol.openEventID, true)
+                if Int(consent) == errAEEventNotPermitted {
+                    fputs(
+                        "veil: \(VeilAppleEventProtocol.failureMessage(forStatus: consent))\n",
+                        stderr)
+                    exit(1)
+                }
                 _ = try? event.sendEvent(
                     options: .noReply,
                     timeout: VeilAppleEventProtocol.replyTimeout)
