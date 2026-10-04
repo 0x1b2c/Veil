@@ -10,7 +10,7 @@ dest := "platform=macOS,arch=arm64"
 dest_universal := "generic/platform=macOS"
 derived := ".build"
 app := derived / "Build/Products/Release/Veil.app"
-# Where Veil.app goes; override with `just install_dir=~/Applications install`.
+# Where Veil.app goes; override with `just install_dir=$HOME/Applications install`.
 install_dir := "/Applications"
 universal := "ONLY_ACTIVE_ARCH=NO"
 no_profiling := "CLANG_ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO"

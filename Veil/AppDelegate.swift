@@ -214,8 +214,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // `.noReply` never prompts for Automation consent, so ask
                 // explicitly; without it the event would be dropped silently.
                 // This path runs from a terminal, where stderr is what the
-                // user sees. Other statuses (such as Veil quitting in between)
-                // keep the best-effort send.
+                // user sees; the running Veil is still brought to the front,
+                // as it was before the consent check. Other statuses (such as
+                // Veil quitting in between) keep the best-effort send.
                 let consent = AEDeterminePermissionToAutomateTarget(
                     target.aeDesc, VeilAppleEventProtocol.eventClass,
                     VeilAppleEventProtocol.openEventID, true)
@@ -223,6 +224,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     fputs(
                         "veil: \(VeilAppleEventProtocol.failureMessage(forStatus: consent))\n",
                         stderr)
+                    existing.activate()
                     exit(1)
                 }
                 _ = try? event.sendEvent(

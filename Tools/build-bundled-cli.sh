@@ -26,8 +26,8 @@ pkg_dir="${SRCROOT}/Packages/veil"
 # every arch of a configuration to the same Products directory, so a
 # second arch would overwrite the first; separate directories also keep
 # each arch's incremental state, so alternating single-arch and universal
-# builds never forces a rebuild. The output location is asked from
-# SwiftPM rather than assumed: its layout differs between build systems,
+# builds never forces a rebuild. The script asks SwiftPM for the output
+# location instead of assuming it: the layout differs between build systems,
 # and a guessed path can silently point at a stale binary left over from
 # an older toolchain.
 build_arch() {
