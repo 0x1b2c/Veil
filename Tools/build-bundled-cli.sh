@@ -58,13 +58,19 @@ if [ $# -gt 1 ]; then
     # dependencies and aborts. Swift Build (Xcode 27) builds a universal
     # binary in one invocation; once CI runs on such a toolchain this
     # branch can collapse into that single call.
-    slices=""
+    #
+    # Slice paths are appended to the positional parameters behind the arch
+    # names (the loop's word list is already expanded, so this is safe) and
+    # the arch names are shifted off afterwards. Joining the paths into one
+    # string and expanding it unquoted would split a path containing spaces.
+    arch_count=$#
     for arch in "$@"; do
         slice=$(build_arch "${arch}") || exit 1
-        slices="${slices} ${slice}"
+        set -- "$@" "${slice}"
     done
+    shift "${arch_count}"
     src_bin="${pkg_dir}/.build/veil-universal"
-    lipo -create ${slices} -output "${src_bin}"
+    lipo -create "$@" -output "${src_bin}"
 else
     src_bin=$(build_arch "$1") || exit 1
 fi

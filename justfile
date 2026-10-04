@@ -20,18 +20,18 @@ no_profiling := "CLANG_ENABLE_CODE_COVERAGE=NO CLANG_COVERAGE_MAPPING=NO"
 # hardened runtime and a CFBundleIdentifier-derived code identity,
 # which diverges from the released artifact.
 no_signing := "CODE_SIGNING_ALLOWED=NO"
-xcodebuild := "xcodebuild -project " + project + " -scheme " + scheme + " -destination '" + dest + "'"
-xcodebuild_universal := "xcodebuild -project " + project + " -scheme " + scheme + " -destination '" + dest_universal + "'"
+xcodebuild := "xcodebuild -project '" + project + "' -scheme " + scheme + " -destination '" + dest + "'"
+xcodebuild_universal := "xcodebuild -project '" + project + "' -scheme " + scheme + " -destination '" + dest_universal + "'"
 lsregister := "/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister"
 
 # Release build for this Mac, arm64 only (fast).
 build:
-    {{ xcodebuild }} -configuration Release -derivedDataPath {{ derived }} {{ no_profiling }} {{ no_signing }} -quiet
+    {{ xcodebuild }} -configuration Release -derivedDataPath "{{ derived }}" {{ no_profiling }} {{ no_signing }} -quiet
     @echo "Built: {{ app }}"
 
 # Release build as a universal binary (arm64 and x86_64), as shipped.
 build-universal:
-    {{ xcodebuild_universal }} -configuration Release -derivedDataPath {{ derived }} {{ universal }} {{ no_profiling }} {{ no_signing }} -quiet
+    {{ xcodebuild_universal }} -configuration Release -derivedDataPath "{{ derived }}" {{ universal }} {{ no_profiling }} {{ no_signing }} -quiet
     @echo "Built (universal): {{ app }}"
 
 # Build only the bundled veil CLI with SwiftPM.
@@ -41,7 +41,7 @@ cli:
 
 # Debug build for this Mac.
 debug:
-    {{ xcodebuild }} -configuration Debug -derivedDataPath {{ derived }} -quiet
+    {{ xcodebuild }} -configuration Debug -derivedDataPath "{{ derived }}" -quiet
 
 # Apple's xcodebuild emits per-test "Test case ... passed/failed" lines but
 # no aggregate summary, so we synthesize one. The "no tests ran" branch is
@@ -57,7 +57,7 @@ test:
     out="{{ derived }}/test.log"
     mkdir -p "{{ derived }}"
     status=0
-    {{ xcodebuild }} -derivedDataPath {{ derived }} -only-testing:VeilTests {{ no_signing }} test -quiet > "$out" 2>&1 || status=$?
+    {{ xcodebuild }} -derivedDataPath "{{ derived }}" -only-testing:VeilTests {{ no_signing }} test -quiet > "$out" 2>&1 || status=$?
     passed=$(grep -cE "^Test case .* passed" "$out" || true)
     failed=$(grep -cE "^Test case .* failed" "$out" || true)
     if [ "$failed" -gt 0 ]; then
@@ -81,13 +81,13 @@ test:
 # Run the tests with xcodebuild's own output and no summary.
 test-verbose:
     swift test --package-path Packages/VeilCore
-    {{ xcodebuild }} -derivedDataPath {{ derived }} -only-testing:VeilTests {{ no_signing }} test -quiet
+    {{ xcodebuild }} -derivedDataPath "{{ derived }}" -only-testing:VeilTests {{ no_signing }} test -quiet
 
 # Remove build products and packaged zips, and unregister the built app.
 clean:
     {{ xcodebuild }} clean -quiet
-    {{ lsregister }} -u {{ app }} 2>/dev/null || true
-    rm -rf {{ derived }} Packages/VeilCore/.build Packages/veil/.build
+    "{{ lsregister }}" -u "{{ app }}" 2>/dev/null || true
+    rm -rf "{{ derived }}" Packages/VeilCore/.build Packages/veil/.build
     rm -f Veil.zip Veil-default-editor.zip
 
 # TCC binds permission grants (Full Disk Access, folder access) to the
@@ -142,15 +142,15 @@ release version notes_file:
     #!/usr/bin/env bash
     set -euo pipefail
     test -f "{{ notes_file }}" || { echo "ERROR: notes file not found: {{ notes_file }}"; exit 1; }
-    sed -i '' 's/MARKETING_VERSION = [^;]*/MARKETING_VERSION = {{ version }}/' {{ project }}/project.pbxproj
-    total=$(grep -cE 'MARKETING_VERSION = ' {{ project }}/project.pbxproj || true)
-    ok=$(grep -cE 'MARKETING_VERSION = {{ version }};' {{ project }}/project.pbxproj || true)
+    sed -i '' 's/MARKETING_VERSION = [^;]*/MARKETING_VERSION = {{ version }}/' "{{ project }}/project.pbxproj"
+    total=$(grep -cE 'MARKETING_VERSION = ' "{{ project }}/project.pbxproj" || true)
+    ok=$(grep -cE 'MARKETING_VERSION = {{ version }};' "{{ project }}/project.pbxproj" || true)
     if [ "$total" != "$ok" ] || [ "$total" -eq 0 ]; then
         echo "ERROR: sed left $ok of $total MARKETING_VERSION lines at {{ version }}; reverting pbxproj"
-        git checkout -- {{ project }}/project.pbxproj
+        git checkout -- "{{ project }}/project.pbxproj"
         exit 1
     fi
-    git add {{ project }}/project.pbxproj
+    git add "{{ project }}/project.pbxproj"
     git commit -m "Release v{{ version }}"
     # --cleanup=verbatim preserves Markdown section headers like `## Features`
     # in the tag annotation. Git's default cleanup mode treats `#` as a comment
