@@ -49,10 +49,11 @@ debug:
 # the count would silently drop to 0 and look like success without it.
 # Assertion details aren't in the stdout log; open the .xcresult bundle in
 # Xcode or use xcrun xcresulttool to inspect them.
-# Run the SPM and xcodebuild tests and print a PASS/FAIL summary.
+# Run the wezterm handler, SPM and xcodebuild tests and print a PASS/FAIL summary.
 test:
     #!/usr/bin/env bash
     set -euo pipefail
+    nvim --clean -l Tests/wezterm/veil-wezterm-test.lua
     swift test --package-path Packages/VeilCore --quiet
     out="{{ derived }}/test.log"
     mkdir -p "{{ derived }}"
