@@ -46,7 +46,7 @@ enum WorkspaceLauncher {
             return false
         }
         let (root, name) = resolveWorkspaceRoot()
-        let host = listenHost()
+        guard let host = listenHost() else { return false }
         var table = loadRegistry()
 
         var port: Int
@@ -88,7 +88,7 @@ enum WorkspaceLauncher {
 
     static func printWorkspaces() -> Bool {
         let table = loadRegistry()
-        let host = listenHost()
+        guard let host = listenHost() else { return false }
         for (root, entry) in table.sorted(by: { $0.key < $1.key }) {
             let status = serverState(of: entry, addr: "\(host):\(entry.port)").rawValue
             let name = URL(fileURLWithPath: root).lastPathComponent
@@ -116,25 +116,23 @@ enum WorkspaceLauncher {
         return (FileManager.default.homeDirectoryForCurrentUser.path, "home")
     }
 
-    /// Address other machines reach this host by: explicit override, else
-    /// the Tailscale MagicDNS self name, else the plain hostname.
-    private static func listenHost() -> String {
-        if let override = ProcessInfo.processInfo.environment["VEIL_WORKSPACE_HOST"],
-            !override.isEmpty
-        {
-            return override
+    /// Address other machines reach this host by (see
+    /// `WorkspaceListenHost.resolve`). Reports on stderr when there is none.
+    private static func listenHost() -> String? {
+        let host = WorkspaceListenHost.resolve(
+            override: ProcessInfo.processInfo.environment["VEIL_WORKSPACE_HOST"],
+            tailscaleStatus: {
+                let result = runCapture(
+                    "/usr/bin/env", ["tailscale", "status", "--json"], timeout: 3)
+                return result?.status == 0 ? result?.stdout : nil
+            },
+            bonjourHostName: WorkspaceListenHost.bonjourHostName())
+        if host == nil {
+            fputs(
+                "veil: no address to serve the workspace on: Tailscale is unavailable and "
+                    + "this Mac has no local hostname; set VEIL_WORKSPACE_HOST\n", stderr)
         }
-        if let result = runCapture("/usr/bin/env", ["tailscale", "status", "--json"], timeout: 3),
-            result.status == 0,
-            let object = try? JSONSerialization.jsonObject(with: result.stdout)
-                as? [String: Any],
-            let selfNode = object["Self"] as? [String: Any],
-            let dnsName = selfNode["DNSName"] as? String,
-            !dnsName.isEmpty
-        {
-            return dnsName.hasSuffix(".") ? String(dnsName.dropLast()) : dnsName
-        }
-        return WorkspaceViewer.normalize(hostname: ProcessInfo.processInfo.hostName)
+        return host
     }
 
     // MARK: - Server lifecycle
