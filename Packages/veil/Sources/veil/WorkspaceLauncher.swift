@@ -48,36 +48,9 @@ enum WorkspaceLauncher {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let root = resolveWorkspaceRoot(home: home)
         let name = WorkspaceRoot.name(of: root, home: home)
-        guard let host = listenHost() else { return false }
-        var table = loadRegistry()
-
-        // Each server is looked for where it was started, which need not be
-        // where this run would start one.
-        let server: WorkspaceRegistry.Entry
-        let entry = table[root]
-        let state = entry.map { serverState(of: $0, addr: $0.address(currentHost: host)) } ?? .dead
-        if let entry, state == .alive {
-            server = entry
-        } else if let entry, state == .busy {
-            reportBusy(name: name, entry: entry, addr: entry.address(currentHost: host))
-            return false
-        } else {
-            // Gone, or its pid now runs something else: forget the entry
-            // without signaling anything, and on disk at once, so a spawn
-            // that fails below does not leave the stale entry behind.
-            table[root] = nil
-            if entry != nil { saveRegistry(table) }
-            guard let picked = pickPort(host: host, table: table) else {
-                fputs("veil: no free workspace port in \(portRange)\n", stderr)
-                return false
-            }
-            guard let pid = spawnServer(root: root, name: name, addr: "\(host):\(picked)") else {
-                return false
-            }
-            server = .init(host: host, port: picked, pid: pid)
-            table[root] = server
-            saveRegistry(table)
-        }
+        guard let host = listenHost(),
+            let server = prepareServer(root: root, name: name, host: host)
+        else { return false }
 
         guard applyArguments(openExpression, on: server.address(currentHost: host)) else {
             return false
@@ -95,7 +68,7 @@ enum WorkspaceLauncher {
     }
 
     static func printWorkspaces() -> Bool {
-        let table = loadRegistry()
+        let table = registryFile.load()
         guard let host = listenHost() else { return false }
         for (root, entry) in table.sorted(by: { $0.key < $1.key }) {
             let status = serverState(of: entry, addr: entry.address(currentHost: host)).rawValue
@@ -144,6 +117,48 @@ enum WorkspaceLauncher {
     }
 
     // MARK: - Server lifecycle
+
+    /// The server for `root`: the registered one when it answers, else a
+    /// freshly spawned and registered one. nil, reported on stderr, when
+    /// the registered one is busy or no new one could be started. The
+    /// registry stays locked throughout, so a concurrent run for the same
+    /// root waits, then finds this server instead of spawning another.
+    private static func prepareServer(
+        root: String, name: String, host: String
+    ) -> WorkspaceRegistry.Entry? {
+        let lock = lockRegistry()
+        defer { lock?.unlock() }
+        var table = registryFile.load()
+
+        // Each server is looked for where it was started, which need not be
+        // where this run would start one.
+        let server: WorkspaceRegistry.Entry
+        let entry = table[root]
+        let state = entry.map { serverState(of: $0, addr: $0.address(currentHost: host)) } ?? .dead
+        if let entry, state == .alive {
+            server = entry
+        } else if let entry, state == .busy {
+            reportBusy(name: name, entry: entry, addr: entry.address(currentHost: host))
+            return nil
+        } else {
+            // Gone, or its pid now runs something else: forget the entry
+            // without signaling anything, and on disk at once, so a spawn
+            // that fails below does not leave the stale entry behind.
+            table[root] = nil
+            if entry != nil { saveRegistry(table) }
+            guard let picked = pickPort(host: host, table: table) else {
+                fputs("veil: no free workspace port in \(portRange)\n", stderr)
+                return nil
+            }
+            guard let pid = spawnServer(root: root, name: name, addr: "\(host):\(picked)") else {
+                return nil
+            }
+            server = .init(host: host, port: picked, pid: pid)
+            table[root] = server
+            saveRegistry(table)
+        }
+        return server
+    }
 
     private static func probe(_ addr: String) -> Bool {
         runCapture("/usr/bin/env", ["nvim", "--server", addr, "--remote-expr", "1"], timeout: 3)?
@@ -270,26 +285,27 @@ enum WorkspaceLauncher {
         return base.appendingPathComponent("veil")
     }
 
-    private static var registryURL: URL { stateDir.appendingPathComponent("registry.json") }
+    private static var registryFile: WorkspaceRegistryFile { .init(directory: stateDir) }
     private static var logsDir: URL { stateDir.appendingPathComponent("logs") }
 
-    private static func loadRegistry() -> WorkspaceRegistry.Table {
-        guard let data = try? Data(contentsOf: registryURL) else { return [:] }
-        return WorkspaceRegistry.decode(data)
+    /// Failing to lock is not fatal, any more than failing to save: the
+    /// run goes ahead as it did before the registry had a lock.
+    private static func lockRegistry() -> WorkspaceRegistryFile.Lock? {
+        do {
+            return try registryFile.lock()
+        } catch {
+            fputs(
+                "veil: proceeding without locking the workspace registry: "
+                    + "\(error.localizedDescription)\n", stderr)
+            return nil
+        }
     }
 
-    /// Atomic replace (temp file + rename) so a concurrent invocation
-    /// never observes a half-written registry. Failure to persist is not
-    /// fatal: the server is already running and reachable, the entry is
-    /// merely forgotten.
+    /// Failure to persist is not fatal: the server is already running and
+    /// reachable, the entry is merely forgotten.
     private static func saveRegistry(_ table: WorkspaceRegistry.Table) {
         do {
-            try FileManager.default.createDirectory(
-                at: stateDir, withIntermediateDirectories: true)
-            let data = try WorkspaceRegistry.encode(table)
-            let tmp = stateDir.appendingPathComponent("registry.json.\(UUID().uuidString)")
-            try data.write(to: tmp)
-            _ = try FileManager.default.replaceItemAt(registryURL, withItemAt: tmp)
+            try registryFile.save(table)
         } catch {
             fputs(
                 "veil: failed to write workspace registry: \(error.localizedDescription)\n", stderr)
