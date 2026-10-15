@@ -12,7 +12,7 @@
 --
 -- The payload is JSON, as encoded by `WorkspaceUserVar.Payload` in VeilCore:
 --
---   { "host": "2b.example.ts.net", "port": 7001, "viewer": "a2",
+--   { "host": "100.101.102.103", "port": 7001, "viewer": "a2",
 --     "workspace": "proj" }
 --
 -- and the handler runs `veil --veil-connect <host>:<port>

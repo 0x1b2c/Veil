@@ -181,7 +181,7 @@ public enum WorkspaceRegistry {
         case busy
         /// Still running, but the address it listens on cannot be reached
         /// right now: the name no longer resolves or the connection is
-        /// refused, as when the Tailscale name it was started on is gone.
+        /// refused, as when the network it was started on is gone.
         /// Left alone like a busy one; it answers again once the network
         /// it was started on is back.
         case unreachable

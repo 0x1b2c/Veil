@@ -3,27 +3,60 @@ import Testing
 import VeilCore
 
 struct WorkspaceListenHostTests {
-    private func tailscaleStatus(dnsName: String) -> Data {
-        #"{ "BackendState": "Running", "Self": { "HostName": "2B", "DNSName": "\#(dnsName)" } }"#
-            .data(using: .utf8)!
+    /// The shape `tailscale status --json` prints, trimmed to the fields
+    /// that matter and taken from a real node.
+    private func tailscaleStatus(
+        backendState: String = "Running",
+        ips: [String] = ["100.101.102.103", "fd7a:115c:a1e0:ab12::1"]
+    ) -> Data {
+        let ipList = ips.map { "\"\($0)\"" }.joined(separator: ", ")
+        return Data(
+            #"""
+            { "BackendState": "\#(backendState)",
+              "Self": { "HostName": "2B", "DNSName": "2b.tail1234.ts.net.",
+                        "TailscaleIPs": [\#(ipList)] } }
+            """#.utf8)
     }
 
     @Test func configuredHostWins() {
         let host = WorkspaceListenHost.resolve(
-            configured: "10.0.0.2", tailscaleStatus: { tailscaleStatus(dnsName: "2b.ts.net.") })
+            configured: "10.0.0.2", tailscaleStatus: { tailscaleStatus() })
         #expect(host == "10.0.0.2")
     }
 
     @Test func emptyConfiguredHostIsIgnored() {
         let host = WorkspaceListenHost.resolve(
-            configured: "", tailscaleStatus: { tailscaleStatus(dnsName: "2b.tail1234.ts.net.") })
-        #expect(host == "2b.tail1234.ts.net")
+            configured: "", tailscaleStatus: { tailscaleStatus() })
+        #expect(host == "100.101.102.103")
     }
 
-    @Test func tailscaleNameLosesOnlyItsTrailingDot() {
+    @Test func tailscaleNodeIsServedOnItsIPv4AddressRatherThanItsName() {
+        // A local DNS proxy in fake-IP mode can answer the MagicDNS name
+        // with an address this Mac does not own, so nvim could not bind it.
         let host = WorkspaceListenHost.resolve(
-            configured: nil, tailscaleStatus: { tailscaleStatus(dnsName: "2b.tail1234.ts.net.") })
-        #expect(host == "2b.tail1234.ts.net")
+            configured: nil, tailscaleStatus: { tailscaleStatus() })
+        #expect(host == "100.101.102.103")
+    }
+
+    @Test func ipv4AddressIsPickedWhereverItIsListed() {
+        let host = WorkspaceListenHost.resolve(
+            configured: nil,
+            tailscaleStatus: { tailscaleStatus(ips: ["fd7a:115c:a1e0:ab12::1", "100.101.102.103"]) })
+        #expect(host == "100.101.102.103")
+    }
+
+    @Test func tailscaleWithoutAnIPv4AddressIsUnavailable() {
+        let host = WorkspaceListenHost.resolve(
+            configured: nil, tailscaleStatus: { tailscaleStatus(ips: ["fd7a:115c:a1e0:ab12::1"]) })
+        #expect(host == nil)
+    }
+
+    @Test func tailscaleThatIsNotRunningIsUnavailable() {
+        for state in ["Stopped", "NeedsLogin", "Starting"] {
+            let host = WorkspaceListenHost.resolve(
+                configured: nil, tailscaleStatus: { tailscaleStatus(backendState: state) })
+            #expect(host == nil, "BackendState \(state)")
+        }
     }
 
     @Test func withoutTailscaleOrConfiguredHostThereIsNoAddress() {
@@ -35,7 +68,7 @@ struct WorkspaceListenHostTests {
     }
 
     @Test func unusableTailscaleStatusLeavesNoAddress() {
-        for status in [Data("not json".utf8), Data(#"{"Self":{"DNSName":""}}"#.utf8)] {
+        for status in [Data("not json".utf8), Data(#"{"Self":{"TailscaleIPs":[]}}"#.utf8)] {
             let host = WorkspaceListenHost.resolve(configured: nil, tailscaleStatus: { status })
             #expect(host == nil)
         }
