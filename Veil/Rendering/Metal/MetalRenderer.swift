@@ -29,6 +29,11 @@ nonisolated final class MetalRenderer {
     private var cachedCols: Int = 0
     private(set) var lastVertexCount: Int = 0
 
+    // Rows whose cached vertices are out of date. The caller hands over its
+    // dirty rows every frame and may forget them afterwards, so rows that a
+    // frame could not rebuild stay here until a later frame does.
+    private var pendingRows = IndexSet()
+
     init() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw MetalRendererError.noDevice
@@ -88,6 +93,9 @@ nonisolated final class MetalRenderer {
 
     // MARK: - Rendering
 
+    /// Returns false when nothing was presented (no drawable or command
+    /// buffer was available), so the caller can schedule another frame.
+    @discardableResult
     func render(
         cells: [[Cell]], attributes: [Int: CellAttributes],
         rows: Int, cols: Int,
@@ -98,9 +106,10 @@ nonisolated final class MetalRenderer {
         cursorCellPercentage: Int,
         debugOverlay: String?,
         in metalLayer: CAMetalLayer
-    ) {
-        guard let drawable = metalLayer.nextDrawable() else { return }
-        guard rows > 0, cols > 0, cells.count >= rows else { return }
+    ) -> Bool {
+        pendingRows.formUnion(dirtyRows)
+        // Nothing to draw yet; the first grid_resize marks every row dirty.
+        guard rows > 0, cols > 0, cells.count >= rows else { return true }
 
         let scale = Float(metalLayer.contentsScale)
         let cellW = Float(cellSize.width) * scale
@@ -113,7 +122,7 @@ nonisolated final class MetalRenderer {
         // Rebuild vertex data only for rows that Grid marked as dirty.
         // Cursor is drawn as an independent quad, so cursor movement alone
         // does not require rebuilding row vertices.
-        for row in dirtyRows {
+        for row in pendingRows {
             guard row < rows, cells[row].count >= cols else { continue }
             rebuildRowVertices(
                 row: row, cells: cells[row], attributes: attributes,
@@ -121,6 +130,7 @@ nonisolated final class MetalRenderer {
                 cellW: cellW, cellH: cellH, topPad: topPad, scale: scale,
                 defaultFg: defaultFg, defaultBg: defaultBg)
         }
+        pendingRows.removeAll()
 
         // Count total vertices across all row caches + cursor quad,
         // then write directly into the Metal buffer to avoid assembling
@@ -131,9 +141,11 @@ nonisolated final class MetalRenderer {
             totalVertices += rowBackgroundVertices[row].count
             totalVertices += rowForegroundVertices[row].count
         }
-        guard totalVertices > 0 else { return }
+        guard totalVertices > 0 else { return false }
 
-        guard let vertexBuffer = ensureVertexBuffer(vertexCount: totalVertices) else { return }
+        guard let vertexBuffer = ensureVertexBuffer(vertexCount: totalVertices) else {
+            return false
+        }
         let dst = vertexBuffer.contents().assumingMemoryBound(to: Vertex.self)
         var offset = 0
 
@@ -196,6 +208,10 @@ nonisolated final class MetalRenderer {
             Float(metalLayer.drawableSize.width),
             Float(metalLayer.drawableSize.height))
 
+        // Acquired after the CPU work, as late as possible: nextDrawable()
+        // blocks while every drawable is in use.
+        guard let drawable = metalLayer.nextDrawable() else { return false }
+
         let passDescriptor = MTLRenderPassDescriptor()
         passDescriptor.colorAttachments[0].texture = drawable.texture
         passDescriptor.colorAttachments[0].loadAction = .clear
@@ -209,7 +225,7 @@ nonisolated final class MetalRenderer {
 
         guard let commandBuffer = commandQueue.makeCommandBuffer(),
             let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor)
-        else { return }
+        else { return false }
 
         encoder.setRenderPipelineState(pipelineState)
         encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
@@ -228,6 +244,7 @@ nonisolated final class MetalRenderer {
         encoder.endEncoding()
         commandBuffer.present(drawable)
         commandBuffer.commit()
+        return true
     }
 
     private func addQuad(
@@ -376,6 +393,8 @@ nonisolated final class MetalRenderer {
         rowForegroundVertices = Array(repeating: [], count: rows)
         cachedRows = rows
         cachedCols = cols
+        // Emptied caches must all be rebuilt, whatever the caller marked dirty.
+        pendingRows = IndexSet(0..<rows)
     }
 
     /// Rebuild background and foreground vertices for a single row.

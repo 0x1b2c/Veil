@@ -423,9 +423,10 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     /// Called from CVDisplayLink callback on main thread.
     /// Renders at most once per vsync, coalescing all flushes since last frame.
     fileprivate func displayLinkFired() {
-        guard needsRender else { return }
-        needsRender = false
-        nvimView?.render(grid: grid)
+        guard needsRender, let nvimView else { return }
+        // The view has taken the dirty rows even when it could not present;
+        // keep needsRender so the next vsync retries the frame.
+        needsRender = !nvimView.render(grid: grid)
         grid.clearDirty()
     }
 

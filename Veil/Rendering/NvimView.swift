@@ -133,7 +133,11 @@ final class NvimView: NSView {
 
     // MARK: - Rendering
 
-    func render(grid: Grid) {
+    /// Draws the grid's dirty rows. The rows are consumed either way; returns
+    /// false when the frame could not be presented and should be retried.
+    @discardableResult
+    func render(grid: Grid) -> Bool {
+        var presented = true
         // Update state
         defaultFg = grid.defaultForeground
         defaultBg = grid.defaultBackground
@@ -165,7 +169,7 @@ final class NvimView: NSView {
             let debugText: String? =
                 debugOverlayEnabled ? debugInfoText(grid: grid) : nil
 
-            metalRenderer.render(
+            presented = metalRenderer.render(
                 cells: grid.cells, attributes: grid.attributes,
                 rows: grid.size.rows, cols: grid.size.cols,
                 dirtyRows: grid.dirtyRows,
@@ -228,6 +232,7 @@ final class NvimView: NSView {
         }
 
         layer?.backgroundColor = NSColor(rgb: defaultBg).cgColor
+        return presented
     }
 
     // MARK: - Cursor
