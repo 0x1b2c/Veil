@@ -202,4 +202,29 @@ final class MetalRendererTests {
             #expect(coverage(ofQuadAt: quad, in: vertices, atlas: atlas) > 0)
         }
     }
+
+    // MARK: - Frames in flight
+
+    @Test func framesThatMayStillBeOnTheGPUWriteDifferentVertexBuffers() throws {
+        let layer = drawableLayer()
+        var buffers: [MTLBuffer] = []
+        for _ in 0..<MetalRenderer.maxFramesInFlight {
+            render(dirtyRows: grid.dirtyRows, in: layer)
+            buffers.append(try #require(renderer.lastVertexBuffer))
+        }
+        for (i, a) in buffers.enumerated() {
+            for b in buffers[(i + 1)...] {
+                #expect(a !== b)
+            }
+        }
+    }
+
+    @Test func framesThatAreNotPresentedReleaseTheirSlot() {
+        // A frame that waits for a slot but never reaches the GPU must give it
+        // back, or the frame after enough of them would wait forever.
+        for _ in 0...MetalRenderer.maxFramesInFlight {
+            render(dirtyRows: grid.dirtyRows, in: layerWithoutDrawables())
+        }
+        #expect(render(dirtyRows: IndexSet(), in: drawableLayer()))
+    }
 }

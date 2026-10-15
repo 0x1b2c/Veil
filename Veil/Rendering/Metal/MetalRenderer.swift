@@ -15,10 +15,15 @@ nonisolated final class MetalRenderer {
     let commandQueue: MTLCommandQueue
     let pipelineState: MTLRenderPipelineState
 
-    // Pre-allocated vertex buffer to avoid per-frame MTLBuffer creation.
-    // Rewritten each frame via contents() pointer instead of makeBuffer().
-    private var vertexBuffer: MTLBuffer?
-    private var vertexBufferCapacity: Int = 0
+    // Pre-allocated vertex buffers to avoid per-frame MTLBuffer creation,
+    // rewritten via contents() pointer instead of makeBuffer(). One per frame
+    // the GPU may still be reading, used in rotation: the CPU waits for a free
+    // slot before writing, so it never overwrites vertices of a frame in flight.
+    static let maxFramesInFlight = 3
+    private let freeFrameSlots = DispatchSemaphore(value: maxFramesInFlight)
+    private var vertexBuffers: [MTLBuffer?] = Array(repeating: nil, count: maxFramesInFlight)
+    private var frameSlot = 0
+    private(set) var lastVertexBuffer: MTLBuffer?
 
     // Persistent per-row vertex data for dirty-region rendering.
     // Only rows marked dirty are rebuilt; unchanged rows reuse cached vertices.
@@ -175,9 +180,19 @@ nonisolated final class MetalRenderer {
         }
         guard totalVertices > 0 else { return false }
 
-        guard let vertexBuffer = ensureVertexBuffer(vertexCount: totalVertices) else {
+        // Every return below this point either hands the slot to the command
+        // buffer, which frees it on completion, or frees it here.
+        freeFrameSlots.wait()
+        var slotHandedToGPU = false
+        defer {
+            if !slotHandedToGPU { freeFrameSlots.signal() }
+        }
+
+        guard let vertexBuffer = ensureVertexBuffer(vertexCount: totalVertices, slot: frameSlot)
+        else {
             return false
         }
+        lastVertexBuffer = vertexBuffer
         let dst = vertexBuffer.contents().assumingMemoryBound(to: Vertex.self)
         var offset = 0
 
@@ -275,7 +290,10 @@ nonisolated final class MetalRenderer {
 
         encoder.endEncoding()
         commandBuffer.present(drawable)
+        commandBuffer.addCompletedHandler { [freeFrameSlots] _ in freeFrameSlots.signal() }
+        slotHandedToGPU = true
         commandBuffer.commit()
+        frameSlot = (frameSlot + 1) % Self.maxFramesInFlight
         return true
     }
 
@@ -612,21 +630,21 @@ nonisolated final class MetalRenderer {
         rowForegroundVertices[row] = fgVerts
     }
 
-    /// Ensure the pre-allocated vertex buffer is large enough for the given vertex count.
+    /// Ensure the slot's pre-allocated vertex buffer is large enough for the given vertex count.
     /// Grows by 2x when capacity is exceeded to amortize reallocation cost.
-    private func ensureVertexBuffer(vertexCount: Int) -> MTLBuffer? {
+    private func ensureVertexBuffer(vertexCount: Int, slot: Int) -> MTLBuffer? {
         let requiredBytes = vertexCount * MemoryLayout<Vertex>.stride
-        if let buffer = vertexBuffer, vertexBufferCapacity >= requiredBytes {
+        let capacity = vertexBuffers[slot]?.length ?? 0
+        if let buffer = vertexBuffers[slot], capacity >= requiredBytes {
             return buffer
         }
         // Grow to at least 2x current capacity to avoid frequent reallocation
-        let newCapacity = max(requiredBytes, vertexBufferCapacity * 2)
+        let newCapacity = max(requiredBytes, capacity * 2)
         guard let buffer = device.makeBuffer(length: newCapacity, options: .storageModeShared)
         else {
             return nil
         }
-        vertexBuffer = buffer
-        vertexBufferCapacity = newCapacity
+        vertexBuffers[slot] = buffer
         return buffer
     }
 
