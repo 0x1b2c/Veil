@@ -7,7 +7,7 @@ import VeilCore
 /// `nvim --headless --listen` per project root (tracked in the registry),
 /// sends the requested files and the nvim arguments that still apply to a
 /// running nvim into it, and broadcasts a user var telling
-/// the viewer's machine to attach a Veil window via `veil --connect`.
+/// the viewer's machine to attach a Veil window via `veil --veil-connect`.
 enum WorkspaceLauncher {
     // MARK: - Viewer detection
 

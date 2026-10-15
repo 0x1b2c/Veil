@@ -62,7 +62,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // a window will already exist, so we skip the default one.
         DispatchQueue.main.async {
             if let address = self.parsedArgs.remoteAddress {
-                // Cold start via `veil --connect`: open the remote window
+                // Cold start via `veil --veil-connect`: open the remote window
                 // instead of a default local one.
                 self.connectOrActivateRemoteWindow(
                     address: address, workspace: self.parsedArgs.workspace)
@@ -454,7 +454,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         doc.showWindows()
     }
 
-    /// Scriptable remote entry (CLI --connect). Idempotent per address: if a
+    /// Scriptable remote entry (CLI --veil-connect). Idempotent per address: if a
     /// window is connected or still connecting to this address, activate it;
     /// otherwise open a new remote window, replacing one whose connection
     /// failed. Address matching is exact string comparison: the launcher

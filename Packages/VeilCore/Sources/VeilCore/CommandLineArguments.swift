@@ -9,18 +9,18 @@ public enum VeilCommandLine {
     public struct ParsedArguments {
         public var nvimArgs: [String] = []
         public var renderer: VeilRendererOption = .metal
-        /// Remote nvim address from --connect ("host:port").
+        /// Remote nvim address from --veil-connect ("host:port").
         public var remoteAddress: String?
-        /// Workspace name from --workspace; pairs with --connect.
+        /// Workspace name from --veil-workspace; pairs with --veil-connect.
         public var workspace: String?
-        /// --workspaces: list registered workspace servers and exit.
+        /// --veil-workspaces: list registered workspace servers and exit.
         public var listWorkspaces = false
         /// --veil-local: open on this machine even when the keyboard behind
         /// the command is on another one.
         public var forceLocal = false
 
         /// Whether the CLI may ask wezterm where the viewer sits and send
-        /// the request to a workspace. `--connect` requests come from that
+        /// the request to a workspace. `--veil-connect` requests come from that
         /// flow's handler and must never recurse into it; `--veil-local`
         /// opts out of it.
         public var mayDivertToWorkspace: Bool {
@@ -28,12 +28,13 @@ public enum VeilCommandLine {
         }
 
         /// Why this combination cannot be honored, nil when it can. File
-        /// arguments next to --connect name paths on this machine, which
+        /// arguments next to --veil-connect name paths on this machine, which
         /// mean nothing to the nvim at the remote address, so they are
         /// refused instead of silently dropped.
         public var usageError: String? {
             guard let remoteAddress, let argument = nvimArgs.first else { return nil }
-            return "--connect takes no files or nvim arguments (got '\(argument)'): paths name "
+            return
+                "--veil-connect takes no files or nvim arguments (got '\(argument)'): paths name "
                 + "files on this machine, not on the nvim at \(remoteAddress); open files with "
                 + "veil on the machine running that nvim"
         }
@@ -54,25 +55,9 @@ public enum VeilCommandLine {
                 }
                 continue
             }
-            // Veil-owned flags for scriptable remote connections. Consumed
-            // here so they never leak into nvimArgs; nvim has no flags with
-            // these names.
-            if arg == "--workspaces" {
-                result.listWorkspaces = true
-                continue
-            }
-            if arg == "--connect" || arg.hasPrefix("--connect=")
-                || arg == "--workspace" || arg.hasPrefix("--workspace=")
-            {
-                let parts = splitFlag(arg)
-                let value = parts.value ?? remaining.popFirst()
-                switch parts.name {
-                case "--connect": result.remoteAddress = value
-                case "--workspace": result.workspace = value
-                default: break
-                }
-                continue
-            }
+            // Veil-owned flags share the `--veil-` prefix and are consumed
+            // here, so they never leak into nvimArgs; nvim has no flags with
+            // this prefix.
             if arg.hasPrefix("--veil-") {
                 let parts = splitFlag(arg)
                 switch parts.name {
@@ -85,6 +70,12 @@ public enum VeilCommandLine {
                     }
                 case "--veil-local":
                     result.forceLocal = true
+                case "--veil-connect":
+                    result.remoteAddress = parts.value ?? remaining.popFirst()
+                case "--veil-workspace":
+                    result.workspace = parts.value ?? remaining.popFirst()
+                case "--veil-workspaces":
+                    result.listWorkspaces = true
                 default:
                     break
                 }

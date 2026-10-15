@@ -5,7 +5,7 @@ import Testing
 
 /// Drives the real connect path in the test host: port 1 on the loopback
 /// interface refuses the connection at once, so the window ends up showing
-/// the error, as after a timed-out `veil --connect`.
+/// the error, as after a timed-out `veil --veil-connect`.
 @MainActor
 @Suite(.serialized)
 struct RemoteConnectionTests {

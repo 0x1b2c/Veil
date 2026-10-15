@@ -172,7 +172,7 @@ public enum WorkspaceRegistry {
     }
 
     /// Where a registered server stands. The raw value is the label
-    /// `veil --workspaces` prints.
+    /// `veil --veil-workspaces` prints.
     public enum ServerState: String, Equatable {
         /// Answers RPC; files can be sent to it.
         case alive
@@ -204,7 +204,7 @@ public enum WorkspaceRegistry {
         return probe == .timedOut ? .busy : .unreachable
     }
 
-    /// The label `veil --workspaces` prints for `entry`. An entry with a
+    /// The label `veil --veil-workspaces` prints for `entry`. An entry with a
     /// recorded host is probed where it was started, so listing it needs no
     /// current host; one without (an older registry) needs `currentHost`, and
     /// without that its state cannot be told: `unknown`, with no probe made.
@@ -233,7 +233,7 @@ public enum WorkspaceRegistry {
 /// The OSC 1337 user var a workspace host emits after preparing a server.
 /// wezterm's mux protocol broadcasts it to every attached GUI client; the
 /// `user-var-changed` handler on the machine named by `viewer` reacts by
-/// running `veil --connect <host>:<port> --workspace <workspace>`.
+/// running `veil --veil-connect <host>:<port> --veil-workspace <workspace>`.
 public enum WorkspaceUserVar {
     public static let name = "veil-edit"
 

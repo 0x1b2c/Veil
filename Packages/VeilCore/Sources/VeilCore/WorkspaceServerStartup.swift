@@ -6,7 +6,7 @@ public enum WorkspaceServerStartup {
     /// never does, the process is ended before returning false: veil
     /// started it moments ago and has sent it none of the user's files, so
     /// nothing can be lost, whereas leaving it would leave a server no
-    /// registry entry tracks and `veil --workspaces` never shows.
+    /// registry entry tracks and `veil --veil-workspaces` never shows.
     public static func awaitReady(
         _ process: Process, attempts: Int, interval: TimeInterval, answers: () -> Bool
     ) -> Bool {

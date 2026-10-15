@@ -24,7 +24,7 @@ public struct WorkspaceRegistryFile: Sendable {
     }
 
     /// Atomic replace (temp file + rename), so a reader that does not
-    /// take the lock, such as `veil --workspaces`, never observes a
+    /// take the lock, such as `veil --veil-workspaces`, never observes a
     /// half-written registry.
     public func save(_ table: WorkspaceRegistry.Table) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

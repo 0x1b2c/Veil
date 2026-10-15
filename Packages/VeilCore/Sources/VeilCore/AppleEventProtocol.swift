@@ -39,7 +39,7 @@ public struct VeilOpenRequest: Codable {
     public var renderer: VeilRendererOption?
     public var nvimAppName: String?
     /// Remote nvim address ("host:port") for scriptable connections
-    /// (CLI --connect). When set, the GUI connects or activates the
+    /// (CLI --veil-connect). When set, the GUI connects or activates the
     /// window for this address instead of opening a local window.
     public var remoteAddress: String?
     /// Workspace name (project-root basename) identifying the remote

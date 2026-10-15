@@ -118,7 +118,8 @@ struct VeilCommandLineTests {
 
     @Test func connectWithWorkspace() {
         let result = VeilCommandLine.parse([
-            "/path/to/veil", "--connect", "2b.example.ts.net:7001", "--workspace", "myproject",
+            "/path/to/veil", "--veil-connect", "2b.example.ts.net:7001", "--veil-workspace",
+            "myproject",
         ])
         #expect(result.remoteAddress == "2b.example.ts.net:7001")
         #expect(result.workspace == "myproject")
@@ -126,7 +127,7 @@ struct VeilCommandLineTests {
     }
 
     @Test func connectWithoutWorkspace() {
-        let result = VeilCommandLine.parse(["/path/to/veil", "--connect", "host:6666"])
+        let result = VeilCommandLine.parse(["/path/to/veil", "--veil-connect", "host:6666"])
         #expect(result.remoteAddress == "host:6666")
         #expect(result.workspace == nil)
         #expect(result.nvimArgs.isEmpty)
@@ -134,7 +135,7 @@ struct VeilCommandLineTests {
 
     @Test func connectEqualsSign() {
         let result = VeilCommandLine.parse([
-            "/path/to/veil", "--connect=host:6666", "--workspace=proj",
+            "/path/to/veil", "--veil-connect=host:6666", "--veil-workspace=proj",
         ])
         #expect(result.remoteAddress == "host:6666")
         #expect(result.workspace == "proj")
@@ -143,7 +144,7 @@ struct VeilCommandLineTests {
 
     @Test func connectMixedWithFiles() {
         let result = VeilCommandLine.parse([
-            "/path/to/veil", "--connect", "host:6666", "file.txt",
+            "/path/to/veil", "--veil-connect", "host:6666", "file.txt",
         ])
         #expect(result.remoteAddress == "host:6666")
         #expect(result.nvimArgs == ["file.txt"])
@@ -151,16 +152,17 @@ struct VeilCommandLineTests {
 
     @Test func connectWithFilesIsRefused() throws {
         let result = VeilCommandLine.parse([
-            "/path/to/veil", "--connect", "host:6666", "file.txt",
+            "/path/to/veil", "--veil-connect", "host:6666", "file.txt",
         ])
         let message = try #require(result.usageError)
+        #expect(message.contains("--veil-connect"))
         #expect(message.contains("file.txt"))
         #expect(message.contains("host:6666"))
     }
 
     @Test func connectAloneIsAccepted() {
         let result = VeilCommandLine.parse([
-            "/path/to/veil", "--connect", "host:6666", "--workspace", "proj",
+            "/path/to/veil", "--veil-connect", "host:6666", "--veil-workspace", "proj",
         ])
         #expect(result.usageError == nil)
     }
@@ -171,13 +173,13 @@ struct VeilCommandLineTests {
     }
 
     @Test func connectMissingValue() {
-        let result = VeilCommandLine.parse(["/path/to/veil", "--connect"])
+        let result = VeilCommandLine.parse(["/path/to/veil", "--veil-connect"])
         #expect(result.remoteAddress == nil)
         #expect(result.nvimArgs.isEmpty)
     }
 
     @Test func workspaceOnly() {
-        let result = VeilCommandLine.parse(["/path/to/veil", "--workspace", "proj"])
+        let result = VeilCommandLine.parse(["/path/to/veil", "--veil-workspace", "proj"])
         #expect(result.remoteAddress == nil)
         #expect(result.workspace == "proj")
         #expect(result.nvimArgs.isEmpty)
@@ -203,12 +205,23 @@ struct VeilCommandLineTests {
     }
 
     @Test func connectNeverDivertsToWorkspace() {
-        let result = VeilCommandLine.parse(["/path/to/veil", "--connect", "host:6666"])
+        let result = VeilCommandLine.parse(["/path/to/veil", "--veil-connect", "host:6666"])
         #expect(!result.mayDivertToWorkspace)
     }
 
+    @Test func unprefixedRemoteFlagsAreNotVeilFlags() {
+        let result = VeilCommandLine.parse([
+            "/path/to/veil", "--connect", "host:6666", "--workspace", "proj", "--workspaces",
+        ])
+        #expect(result.remoteAddress == nil)
+        #expect(result.workspace == nil)
+        #expect(!result.listWorkspaces)
+        #expect(
+            result.nvimArgs == ["--connect", "host:6666", "--workspace", "proj", "--workspaces"])
+    }
+
     @Test func workspacesFlag() {
-        let result = VeilCommandLine.parse(["/path/to/veil", "--workspaces"])
+        let result = VeilCommandLine.parse(["/path/to/veil", "--veil-workspaces"])
         #expect(result.listWorkspaces)
         #expect(result.nvimArgs.isEmpty)
     }
