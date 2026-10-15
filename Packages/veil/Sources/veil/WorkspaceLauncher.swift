@@ -80,10 +80,21 @@ enum WorkspaceLauncher {
 
     static func printWorkspaces() -> Bool {
         let table = registryFile.load()
-        guard let host = listenHost() else { return false }
+        // Listing needs a current host only for entries that never recorded
+        // theirs, so its absence is reported, not fatal.
+        let host = resolveListenHost()
+        if host == nil {
+            fputs(
+                "veil: no address to serve workspaces on right now (Tailscale is unavailable "
+                    + "and workspace_host is not set), so workspaces registered without a "
+                    + "host cannot be probed and show as unknown; set workspace_host in "
+                    + "\(configPath.path) to probe them\n", stderr)
+        }
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         for (root, entry) in table.sorted(by: { $0.key < $1.key }) {
-            let status = serverState(of: entry, addr: entry.address(currentHost: host)).rawValue
+            let status = WorkspaceRegistry.listedStatus(of: entry, currentHost: host) {
+                serverState(of: entry, addr: $0)
+            }
             let name = WorkspaceRoot.name(of: root, home: home)
             print(
                 status.padded(to: 12) + name.padded(to: 24) + "\(entry.port)".padded(to: 6) + root)
@@ -112,22 +123,30 @@ enum WorkspaceLauncher {
     /// Address other machines reach this host by (see
     /// `WorkspaceListenHost.resolve`). Reports on stderr when there is none.
     private static func listenHost() -> String? {
-        let configPath = VeilConfigFile.path(
-            environment: ProcessInfo.processInfo.environment,
-            home: FileManager.default.homeDirectoryForCurrentUser)
-        let host = WorkspaceListenHost.resolve(
-            configured: configuredWorkspaceHost(in: configPath),
-            tailscaleStatus: {
-                let result = runCapture(
-                    "/usr/bin/env", ["tailscale", "status", "--json"], timeout: 3)
-                return result?.status == 0 ? result?.stdout : nil
-            })
+        let host = resolveListenHost()
         if host == nil {
             fputs(
                 "veil: no address to serve the workspace on: Tailscale is unavailable and "
                     + "workspace_host is not set; set it in \(configPath.path)\n", stderr)
         }
         return host
+    }
+
+    private static var configPath: URL {
+        VeilConfigFile.path(
+            environment: ProcessInfo.processInfo.environment,
+            home: FileManager.default.homeDirectoryForCurrentUser)
+    }
+
+    /// `listenHost` without the report, for callers that can go on without one.
+    private static func resolveListenHost() -> String? {
+        WorkspaceListenHost.resolve(
+            configured: configuredWorkspaceHost(in: configPath),
+            tailscaleStatus: {
+                let result = runCapture(
+                    "/usr/bin/env", ["tailscale", "status", "--json"], timeout: 3)
+                return result?.status == 0 ? result?.stdout : nil
+            })
     }
 
     /// A config file that cannot be read is reported and treated as not

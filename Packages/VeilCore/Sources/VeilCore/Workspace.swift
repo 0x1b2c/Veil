@@ -204,6 +204,18 @@ public enum WorkspaceRegistry {
         return probe == .timedOut ? .busy : .unreachable
     }
 
+    /// The label `veil --workspaces` prints for `entry`. An entry with a
+    /// recorded host is probed where it was started, so listing it needs no
+    /// current host; one without (an older registry) needs `currentHost`, and
+    /// without that its state cannot be told: `unknown`, with no probe made.
+    /// - Parameter state: probes the given `host:port` and classifies it.
+    public static func listedStatus(
+        of entry: Entry, currentHost: String?, state: (String) -> ServerState
+    ) -> String {
+        guard let host = entry.host ?? currentHost else { return "unknown" }
+        return state("\(host):\(entry.port)").rawValue
+    }
+
     /// Whether `commandLine` is an nvim listening on exactly `addr`. argv[0]
     /// shows as a full path (`/opt/homebrew/bin/nvim`) even though the
     /// server is spawned as bare `nvim`, so only its last component counts.
