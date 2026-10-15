@@ -171,6 +171,18 @@ nonisolated final class GlyphAtlas {
         let bold: Bool
         let italic: Bool
         let cellCount: Int
+        /// The cells of the glyph this entry holds, for a group stored in
+        /// several entries; the whole glyph otherwise.
+        var firstCell = 0
+        var segmentCells = 0
+    }
+
+    /// One atlas entry of a shaped group, covering `cellCount` cells that
+    /// start `colOffset` cells into the group.
+    struct Segment {
+        let colOffset: Int
+        let cellCount: Int
+        let region: Region
     }
 
     private struct ShapingKey: Hashable {
@@ -222,23 +234,12 @@ nonisolated final class GlyphAtlas {
 
         if let existing = regions[key] { return existing }
 
-        // Resolve font variant for measuring
-        var drawFont = font
-        if bold {
-            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.bold)
-            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
-        }
-        if italic {
-            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.italic)
-            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
-        }
-
-        drawFont = FontFallback.resolveFont(drawFont, for: text)
+        let drawFont = variantFont(font, bold: bold, italic: italic, for: text)
 
         // Measure glyph width. For single-cell glyphs we use ink bounds and
         // take max(allocated, ink) so overflowing shapes (Nerd Font icons,
         // italic Latin descenders) can spill past the cell when followed by
-        // a space. For multi-cell glyphs (CJK, wide ligatures) we use the
+        // a space. For double-width glyphs (CJK) we use the
         // typographic advance instead, so the glyph renders at its natural
         // width rather than being stretched or compressed into the cell grid.
         let allocatedWidth = cellSize.width * CGFloat(cellCount)
@@ -265,53 +266,57 @@ nonisolated final class GlyphAtlas {
             let naturalWidth = inkBounds.origin.x + inkBounds.size.width
             renderWidth = max(allocatedWidth, naturalWidth)
         }
-        let pixelW = Int(ceil(renderWidth * scale))
-        let pixelH = Int(ceil(cellSize.height * scale))
 
-        // Check if we need to move to next row
-        if nextX + pixelW > atlasWidth {
-            nextX = 0
-            nextY += currentRowHeight
-            currentRowHeight = 0
+        return store(key: key, drawWidth: renderWidth, cellHeight: cellSize.height) {
+            width, height, drawWidth in
+            renderGlyph(
+                text: text, font: drawFont,
+                width: width, height: height,
+                drawWidth: drawWidth, cellHeight: cellSize.height)
         }
+    }
 
-        // Grow atlas vertically if out of space, fall back to full
-        // invalidation only at the maximum supported texture size.
-        if nextY + pixelH > atlasHeight {
-            if atlasHeight < maxAtlasHeight {
-                growAtlas()
-            } else {
-                invalidate()
-            }
+    /// Entries for a shaped group (a ligature or a run of contextual
+    /// alternates) laid exactly on its cells: the group is scaled
+    /// horizontally to `cellCount` cell widths, the way terminals keep a
+    /// ligature on the grid when the font's advance and the rounded cell
+    /// width differ. A group wider than the atlas is stored in several
+    /// entries, each rasterized from the whole group so contextual forms
+    /// stay continuous across the joins.
+    func segments(
+        text: String, font: NSFont, bold: Bool, italic: Bool,
+        cellSize: CGSize, cellCount: Int
+    ) -> [Segment] {
+        let drawFont = variantFont(font, bold: bold, italic: italic, for: text)
+        let cellPixels = max(Int(ceil(cellSize.width * scale)), 1)
+        let cellsPerSegment = max(maxEntryWidth / cellPixels, 1)
+
+        var segments: [Segment] = []
+        var firstCell = 0
+        while firstCell < cellCount {
+            let segmentCells = min(cellsPerSegment, cellCount - firstCell)
+            let key = Key(
+                text: text, fontName: font.fontName, fontSize: font.pointSize,
+                bold: bold, italic: italic, cellCount: cellCount,
+                firstCell: firstCell, segmentCells: segmentCells)
+            let region =
+                regions[key]
+                ?? store(
+                    key: key, drawWidth: cellSize.width * CGFloat(segmentCells),
+                    cellHeight: cellSize.height
+                ) { [firstCell] width, height, _ in
+                    renderGroupSegment(
+                        text: text, font: drawFont,
+                        width: width, height: height,
+                        groupWidth: cellSize.width * CGFloat(cellCount),
+                        offset: cellSize.width * CGFloat(firstCell),
+                        cellHeight: cellSize.height)
+                }
+            segments.append(
+                Segment(colOffset: firstCell, cellCount: segmentCells, region: region))
+            firstCell += segmentCells
         }
-
-        // Render glyph as a single-channel coverage mask. The fragment shader
-        // multiplies this coverage against the per-vertex foreground color.
-        let imageData = renderGlyph(
-            text: text, font: drawFont,
-            width: pixelW, height: pixelH,
-            drawWidth: renderWidth, cellHeight: cellSize.height)
-
-        // Copy to atlas texture (1 byte per pixel, matches .r8Unorm)
-        let mtlRegion = MTLRegionMake2D(nextX, nextY, pixelW, pixelH)
-        texture.replace(
-            region: mtlRegion, mipmapLevel: 0,
-            withBytes: imageData, bytesPerRow: pixelW)
-
-        // Calculate UV coordinates
-        let uvRegion = Region(
-            u: Float(nextX) / Float(atlasWidth),
-            v: Float(nextY) / Float(atlasHeight),
-            uMax: Float(nextX + pixelW) / Float(atlasWidth),
-            vMax: Float(nextY + pixelH) / Float(atlasHeight),
-            drawWidth: Float(renderWidth)
-        )
-
-        regions[key] = uvRegion
-        nextX += pixelW
-        currentRowHeight = max(currentRowHeight, pixelH)
-
-        return uvRegion
+        return segments
     }
 
     func shapeRun(
@@ -338,6 +343,84 @@ nonisolated final class GlyphAtlas {
     }
 
     // MARK: - Private
+
+    /// Widest entry the atlas stores. Pixel (0,0) is reserved on the first
+    /// row, so one pixel less than the texture keeps every entry inside it.
+    private var maxEntryWidth: Int { atlasWidth - 1 }
+
+    private func variantFont(_ font: NSFont, bold: Bool, italic: Bool, for text: String)
+        -> NSFont
+    {
+        var drawFont = font
+        if bold {
+            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.bold)
+            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
+        }
+        if italic {
+            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.italic)
+            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
+        }
+        return FontFallback.resolveFont(drawFont, for: text)
+    }
+
+    /// Allocate space for an entry `drawWidth` points wide, rasterize it with
+    /// `render(width, height, drawWidth)` and upload it. An entry wider than
+    /// the atlas is cut to the atlas width rather than written past the
+    /// texture, which Metal drops entirely.
+    private func store(
+        key: Key, drawWidth: CGFloat, cellHeight: CGFloat,
+        render: (Int, Int, CGFloat) -> [UInt8]
+    ) -> Region {
+        var renderWidth = drawWidth
+        var pixelW = Int(ceil(renderWidth * scale))
+        if pixelW > maxEntryWidth {
+            pixelW = maxEntryWidth
+            renderWidth = CGFloat(pixelW) / scale
+        }
+        let pixelH = Int(ceil(cellHeight * scale))
+
+        // Check if we need to move to next row
+        if nextX + pixelW > atlasWidth {
+            nextX = 0
+            nextY += currentRowHeight
+            currentRowHeight = 0
+        }
+
+        // Grow atlas vertically if out of space, fall back to full
+        // invalidation only at the maximum supported texture size.
+        if nextY + pixelH > atlasHeight {
+            if atlasHeight < maxAtlasHeight {
+                growAtlas()
+            } else {
+                invalidate()
+            }
+        }
+
+        // Rasterize as a single-channel coverage mask. The fragment shader
+        // multiplies this coverage against the per-vertex foreground color.
+        let imageData = render(pixelW, pixelH, renderWidth)
+
+        // Copy to atlas texture (1 byte per pixel, matches .r8Unorm)
+        let mtlRegion = MTLRegionMake2D(nextX, nextY, pixelW, pixelH)
+        texture.replace(
+            region: mtlRegion, mipmapLevel: 0,
+            withBytes: imageData, bytesPerRow: pixelW)
+
+        // Calculate UV coordinates
+        let uvRegion = Region(
+            u: Float(nextX) / Float(atlasWidth),
+            v: Float(nextY) / Float(atlasHeight),
+            uMax: Float(nextX + pixelW) / Float(atlasWidth),
+            vMax: Float(nextY + pixelH) / Float(atlasHeight),
+            drawWidth: Float(renderWidth)
+        )
+
+        regions[key] = uvRegion
+        nextX += pixelW
+        currentRowHeight = max(currentRowHeight, pixelH)
+
+        return uvRegion
+    }
 
     /// Double the atlas height and blit existing content to the new texture.
     /// Rescales all cached UV v-coordinates to account for the new height.
@@ -413,6 +496,43 @@ nonisolated final class GlyphAtlas {
         width: Int, height: Int,
         drawWidth: CGFloat, cellHeight: CGFloat
     ) -> [UInt8] {
+        rasterize(width: width, height: height) { ctx in
+            let scalar = text.unicodeScalars.first
+            if let scalar, text.unicodeScalars.count == 1,
+                BoxDrawing.render(
+                    scalar.value, ctx: ctx,
+                    cellWidth: drawWidth, cellHeight: cellHeight, font: font)
+            {
+                // Custom drawing handled
+            } else {
+                drawLine(text, font: font, cellHeight: cellHeight, in: ctx)
+            }
+        }
+    }
+
+    /// Rasterize the part of a shaped group that starts `offset` points into
+    /// it, with the whole group scaled horizontally to `groupWidth`.
+    private func renderGroupSegment(
+        text: String, font: NSFont,
+        width: Int, height: Int,
+        groupWidth: CGFloat, offset: CGFloat, cellHeight: CGFloat
+    ) -> [UInt8] {
+        rasterize(width: width, height: height) { ctx in
+            let line = CTLineCreateWithAttributedString(
+                NSAttributedString(string: text, attributes: [.font: font]))
+            let advanceBounds = CTLineGetBoundsWithOptions(line, [])
+            let naturalWidth = advanceBounds.origin.x + advanceBounds.size.width
+            ctx.translateBy(x: -offset, y: 0)
+            if naturalWidth > 0 {
+                ctx.scaleBy(x: groupWidth / naturalWidth, y: 1)
+            }
+            drawLine(text, font: font, cellHeight: cellHeight, in: ctx)
+        }
+    }
+
+    /// Run `draw` in a linearGray alpha-only bitmap scaled to the atlas
+    /// scale and return its coverage bytes.
+    private func rasterize(width: Int, height: Int, draw: (CGContext) -> Void) -> [UInt8] {
         let colorSpace = CGColorSpace(name: CGColorSpace.linearGray)!
         guard
             let ctx = CGContext(
@@ -436,6 +556,18 @@ nonisolated final class GlyphAtlas {
 
         ctx.scaleBy(x: scale, y: scale)
 
+        draw(ctx)
+
+        // Extract pixel data (1 byte per pixel)
+        guard let data = ctx.data else { return Array(repeating: 0, count: width * height) }
+        return Array(
+            UnsafeBufferPointer(
+                start: data.assumingMemoryBound(to: UInt8.self),
+                count: width * height))
+    }
+
+    /// Draw `text` on the baseline, centered vertically in the cell.
+    private func drawLine(_ text: String, font: NSFont, cellHeight: CGFloat, in ctx: CGContext) {
         // Background is zeroed (no coverage). Glyph is rendered in white;
         // the shader colorizes via per-vertex fgColor.
         let attributes: [NSAttributedString.Key: Any] = [
@@ -452,23 +584,7 @@ nonisolated final class GlyphAtlas {
         let extraPadding = (cellHeight - naturalHeight) / 2
         let baselineY = descent + leading + extraPadding
 
-        let scalar = text.unicodeScalars.first
-        if let scalar, text.unicodeScalars.count == 1,
-            BoxDrawing.render(
-                scalar.value, ctx: ctx,
-                cellWidth: drawWidth, cellHeight: cellHeight, font: font)
-        {
-            // Custom drawing handled
-        } else {
-            ctx.textPosition = CGPoint(x: 0, y: baselineY)
-            CTLineDraw(line, ctx)
-        }
-
-        // Extract pixel data (1 byte per pixel)
-        guard let data = ctx.data else { return Array(repeating: 0, count: width * height) }
-        return Array(
-            UnsafeBufferPointer(
-                start: data.assumingMemoryBound(to: UInt8.self),
-                count: width * height))
+        ctx.textPosition = CGPoint(x: 0, y: baselineY)
+        CTLineDraw(line, ctx)
     }
 }

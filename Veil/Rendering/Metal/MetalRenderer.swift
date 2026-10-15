@@ -569,6 +569,22 @@ nonisolated final class MetalRenderer {
 
             for glyph in shaped {
                 let glyphCol = runStartCol + glyph.colOffset
+                if glyph.cellCount >= 2 {
+                    // Ligatures and contextual-alternate groups are laid on
+                    // the grid, one quad per atlas segment, so a long group
+                    // neither overruns the text after it nor exceeds the atlas.
+                    for segment in atlas.segments(
+                        text: glyph.text, font: font,
+                        bold: lastFgAttrs.bold, italic: lastFgAttrs.italic,
+                        cellSize: cellSize, cellCount: glyph.cellCount)
+                    {
+                        addQuad(
+                            to: &fgVerts, x: Float(glyphCol + segment.colOffset) * cellW, y: y,
+                            w: Float(segment.cellCount) * cellW, h: cellH,
+                            region: segment.region, fgColor: fgSIMD, bgColor: transparentBg)
+                    }
+                    continue
+                }
                 let x = Float(glyphCol) * cellW
                 let allocatedW = cellW * Float(glyph.cellCount)
                 let region = atlas.region(
@@ -577,11 +593,7 @@ nonisolated final class MetalRenderer {
                     cellSize: cellSize, cellCount: glyph.cellCount)
                 let glyphW = region.drawWidth * Float(atlas.scale)
                 let quadW: Float
-                if glyph.cellCount >= 2 {
-                    // Multi-cell glyphs draw at their natural advance; the
-                    // grid geometry is separate from the glyph's visual size.
-                    quadW = glyphW
-                } else if glyphW > allocatedW {
+                if glyphW > allocatedW {
                     // Single-cell overflow (Nerd Font icons, italic tails):
                     // spill into the next cell only when it is empty space.
                     let nextCol = glyphCol + glyph.cellCount

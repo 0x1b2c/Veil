@@ -47,13 +47,15 @@ final class MetalRendererTests {
 
     @discardableResult
     private func render(
-        dirtyRows: IndexSet, in layer: CAMetalLayer, atlas: GlyphAtlas? = nil
+        dirtyRows: IndexSet, in layer: CAMetalLayer, atlas: GlyphAtlas? = nil,
+        font: NSFont? = nil, cellSize: CGSize? = nil
     ) -> Bool {
         renderer.render(
             cells: grid.cells, attributes: grid.attributes,
             rows: grid.size.rows, cols: grid.size.cols,
             dirtyRows: dirtyRows,
-            atlas: atlas ?? self.atlas, font: font, cellSize: cellSize,
+            atlas: atlas ?? self.atlas, font: font ?? self.font,
+            cellSize: cellSize ?? self.cellSize,
             gridTopPadding: 0, defaultFg: 0xFFFFFF, defaultBg: 0x000000,
             cursorPosition: Position(row: 0, col: 0), cursorShape: .block,
             cursorCellPercentage: 100,
@@ -147,5 +149,57 @@ final class MetalRendererTests {
         #expect(iQuadX == 8)
         let after = currentRegionOfH(in: atlas)
         #expect(after.uMax - after.u < before.uMax - before.u)
+    }
+
+    // MARK: - Long shaped groups
+
+    /// A font that merges a run of hyphens into one contextual-alternates
+    /// group. No system monospace font does, so this test needs the font the
+    /// group was first seen with.
+    static let groupingFont = NSFont(name: "MapleMono-NF-CN-Regular", size: 19)
+
+    /// Pixels of the atlas texture under a quad's texture coordinates.
+    private func coverage(
+        ofQuadAt index: Int, in vertices: [MetalRenderer.Vertex], atlas: GlyphAtlas
+    ) -> Int {
+        let texture = atlas.texture!
+        let corners = vertices[index..<index + 6].map(\.texCoord)
+        let x0 = Int(corners.map(\.x).min()! * Float(texture.width))
+        let x1 = min(Int(corners.map(\.x).max()! * Float(texture.width)), texture.width)
+        let y0 = Int(corners.map(\.y).min()! * Float(texture.height))
+        let y1 = min(Int(corners.map(\.y).max()! * Float(texture.height)), texture.height)
+        guard x1 > x0, y1 > y0 else { return 0 }
+        var bytes = [UInt8](repeating: 0, count: (x1 - x0) * (y1 - y0))
+        texture.getBytes(
+            &bytes, bytesPerRow: x1 - x0,
+            from: MTLRegionMake2D(x0, y0, x1 - x0, y1 - y0), mipmapLevel: 0)
+        return bytes.filter { $0 > 0 }.count
+    }
+
+    @Test(.enabled(if: groupingFont != nil))
+    func aHyphenRunWiderThanTheAtlasIsDrawnInsideItsCells() throws {
+        let font = try #require(Self.groupingFont)
+        let cellSize = CGSize(width: 11, height: 24)
+        let dashes = 113
+        grid.resize(width: dashes + 6, height: 3)
+        put(String(repeating: "-", count: dashes) + " {{{1", row: 0)
+        let layer = drawableLayer()
+        layer.contentsScale = 2
+        atlas.scale = 2
+
+        render(
+            dirtyRows: IndexSet(0..<3), in: layer, font: font, cellSize: cellSize)
+
+        let cellW = Float(cellSize.width) * 2
+        let vertices = renderer.rowForegroundVertices[0]
+        let runQuads = stride(from: 0, to: vertices.count, by: 6).filter {
+            vertices[$0].position.x < Float(dashes) * cellW
+        }
+        #expect(!runQuads.isEmpty)
+        for quad in runQuads {
+            let right = vertices[quad..<quad + 6].map(\.position.x).max()!
+            #expect(right <= Float(dashes) * cellW)
+            #expect(coverage(ofQuadAt: quad, in: vertices, atlas: atlas) > 0)
+        }
     }
 }
