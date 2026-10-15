@@ -315,7 +315,9 @@ struct WorkspaceListedStatusTests {
         var probed: [String] = []
         let label = WorkspaceRegistry.listedStatus(
             of: .init(host: "a.ts.net", port: 6700, pid: 1), currentHost: nil,
-            state: { probed.append($0); return .busy })
+            state: {
+                probed.append($0); return .busy
+            })
         #expect(label == "busy")
         #expect(probed == ["a.ts.net:6700"])
     }
@@ -324,7 +326,9 @@ struct WorkspaceListedStatusTests {
         var probed: [String] = []
         _ = WorkspaceRegistry.listedStatus(
             of: .init(host: "a.ts.net", port: 6700, pid: 1), currentHost: "b.ts.net",
-            state: { probed.append($0); return .alive })
+            state: {
+                probed.append($0); return .alive
+            })
         #expect(probed == ["a.ts.net:6700"])
     }
 
@@ -332,7 +336,9 @@ struct WorkspaceListedStatusTests {
         var probed: [String] = []
         let label = WorkspaceRegistry.listedStatus(
             of: .init(port: 6701, pid: 1), currentHost: "b.ts.net",
-            state: { probed.append($0); return .alive })
+            state: {
+                probed.append($0); return .alive
+            })
         #expect(label == "alive")
         #expect(probed == ["b.ts.net:6701"])
     }
@@ -341,7 +347,9 @@ struct WorkspaceListedStatusTests {
         var probed = false
         let label = WorkspaceRegistry.listedStatus(
             of: .init(port: 6701, pid: 1), currentHost: nil,
-            state: { _ in probed = true; return .dead })
+            state: { _ in
+                probed = true; return .dead
+            })
         #expect(label == "unknown")
         #expect(!probed)
     }
