@@ -15,6 +15,17 @@ public enum VeilCommandLine {
         public var workspace: String?
         /// --workspaces: list registered workspace servers and exit.
         public var listWorkspaces = false
+        /// --veil-local: open on this machine even when the keyboard behind
+        /// the command is on another one.
+        public var forceLocal = false
+
+        /// Whether the CLI may ask wezterm where the viewer sits and send
+        /// the request to a workspace. `--connect` requests come from that
+        /// flow's handler and must never recurse into it; `--veil-local`
+        /// opts out of it.
+        public var mayDivertToWorkspace: Bool {
+            remoteAddress == nil && !forceLocal
+        }
 
         /// Why this combination cannot be honored, nil when it can. File
         /// arguments next to --connect name paths on this machine, which
@@ -72,6 +83,8 @@ public enum VeilCommandLine {
                     {
                         result.renderer = renderer
                     }
+                case "--veil-local":
+                    result.forceLocal = true
                 default:
                     break
                 }

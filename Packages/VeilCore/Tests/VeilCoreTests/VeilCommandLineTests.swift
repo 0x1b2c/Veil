@@ -190,6 +190,23 @@ struct VeilCommandLineTests {
         #expect(!result.listWorkspaces)
     }
 
+    @Test("@ws-006 --veil-local keeps the invocation on this machine")
+    func veilLocalSkipsWorkspace() {
+        let result = VeilCommandLine.parse(["/path/to/veil", "--veil-local", "foo.txt"])
+        #expect(!result.mayDivertToWorkspace)
+        #expect(result.nvimArgs == ["foo.txt"])
+    }
+
+    @Test func plainInvocationMayDivertToWorkspace() {
+        let result = VeilCommandLine.parse(["/path/to/veil", "foo.txt"])
+        #expect(result.mayDivertToWorkspace)
+    }
+
+    @Test func connectNeverDivertsToWorkspace() {
+        let result = VeilCommandLine.parse(["/path/to/veil", "--connect", "host:6666"])
+        #expect(!result.mayDivertToWorkspace)
+    }
+
     @Test func workspacesFlag() {
         let result = VeilCommandLine.parse(["/path/to/veil", "--workspaces"])
         #expect(result.listWorkspaces)

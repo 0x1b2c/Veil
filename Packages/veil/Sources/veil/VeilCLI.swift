@@ -31,11 +31,10 @@ struct VeilCLI {
 
         // When the keyboard behind this command is on another machine (a
         // remote wezterm mux client), divert to the workspace flow instead
-        // of opening a window on this machine's display. `--connect`
-        // requests come *from* that flow's handler and must never recurse
-        // into it. Any doubt about where the viewer sits resolves to the
-        // plain local path below.
-        if arguments.remoteAddress == nil,
+        // of opening a window on this machine's display, unless the request
+        // rules that out (see `mayDivertToWorkspace`). Any doubt about where
+        // the viewer sits resolves to the plain local path below.
+        if arguments.mayDivertToWorkspace,
             let viewer = WorkspaceLauncher.remoteViewerHost()
         {
             exit(WorkspaceLauncher.summon(nvimArgs: arguments.nvimArgs, viewer: viewer) ? 0 : 1)
