@@ -35,6 +35,16 @@
 # Disable if you prefer not to make network requests.
 # update_check = true
 
+# Address the headless nvim of a remote workspace listens on, which the
+# viewing machine connects to (see "Remote Neovim" in the README). Read
+# by the veil CLI on the machine running the workspace.
+# When unset, the workspace listens on this machine's Tailscale name;
+# without Tailscale, veil refuses to start a workspace until this is set.
+# nvim accepts commands on this address without authentication, so a LAN
+# address exposes the workspace to every machine on that network: how far
+# it is exposed is your decision.
+# workspace_host = ""
+
 
 # Font. See https://github.com/0x1b2c/Veil/blob/master/FONT.md for full
 # documentation. On a local connection Veil reads each field from nvim's

@@ -1,5 +1,6 @@
 import Foundation
 import TOML
+import VeilCore
 
 // MARK: - DecodableDefault
 
@@ -267,18 +268,11 @@ struct VeilConfig: Decodable {
 
     static var current: VeilConfig = load()
 
+    /// Shared with the CLI, which reads `workspace_host` from the same file.
     static var userConfigPath: URL {
-        // Allow overriding the config location via $VEIL_CONFIG. This lets the
-        // config live somewhere other than the home directory — useful for
-        // immutable/managed setups (e.g. Nix) that point Veil at a generated,
-        // read-only config instead of seeding and editing the default path.
-        if let override = ProcessInfo.processInfo.environment["VEIL_CONFIG"],
-            !override.isEmpty
-        {
-            return URL(fileURLWithPath: (override as NSString).expandingTildeInPath)
-        }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/veil/veil.toml")
+        VeilConfigFile.path(
+            environment: ProcessInfo.processInfo.environment,
+            home: FileManager.default.homeDirectoryForCurrentUser)
     }
 
     static func load() -> VeilConfig {

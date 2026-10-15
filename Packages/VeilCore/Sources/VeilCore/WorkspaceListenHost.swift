@@ -1,26 +1,24 @@
 import Foundation
-import SystemConfiguration
 
 /// The host a workspace server listens on, which is also the address the
 /// viewer's machine connects to, so it must be a name other machines can
 /// resolve and this one can bind.
 public enum WorkspaceListenHost {
-    /// In order: an explicit override (`VEIL_WORKSPACE_HOST`), this node's
-    /// Tailscale MagicDNS name, then the Bonjour name
-    /// `<LocalHostName>.local`. nil when none of them is available.
+    /// In order: `workspace_host` from veil.toml, then this node's Tailscale
+    /// MagicDNS name. nil when neither is available. There is deliberately
+    /// no fallback to a LAN name: nvim takes commands on its listen address
+    /// without authentication, so how widely it is exposed is the user's
+    /// call, made by writing that address in veil.toml.
     ///
     /// - Parameters:
-    ///   - override: the value of `VEIL_WORKSPACE_HOST`, if set.
+    ///   - configured: `workspace_host` from veil.toml, if set.
     ///   - tailscaleStatus: stdout of a successful `tailscale status --json`;
-    ///     only asked for when there is no override.
-    ///   - bonjourHostName: see `bonjourHostName()`.
+    ///     only asked for when nothing is configured.
     public static func resolve(
-        override: String?, tailscaleStatus: () -> Data?, bonjourHostName: String?
+        configured: String?, tailscaleStatus: () -> Data?
     ) -> String? {
-        if let override, !override.isEmpty { return override }
-        if let name = magicDNSName(inTailscaleStatus: tailscaleStatus()) { return name }
-        guard let bonjourHostName, !bonjourHostName.isEmpty else { return nil }
-        return "\(bonjourHostName).local"
+        if let configured, !configured.isEmpty { return configured }
+        return magicDNSName(inTailscaleStatus: tailscaleStatus())
     }
 
     /// `Self.DNSName` of the status report, without the trailing dot of
@@ -35,10 +33,4 @@ public enum WorkspaceListenHost {
         return dnsName.hasSuffix(".") ? String(dnsName.dropLast()) : dnsName
     }
 
-    /// SystemConfiguration's LocalHostName, the name this Mac answers to
-    /// over mDNS (System Settings > General > Sharing > Local hostname),
-    /// without the `.local` suffix. nil when it is not set.
-    public static func bonjourHostName() -> String? {
-        SCDynamicStoreCopyLocalHostName(nil) as String?
-    }
 }

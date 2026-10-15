@@ -112,20 +112,35 @@ enum WorkspaceLauncher {
     /// Address other machines reach this host by (see
     /// `WorkspaceListenHost.resolve`). Reports on stderr when there is none.
     private static func listenHost() -> String? {
+        let configPath = VeilConfigFile.path(
+            environment: ProcessInfo.processInfo.environment,
+            home: FileManager.default.homeDirectoryForCurrentUser)
         let host = WorkspaceListenHost.resolve(
-            override: ProcessInfo.processInfo.environment["VEIL_WORKSPACE_HOST"],
+            configured: configuredWorkspaceHost(in: configPath),
             tailscaleStatus: {
                 let result = runCapture(
                     "/usr/bin/env", ["tailscale", "status", "--json"], timeout: 3)
                 return result?.status == 0 ? result?.stdout : nil
-            },
-            bonjourHostName: WorkspaceListenHost.bonjourHostName())
+            })
         if host == nil {
             fputs(
                 "veil: no address to serve the workspace on: Tailscale is unavailable and "
-                    + "this Mac has no local hostname; set VEIL_WORKSPACE_HOST\n", stderr)
+                    + "workspace_host is not set; set it in \(configPath.path)\n", stderr)
         }
         return host
+    }
+
+    /// A config file that cannot be read is reported and treated as not
+    /// setting `workspace_host`, as the app falls back to its defaults then.
+    private static func configuredWorkspaceHost(in configPath: URL) -> String? {
+        do {
+            return try VeilConfigFile.workspaceHost(inFileAt: configPath)
+        } catch {
+            fputs(
+                "veil: ignoring workspace_host: cannot read \(configPath.path): "
+                    + "\(error.message)\n", stderr)
+            return nil
+        }
     }
 
     // MARK: - Server lifecycle
