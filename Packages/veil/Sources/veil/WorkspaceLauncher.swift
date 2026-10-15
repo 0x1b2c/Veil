@@ -5,7 +5,8 @@ import VeilCore
 /// this command sits on another machine (per wezterm's client metadata),
 /// the CLI does not open a local window: it keeps one headless
 /// `nvim --headless --listen` per project root (tracked in the registry),
-/// sends the requested files into it, and broadcasts a user var telling
+/// sends the requested files and the nvim arguments that still apply to a
+/// running nvim into it, and broadcasts a user var telling
 /// the viewer's machine to attach a Veil window via `veil --connect`.
 enum WorkspaceLauncher {
     // MARK: - Viewer detection
@@ -34,6 +35,16 @@ enum WorkspaceLauncher {
     // MARK: - Main flows
 
     static func summon(nvimArgs: [String], viewer: String) -> Bool {
+        // Translate before touching any server: a refused argument must not
+        // leave a freshly spawned workspace behind.
+        let openExpression: String?
+        do {
+            openExpression = try WorkspaceNvimArguments.remoteExpression(
+                for: nvimArgs, cwd: FileManager.default.currentDirectoryPath)
+        } catch {
+            fputs("veil: \(error.message)\n", stderr)
+            return false
+        }
         let (root, name) = resolveWorkspaceRoot()
         let host = listenHost()
         var table = loadRegistry()
@@ -62,7 +73,7 @@ enum WorkspaceLauncher {
             saveRegistry(table)
         }
 
-        guard sendFiles(nvimArgs, to: "\(host):\(port)") else { return false }
+        guard sendFiles(openExpression, to: "\(host):\(port)") else { return false }
         let payload = WorkspaceUserVar.Payload(
             host: host, port: port, workspace: name, viewer: viewer)
         guard let sequence = WorkspaceUserVar.sequence(for: payload),
@@ -211,21 +222,19 @@ enum WorkspaceLauncher {
         return nil
     }
 
-    private static func sendFiles(_ nvimArgs: [String], to addr: String) -> Bool {
-        guard !nvimArgs.isEmpty else { return true }
-        let cwd = FileManager.default.currentDirectoryPath
-        // Absolutize bare paths; leave nvim's own `-`/`+` arguments alone.
-        let arguments = nvimArgs.map { arg in
-            arg.hasPrefix("/") || arg.hasPrefix("-") || arg.hasPrefix("+")
-                ? arg : cwd + "/" + arg
-        }
+    /// Evaluates the translated arguments (see `WorkspaceNvimArguments`)
+    /// on the server. `--remote-expr`, unlike `--remote`, fails at once
+    /// when the server is unreachable instead of editing locally.
+    private static func sendFiles(_ openExpression: String?, to addr: String) -> Bool {
+        guard let openExpression else { return true }
         let result = runCapture(
-            "/usr/bin/env", ["nvim", "--server", addr, "--remote"] + arguments, timeout: 10)
+            "/usr/bin/env", ["nvim", "--server", addr, "--remote-expr", openExpression],
+            timeout: 10)
         guard let result, result.status == 0 else {
             fputs("veil: failed to send files to workspace server at \(addr)\n", stderr)
             // nvim's own words are the only record of why; pass them on as is.
-            // E247 ends without a newline, which would glue the shell prompt
-            // to it, so terminate the line when nvim did not.
+            // Terminate the line when nvim did not, so the shell prompt
+            // never joins it.
             if let result, !result.stderr.isEmpty {
                 FileHandle.standardError.write(result.stderr)
                 if result.stderr.last != UInt8(ascii: "\n") {
