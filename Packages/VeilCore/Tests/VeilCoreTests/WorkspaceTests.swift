@@ -183,32 +183,44 @@ struct WorkspaceServerStateTests {
     @Test("@ws-003 a running server that does not answer is busy, not dead")
     func busyServerIsNotDead() {
         let state = WorkspaceRegistry.serverState(
-            answersProbe: false, commandLine: serverCommand, addr: addr)
+            probe: .timedOut, commandLine: serverCommand, addr: addr)
         #expect(state == .busy)
+    }
+
+    @Test func runningServerWhoseAddressFailsAtOnceIsUnreachable() {
+        // The address it was started on no longer resolves or refuses the
+        // connection (say, its Tailscale name is gone): nothing suggests a
+        // blocked nvim, so it must not be reported as busy.
+        let state = WorkspaceRegistry.serverState(
+            probe: .failed, commandLine: serverCommand, addr: addr)
+        #expect(state == .unreachable)
     }
 
     @Test func answeringServerIsAlive() {
         let state = WorkspaceRegistry.serverState(
-            answersProbe: true, commandLine: serverCommand, addr: addr)
+            probe: .answered, commandLine: serverCommand, addr: addr)
         #expect(state == .alive)
     }
 
     @Test func missingProcessIsDead() {
-        let state = WorkspaceRegistry.serverState(
-            answersProbe: false, commandLine: nil, addr: addr)
-        #expect(state == .dead)
+        for probe in [WorkspaceRegistry.ProbeResult.timedOut, .failed] {
+            let state = WorkspaceRegistry.serverState(probe: probe, commandLine: nil, addr: addr)
+            #expect(state == .dead)
+        }
     }
 
     @Test func reusedPidIsDead() {
-        let state = WorkspaceRegistry.serverState(
-            answersProbe: false, commandLine: "/usr/bin/ssh-agent -l\n", addr: addr)
-        #expect(state == .dead)
+        for probe in [WorkspaceRegistry.ProbeResult.timedOut, .failed] {
+            let state = WorkspaceRegistry.serverState(
+                probe: probe, commandLine: "/usr/bin/ssh-agent -l\n", addr: addr)
+            #expect(state == .dead)
+        }
     }
 
     @Test func serverOnAnotherAddressIsDead() {
         // A port that merely shares a prefix with ours is a different server.
         let state = WorkspaceRegistry.serverState(
-            answersProbe: false,
+            probe: .failed,
             commandLine: "/opt/homebrew/bin/nvim --headless --listen 127.0.0.1:69910\n",
             addr: addr)
         #expect(state == .dead)
@@ -216,8 +228,30 @@ struct WorkspaceServerStateTests {
 
     @Test func otherProgramListeningOnOurAddressIsDead() {
         let state = WorkspaceRegistry.serverState(
-            answersProbe: false, commandLine: "/usr/bin/nc --listen \(addr)", addr: addr)
+            probe: .timedOut, commandLine: "/usr/bin/nc --listen \(addr)", addr: addr)
         #expect(state == .dead)
+    }
+}
+
+struct WorkspaceProbeResultTests {
+    @Test func zeroStatusIsAnAnswer() {
+        #expect(WorkspaceRegistry.ProbeResult(exitStatus: 0, timedOut: false) == .answered)
+    }
+
+    @Test func probeKilledAtTheTimeoutTimedOut() {
+        // A blocked nvim accepts the connection and never replies, so the
+        // probe waits until the timeout kills it.
+        #expect(WorkspaceRegistry.ProbeResult(exitStatus: SIGKILL, timedOut: true) == .timedOut)
+    }
+
+    @Test func probeThatExitsWithAnErrorFailed() {
+        // `nvim --server` exits 2 within a fraction of a second when the
+        // host does not resolve or the connection is refused.
+        #expect(WorkspaceRegistry.ProbeResult(exitStatus: 2, timedOut: false) == .failed)
+    }
+
+    @Test func probeThatCouldNotRunFailed() {
+        #expect(WorkspaceRegistry.ProbeResult(exitStatus: nil, timedOut: false) == .failed)
     }
 }
 

@@ -146,6 +146,31 @@ public enum WorkspaceRegistry {
         return try encoder.encode(table)
     }
 
+    /// How `nvim --server <addr> --remote-expr 1` ended.
+    public enum ProbeResult: Equatable {
+        /// It answered.
+        case answered
+        /// No reply before the timeout, which is what a server blocked on a
+        /// long-running command does: it accepts the connection and never
+        /// replies.
+        case timedOut
+        /// It gave up before the timeout: the host does not resolve or the
+        /// connection is refused. Also when the probe could not run at all.
+        case failed
+
+        /// - Parameters:
+        ///   - exitStatus: the probe's exit status, nil when it could not
+        ///     be started.
+        ///   - timedOut: whether the probe was killed at its timeout.
+        public init(exitStatus: Int32?, timedOut: Bool) {
+            if timedOut {
+                self = .timedOut
+            } else {
+                self = exitStatus == 0 ? .answered : .failed
+            }
+        }
+    }
+
     /// Where a registered server stands. The raw value is the label
     /// `veil --workspaces` prints.
     public enum ServerState: String, Equatable {
@@ -154,23 +179,29 @@ public enum WorkspaceRegistry {
         /// Still running but not answering, typically blocked on a
         /// long-running command. Must be left alone: it may hold unsaved work.
         case busy
+        /// Still running, but the address it listens on cannot be reached
+        /// right now: the name no longer resolves or the connection is
+        /// refused, as when the Tailscale name it was started on is gone.
+        /// Left alone like a busy one; it answers again once the network
+        /// it was started on is back.
+        case unreachable
         /// The recorded pid is gone or now belongs to another program.
         case dead
     }
 
     /// - Parameters:
-    ///   - answersProbe: whether the server answered an RPC at `addr`.
+    ///   - probe: how an RPC probe at `addr` ended.
     ///   - commandLine: `ps -o command=` of the entry's pid, nil when no
     ///     such process exists.
     ///   - addr: the `host:port` the server was spawned to listen on.
     public static func serverState(
-        answersProbe: Bool, commandLine: String?, addr: String
+        probe: ProbeResult, commandLine: String?, addr: String
     ) -> ServerState {
-        if answersProbe { return .alive }
+        if probe == .answered { return .alive }
         guard let commandLine, isServerCommand(commandLine, listeningOn: addr) else {
             return .dead
         }
-        return .busy
+        return probe == .timedOut ? .busy : .unreachable
     }
 
     /// Whether `commandLine` is an nvim listening on exactly `addr`. argv[0]

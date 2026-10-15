@@ -86,7 +86,7 @@ enum WorkspaceLauncher {
             let status = serverState(of: entry, addr: entry.address(currentHost: host)).rawValue
             let name = WorkspaceRoot.name(of: root, home: home)
             print(
-                status.padded(to: 6) + name.padded(to: 24) + "\(entry.port)".padded(to: 6) + root)
+                status.padded(to: 12) + name.padded(to: 24) + "\(entry.port)".padded(to: 6) + root)
         }
         return true
     }
@@ -132,7 +132,8 @@ enum WorkspaceLauncher {
 
     /// The server for `root`: the registered one when it answers, else a
     /// freshly spawned and registered one. nil, reported on stderr, when
-    /// the registered one is busy or no new one could be started. The
+    /// the registered one is busy or unreachable, or no new one could be
+    /// started. The
     /// registry stays locked throughout, so a concurrent run for the same
     /// root waits, then finds this server instead of spawning another.
     private static func prepareServer(
@@ -144,37 +145,42 @@ enum WorkspaceLauncher {
 
         // Each server is looked for where it was started, which need not be
         // where this run would start one.
-        let server: WorkspaceRegistry.Entry
-        let entry = table[root]
-        let state = entry.map { serverState(of: $0, addr: $0.address(currentHost: host)) } ?? .dead
-        if let entry, state == .alive {
-            server = entry
-        } else if let entry, state == .busy {
-            reportBusy(name: name, entry: entry, addr: entry.address(currentHost: host))
-            return nil
-        } else {
-            // Gone, or its pid now runs something else: forget the entry
-            // without signaling anything, and on disk at once, so a spawn
-            // that fails below does not leave the stale entry behind.
-            table[root] = nil
-            if entry != nil { saveRegistry(table) }
-            guard let picked = pickPort(host: host, table: table) else {
-                fputs("veil: no free workspace port in \(portRange)\n", stderr)
+        if let entry = table[root] {
+            let addr = entry.address(currentHost: host)
+            switch serverState(of: entry, addr: addr) {
+            case .alive:
+                return entry
+            case .busy:
+                reportBusy(name: name, entry: entry, addr: addr)
                 return nil
-            }
-            guard let pid = spawnServer(root: root, name: name, addr: "\(host):\(picked)") else {
+            case .unreachable:
+                reportUnreachable(name: name, entry: entry, addr: addr)
                 return nil
+            case .dead:
+                // Gone, or its pid now runs something else: forget the entry
+                // without signaling anything, and on disk at once, so a spawn
+                // that fails below does not leave the stale entry behind.
+                table[root] = nil
+                saveRegistry(table)
             }
-            server = .init(host: host, port: picked, pid: pid)
-            table[root] = server
-            saveRegistry(table)
         }
+        guard let picked = pickPort(host: host, table: table) else {
+            fputs("veil: no free workspace port in \(portRange)\n", stderr)
+            return nil
+        }
+        guard let pid = spawnServer(root: root, name: name, addr: "\(host):\(picked)") else {
+            return nil
+        }
+        let server = WorkspaceRegistry.Entry(host: host, port: picked, pid: pid)
+        table[root] = server
+        saveRegistry(table)
         return server
     }
 
-    private static func probe(_ addr: String) -> Bool {
-        runCapture("/usr/bin/env", ["nvim", "--server", addr, "--remote-expr", "1"], timeout: 3)?
-            .status == 0
+    private static func probe(_ addr: String) -> WorkspaceRegistry.ProbeResult {
+        let result = runCapture(
+            "/usr/bin/env", ["nvim", "--server", addr, "--remote-expr", "1"], timeout: 3)
+        return .init(exitStatus: result?.status, timedOut: result?.timedOut ?? false)
     }
 
     /// Classifies a registry entry by its pid's command line as well as
@@ -184,7 +190,7 @@ enum WorkspaceLauncher {
         of entry: WorkspaceRegistry.Entry, addr: String
     ) -> WorkspaceRegistry.ServerState {
         WorkspaceRegistry.serverState(
-            answersProbe: probe(addr), commandLine: commandLine(ofPid: entry.pid), addr: addr)
+            probe: probe(addr), commandLine: commandLine(ofPid: entry.pid), addr: addr)
     }
 
     /// nil when no such process exists. A non-positive pid is never looked
@@ -206,6 +212,19 @@ enum WorkspaceLauncher {
                 + "Left it untouched; try again once it finishes.\n", stderr)
     }
 
+    /// Like a busy server, an unreachable one may hold unsaved buffers and
+    /// is neither signaled nor replaced; it answers again once the network
+    /// it was started on is back.
+    private static func reportUnreachable(
+        name: String, entry: WorkspaceRegistry.Entry, addr: String
+    ) {
+        fputs(
+            "veil: workspace '\(name)' cannot be reached: its nvim (pid \(entry.pid)) is "
+                + "still running, but \(addr), the address it listens on, does not resolve "
+                + "or refuses connections right now. Left it untouched; try again once "
+                + "the network it was started on is back.\n", stderr)
+    }
+
     private static let portRange = 6700...6899
 
     private static func pickPort(host: String, table: WorkspaceRegistry.Table) -> Int? {
@@ -213,7 +232,7 @@ enum WorkspaceLauncher {
         for _ in 0..<20 {
             let port = Int.random(in: portRange)
             if registered.contains(port) { continue }
-            if probe("\(host):\(port)") { continue }
+            if probe("\(host):\(port)") == .answered { continue }
             return port
         }
         return nil
@@ -246,7 +265,7 @@ enum WorkspaceLauncher {
         }
 
         let ready = WorkspaceServerStartup.awaitReady(
-            process, attempts: 50, interval: 0.2, answers: { probe(addr) })
+            process, attempts: 50, interval: 0.2, answers: { probe(addr) == .answered })
         guard ready else {
             fputs(
                 "veil: server for '\(name)' did not become ready on \(addr) "
@@ -342,11 +361,12 @@ enum WorkspaceLauncher {
     // MARK: - Subprocess plumbing
 
     /// Runs a subprocess, captures stdout and stderr, and enforces a
-    /// wall-clock timeout by SIGKILLing the pid from a detached work item.
-    /// Returns nil when the process cannot be started at all.
+    /// wall-clock timeout by SIGKILLing the pid from a detached work item;
+    /// `timedOut` tells that kill apart from an ordinary exit. Returns nil
+    /// when the process cannot be started at all.
     private static func runCapture(
         _ executable: String, _ arguments: [String], timeout: TimeInterval
-    ) -> (status: Int32, stdout: Data, stderr: Data)? {
+    ) -> (status: Int32, stdout: Data, stderr: Data, timedOut: Bool)? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -375,7 +395,9 @@ enum WorkspaceLauncher {
         stderrDrained.wait()
         process.waitUntilExit()
         watchdog.cancel()
-        return (process.terminationStatus, output, errorOutput.data)
+        let timedOut =
+            process.terminationReason == .uncaughtSignal && process.terminationStatus == SIGKILL
+        return (process.terminationStatus, output, errorOutput.data, timedOut)
     }
 }
 
