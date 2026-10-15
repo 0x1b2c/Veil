@@ -63,8 +63,10 @@ enum WorkspaceLauncher {
             return false
         } else {
             // Gone, or its pid now runs something else: forget the entry
-            // without signaling anything.
+            // without signaling anything, and on disk at once, so a spawn
+            // that fails below does not leave the stale entry behind.
             table[root] = nil
+            if entry != nil { saveRegistry(table) }
             guard let picked = pickPort(host: host, table: table) else {
                 fputs("veil: no free workspace port in \(portRange)\n", stderr)
                 return false
@@ -216,14 +218,15 @@ enum WorkspaceLauncher {
             return nil
         }
 
-        for _ in 0..<50 {
-            if probe(addr) { return process.processIdentifier }
-            Thread.sleep(forTimeInterval: 0.2)
+        let ready = WorkspaceServerStartup.awaitReady(
+            process, attempts: 50, interval: 0.2, answers: { probe(addr) })
+        guard ready else {
+            fputs(
+                "veil: server for '\(name)' did not become ready on \(addr) "
+                    + "and was stopped (see \(log.path))\n", stderr)
+            return nil
         }
-        fputs(
-            "veil: server for '\(name)' did not become ready on \(addr) (see \(log.path))\n", stderr
-        )
-        return nil
+        return process.processIdentifier
     }
 
     /// Evaluates the translated arguments (see `WorkspaceNvimArguments`)
