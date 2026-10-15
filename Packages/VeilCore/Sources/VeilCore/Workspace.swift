@@ -74,7 +74,8 @@ public enum WorkspaceViewer {
         var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
         guard gethostname(&buffer, buffer.count - 1) == 0 else { return nil }
         buffer[buffer.count - 1] = 0
-        let name = String(cString: buffer)
+        let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        let name = String(decoding: bytes, as: UTF8.self)
         return name.isEmpty ? nil : name
     }
 
