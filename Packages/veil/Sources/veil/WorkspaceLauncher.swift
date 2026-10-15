@@ -45,7 +45,9 @@ enum WorkspaceLauncher {
             fputs("veil: \(error.message)\n", stderr)
             return false
         }
-        let (root, name) = resolveWorkspaceRoot()
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let root = resolveWorkspaceRoot(home: home)
+        let name = WorkspaceRoot.name(of: root, home: home)
         guard let host = listenHost() else { return false }
         var table = loadRegistry()
 
@@ -107,7 +109,7 @@ enum WorkspaceLauncher {
     /// Project root = git root; anything outside a repository shares one
     /// default workspace rooted at $HOME instead of spawning a server per
     /// random directory.
-    private static func resolveWorkspaceRoot() -> (root: String, name: String) {
+    private static func resolveWorkspaceRoot(home: String) -> String {
         if let result = runCapture(
             "/usr/bin/env", ["git", "rev-parse", "--show-toplevel"], timeout: 3),
             result.status == 0,
@@ -115,9 +117,9 @@ enum WorkspaceLauncher {
                 .trimmingCharacters(in: .whitespacesAndNewlines),
             !output.isEmpty
         {
-            return (output, URL(fileURLWithPath: output).lastPathComponent)
+            return output
         }
-        return (FileManager.default.homeDirectoryForCurrentUser.path, "home")
+        return home
     }
 
     /// Address other machines reach this host by (see
@@ -193,7 +195,7 @@ enum WorkspaceLauncher {
     /// once the CLI exits the server is an orphan outside the shell's job
     /// table, so closing the pane cannot reach it.
     private static func spawnServer(root: String, name: String, addr: String) -> Int32? {
-        let log = logsDir.appendingPathComponent("\(name).log")
+        let log = logsDir.appendingPathComponent(WorkspaceRoot.logFileName(of: root))
         guard let logHandle = appendHandle(for: log) else {
             fputs("veil: cannot open log file \(log.path)\n", stderr)
             return nil
