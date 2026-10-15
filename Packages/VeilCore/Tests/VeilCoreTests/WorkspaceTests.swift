@@ -85,7 +85,8 @@ struct WorkspaceViewerTests {
         #expect(location == nil)
     }
 
-    @Test func localHostnameSharesItsSourceWithOtherTools() throws {
+    @Test("@ws-001 this machine's name comes from the source wezterm reads")
+    func localHostnameSharesItsSourceWithOtherTools() throws {
         // Scenario: editing while sitting at this machine opens a local
         // window. That only holds if our idea of "this machine" is the very
         // name wezterm reports for its local client, which it reads from

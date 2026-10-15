@@ -224,7 +224,14 @@ enum WorkspaceLauncher {
         guard let result, result.status == 0 else {
             fputs("veil: failed to send files to workspace server at \(addr)\n", stderr)
             // nvim's own words are the only record of why; pass them on as is.
-            if let result { FileHandle.standardError.write(result.stderr) }
+            // E247 ends without a newline, which would glue the shell prompt
+            // to it, so terminate the line when nvim did not.
+            if let result, !result.stderr.isEmpty {
+                FileHandle.standardError.write(result.stderr)
+                if result.stderr.last != UInt8(ascii: "\n") {
+                    FileHandle.standardError.write(Data("\n".utf8))
+                }
+            }
             return false
         }
         return true
