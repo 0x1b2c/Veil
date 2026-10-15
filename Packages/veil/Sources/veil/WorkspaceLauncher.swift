@@ -219,12 +219,12 @@ enum WorkspaceLauncher {
             arg.hasPrefix("/") || arg.hasPrefix("-") || arg.hasPrefix("+")
                 ? arg : cwd + "/" + arg
         }
-        guard
-            let result = runCapture(
-                "/usr/bin/env", ["nvim", "--server", addr, "--remote"] + arguments, timeout: 10),
-            result.status == 0
-        else {
+        let result = runCapture(
+            "/usr/bin/env", ["nvim", "--server", addr, "--remote"] + arguments, timeout: 10)
+        guard let result, result.status == 0 else {
             fputs("veil: failed to send files to workspace server at \(addr)\n", stderr)
+            // nvim's own words are the only record of why; pass them on as is.
+            if let result { FileHandle.standardError.write(result.stderr) }
             return false
         }
         return true
@@ -284,18 +284,19 @@ enum WorkspaceLauncher {
 
     // MARK: - Subprocess plumbing
 
-    /// Runs a subprocess, captures stdout, and enforces a wall-clock
-    /// timeout by SIGKILLing the pid from a detached work item. Returns
-    /// nil when the process cannot be started at all.
+    /// Runs a subprocess, captures stdout and stderr, and enforces a
+    /// wall-clock timeout by SIGKILLing the pid from a detached work item.
+    /// Returns nil when the process cannot be started at all.
     private static func runCapture(
         _ executable: String, _ arguments: [String], timeout: TimeInterval
-    ) -> (status: Int32, stdout: Data)? {
+    ) -> (status: Int32, stdout: Data, stderr: Data)? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         let pipe = Pipe()
+        let errorPipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
+        process.standardError = errorPipe
         process.standardInput = FileHandle.nullDevice
         do {
             try process.run()
@@ -306,11 +307,26 @@ enum WorkspaceLauncher {
         let pid = process.processIdentifier
         let watchdog = DispatchWorkItem { kill(pid, SIGKILL) }
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
+        // Drain stderr concurrently: reading the two pipes one after the
+        // other deadlocks once the child fills the unread one.
+        let stderr = DrainedOutput()
+        let stderrDrained = DispatchGroup()
+        DispatchQueue.global().async(group: stderrDrained) {
+            stderr.data = errorPipe.fileHandleForReading.readDataToEndOfFile()
+        }
         let stdout = pipe.fileHandleForReading.readDataToEndOfFile()
+        stderrDrained.wait()
         process.waitUntilExit()
         watchdog.cancel()
-        return (process.terminationStatus, stdout)
+        return (process.terminationStatus, stdout, stderr.data)
     }
+}
+
+/// Holds what a background reader drained from a pipe. Written once by
+/// that reader and read only after `DispatchGroup.wait()` returns, which
+/// orders the two accesses, so no lock is needed.
+private final class DrainedOutput: @unchecked Sendable {
+    var data = Data()
 }
 
 extension String {
