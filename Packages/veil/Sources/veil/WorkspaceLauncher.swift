@@ -316,16 +316,16 @@ enum WorkspaceLauncher {
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
         // Drain stderr concurrently: reading the two pipes one after the
         // other deadlocks once the child fills the unread one.
-        let stderr = DrainedOutput()
+        let errorOutput = DrainedOutput()
         let stderrDrained = DispatchGroup()
         DispatchQueue.global().async(group: stderrDrained) {
-            stderr.data = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            errorOutput.data = errorPipe.fileHandleForReading.readDataToEndOfFile()
         }
-        let stdout = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = pipe.fileHandleForReading.readDataToEndOfFile()
         stderrDrained.wait()
         process.waitUntilExit()
         watchdog.cancel()
-        return (process.terminationStatus, stdout, stderr.data)
+        return (process.terminationStatus, output, errorOutput.data)
     }
 }
 
