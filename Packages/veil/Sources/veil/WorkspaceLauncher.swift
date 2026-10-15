@@ -81,9 +81,10 @@ enum WorkspaceLauncher {
     static func printWorkspaces() -> Bool {
         let table = registryFile.load()
         guard let host = listenHost() else { return false }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
         for (root, entry) in table.sorted(by: { $0.key < $1.key }) {
             let status = serverState(of: entry, addr: entry.address(currentHost: host)).rawValue
-            let name = URL(fileURLWithPath: root).lastPathComponent
+            let name = WorkspaceRoot.name(of: root, home: home)
             print(
                 status.padded(to: 6) + name.padded(to: 24) + "\(entry.port)".padded(to: 6) + root)
         }
