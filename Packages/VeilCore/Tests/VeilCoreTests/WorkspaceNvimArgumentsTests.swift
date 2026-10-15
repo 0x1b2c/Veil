@@ -43,6 +43,19 @@ struct WorkspaceNvimArgumentsTests {
         #expect(try nvim.bufferNames() == ["a.txt"])
     }
 
+    @Test func aFailingPlusCommandLeavesTheFileOpenAndTheLaterCommandsRun() throws {
+        let nvim = try HeadlessNvim()
+        defer { nvim.stop() }
+        let reply = try nvim.open(["+/NOPE", "a.txt", "+2"])
+
+        #expect(
+            WorkspaceNvimArguments.commandFailures(inReply: reply) == [
+                "/NOPE: E486: Pattern not found: NOPE"
+            ])
+        #expect(try nvim.eval("expand('%:t') .. ':' .. line('.')") == "a.txt:2")
+        #expect(try nvim.eval("execute('messages')").contains("E486"))
+    }
+
     @Test func barePlusGoesToLastLine() throws {
         let nvim = try HeadlessNvim()
         defer { nvim.stop() }
@@ -136,11 +149,13 @@ final class HeadlessNvim {
         try? FileManager.default.removeItem(at: directory)
     }
 
-    /// Sends `nvimArgs` the way `veil` does for a workspace.
-    func open(_ nvimArgs: [String]) throws {
+    /// Sends `nvimArgs` the way `veil` does for a workspace, returning
+    /// the server's reply.
+    @discardableResult
+    func open(_ nvimArgs: [String]) throws -> String {
         let expression = try #require(
             try WorkspaceNvimArguments.remoteExpression(for: nvimArgs, cwd: directory.path))
-        _ = try eval(expression)
+        return try eval(expression)
     }
 
     func eval(_ expression: String) throws -> String {

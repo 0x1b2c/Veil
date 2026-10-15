@@ -73,7 +73,7 @@ enum WorkspaceLauncher {
             saveRegistry(table)
         }
 
-        guard sendFiles(openExpression, to: "\(host):\(port)") else { return false }
+        guard applyArguments(openExpression, on: "\(host):\(port)") else { return false }
         let payload = WorkspaceUserVar.Payload(
             host: host, port: port, workspace: name, viewer: viewer)
         guard let sequence = WorkspaceUserVar.sequence(for: payload),
@@ -224,14 +224,16 @@ enum WorkspaceLauncher {
 
     /// Evaluates the translated arguments (see `WorkspaceNvimArguments`)
     /// on the server. `--remote-expr`, unlike `--remote`, fails at once
-    /// when the server is unreachable instead of editing locally.
-    private static func sendFiles(_ openExpression: String?, to addr: String) -> Bool {
+    /// when the server is unreachable instead of editing locally. Only a
+    /// failure to open the files is fatal; a `+cmd` that fails afterwards
+    /// is reported and the window still opens, as a local nvim would.
+    private static func applyArguments(_ openExpression: String?, on addr: String) -> Bool {
         guard let openExpression else { return true }
         let result = runCapture(
             "/usr/bin/env", ["nvim", "--server", addr, "--remote-expr", openExpression],
             timeout: 10)
         guard let result, result.status == 0 else {
-            fputs("veil: failed to send files to workspace server at \(addr)\n", stderr)
+            fputs("veil: failed to open files in workspace server at \(addr)\n", stderr)
             // nvim's own words are the only record of why; pass them on as is.
             // Terminate the line when nvim did not, so the shell prompt
             // never joins it.
@@ -242,6 +244,10 @@ enum WorkspaceLauncher {
                 }
             }
             return false
+        }
+        let reply = String(decoding: result.stdout, as: UTF8.self)
+        for failure in WorkspaceNvimArguments.commandFailures(inReply: reply) {
+            fputs("veil: \(failure)\n", stderr)
         }
         return true
     }

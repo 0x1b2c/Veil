@@ -16,6 +16,11 @@ import Foundation
 /// Every other option only takes effect while nvim starts (`-u`, `-i`,
 /// `--clean`, ...) or is not translated, and is refused rather than
 /// silently dropped.
+///
+/// Only opening the files has to succeed. As with a local `nvim +cmd`, a
+/// command that fails afterwards does not undo the open or stop the
+/// commands after it: each failure is recorded in nvim's message history
+/// and returned in the reply, one `<command>: <error>` per line.
 public enum WorkspaceNvimArguments {
     public struct UnsupportedArgument: Error, Equatable {
         public var argument: String
@@ -38,10 +43,37 @@ public enum WorkspaceNvimArguments {
         for nvimArgs: [String], cwd: String
     ) throws(UnsupportedArgument) -> String? {
         let request = try parse(nvimArgs, cwd: cwd)
-        let commands = request.openCommands() + request.readonlyCommands() + request.userCommands()
+        var commands = request.openCommands() + request.readonlyCommands() + request.userCommands()
         guard !commands.isEmpty else { return nil }
-        return "execute([" + commands.joined(separator: ", ") + "])"
+        let open = request.files.isEmpty ? nil : commands.removeFirst()
+        let applied =
+            "luaeval(" + vimLiteral(runEachRecordingFailures) + ", ["
+            + commands.joined(separator: ", ") + "])"
+        guard let open else { return applied }
+        // An error while opening fails the whole expression; the list keeps
+        // the open ahead of the rest and yields only the failures.
+        return "[execute([\(open)]), \(applied)][1]"
     }
+
+    /// The failed commands in a reply to `remoteExpression`, each as
+    /// `<command>: <error>`.
+    public static func commandFailures(inReply reply: String) -> [String] {
+        reply.split(separator: "\n").map(String.init)
+    }
+
+    /// Runs each ex command in `_A` on its own, so one failure leaves the
+    /// rest to run, and returns the failures joined by newlines.
+    private static let runEachRecordingFailures = """
+        (function(cmds) local failures = {} \
+        for _, cmd in ipairs(cmds) do \
+        local ok, err = pcall(vim.cmd, cmd) \
+        if not ok then \
+        local line = cmd .. ": " .. (tostring(err):match("E%d+:.*") or tostring(err)) \
+        table.insert(failures, line) \
+        vim.api.nvim_echo({{line, "ErrorMsg"}}, true, {}) \
+        end end \
+        return table.concat(failures, "\\n") end)(_A)
+        """
 
     private struct Request {
         var files: [String] = []
