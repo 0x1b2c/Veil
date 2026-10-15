@@ -37,10 +37,11 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     // as true to avoid suppressing it.
     private var titleReady = false
 
-    /// Frame coalescing: set true on flush, cleared after render.
-    /// CVDisplayLink fires at screen refresh rate and only renders when dirty,
-    /// preventing main-thread vsync stalls when nvim flushes faster than 60fps.
-    private var needsRender = false
+    /// Frame coalescing: a render is requested on flush and cleared once presented.
+    /// CVDisplayLink fires at screen refresh rate and only renders when the gate
+    /// allows it, preventing main-thread vsync stalls when nvim flushes faster
+    /// than 60fps and never showing a batch whose flush has not arrived.
+    private var frameGate = FrameGate()
     private var displayLink: CVDisplayLink?
     private var displayLinkContext: Unmanaged<DisplayLinkContext>?
 
@@ -254,11 +255,10 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             for await batch in events {
                 for event in batch {
                     grid.apply(event)
+                    // Don't render on flush; the CVDisplayLink callback renders
+                    // at screen refresh rate once the gate allows it.
+                    frameGate.apply(event)
                     switch event {
-                    case .flush:
-                        // Don't render immediately; mark dirty and let the
-                        // CVDisplayLink callback render at screen refresh rate.
-                        needsRender = true
                     case .setTitle(let title):
                         if titleReady {
                             // Replace nvim's hardcoded "- Nvim" suffix with
@@ -278,7 +278,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                         titleReady = true
                     case .veilDebugToggle:
                         nvimView?.debugOverlayEnabled.toggle()
-                        needsRender = true
+                        frameGate.requestRender()
                     case .veilDebugCopy:
                         if let text = nvimView?.debugInfoText() {
                             NSPasteboard.general.clearContents()
@@ -393,7 +393,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     // MARK: - CVDisplayLink frame pacing
 
     /// Start a CVDisplayLink that fires at screen refresh rate.
-    /// The callback dispatches to main thread where we check needsRender
+    /// The callback dispatches to main thread where we ask the frame gate
     /// and render at most once per vsync, coalescing multiple flushes.
     private func startDisplayLink() {
         guard displayLink == nil else { return }
@@ -423,10 +423,10 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     /// Called from CVDisplayLink callback on main thread.
     /// Renders at most once per vsync, coalescing all flushes since last frame.
     fileprivate func displayLinkFired() {
-        guard needsRender, let nvimView else { return }
+        guard frameGate.shouldRender, let nvimView else { return }
         // The view has taken the dirty rows even when it could not present;
-        // keep needsRender so the next vsync retries the frame.
-        needsRender = !nvimView.render(grid: grid)
+        // the gate keeps the request so the next vsync retries the frame.
+        frameGate.frameRendered(presented: nvimView.render(grid: grid))
         grid.clearDirty()
     }
 
@@ -492,7 +492,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
 
     func nvimViewNeedsDisplay(_ view: NvimView) {
         grid.markAllRowsDirty()
-        needsRender = true
+        frameGate.requestRender()
     }
 
     func redraw() {
@@ -502,7 +502,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         // to a white background which cause white flash.
         guard grid.size != .zero else { return }
         grid.markAllRowsDirty()
-        needsRender = true
+        frameGate.requestRender()
     }
 
     func windowDidResize(to size: NSSize) {
