@@ -20,6 +20,10 @@ struct VeilCLI {
             launchArguments.insert("-d", at: 0)
             arguments.nvimArgs.insert("-d", at: 0)
         }
+        if let usageError = arguments.usageError {
+            fputs("veil: \(usageError)\n", stderr)
+            exit(1)
+        }
 
         if arguments.listWorkspaces {
             exit(WorkspaceLauncher.printWorkspaces() ? 0 : 1)

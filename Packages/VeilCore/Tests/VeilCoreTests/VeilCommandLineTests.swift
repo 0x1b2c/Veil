@@ -149,6 +149,27 @@ struct VeilCommandLineTests {
         #expect(result.nvimArgs == ["file.txt"])
     }
 
+    @Test func connectWithFilesIsRefused() throws {
+        let result = VeilCommandLine.parse([
+            "/path/to/veil", "--connect", "host:6666", "file.txt",
+        ])
+        let message = try #require(result.usageError)
+        #expect(message.contains("file.txt"))
+        #expect(message.contains("host:6666"))
+    }
+
+    @Test func connectAloneIsAccepted() {
+        let result = VeilCommandLine.parse([
+            "/path/to/veil", "--connect", "host:6666", "--workspace", "proj",
+        ])
+        #expect(result.usageError == nil)
+    }
+
+    @Test func filesWithoutConnectAreAccepted() {
+        let result = VeilCommandLine.parse(["/path/to/veil", "-d", "a.txt", "b.txt"])
+        #expect(result.usageError == nil)
+    }
+
     @Test func connectMissingValue() {
         let result = VeilCommandLine.parse(["/path/to/veil", "--connect"])
         #expect(result.remoteAddress == nil)

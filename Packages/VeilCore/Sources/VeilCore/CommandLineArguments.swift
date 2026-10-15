@@ -15,6 +15,17 @@ public enum VeilCommandLine {
         public var workspace: String?
         /// --workspaces: list registered workspace servers and exit.
         public var listWorkspaces = false
+
+        /// Why this combination cannot be honored, nil when it can. File
+        /// arguments next to --connect name paths on this machine, which
+        /// mean nothing to the nvim at the remote address, so they are
+        /// refused instead of silently dropped.
+        public var usageError: String? {
+            guard let remoteAddress, let argument = nvimArgs.first else { return nil }
+            return "--connect takes no files or nvim arguments (got '\(argument)'): paths name "
+                + "files on this machine, not on the nvim at \(remoteAddress); open files with "
+                + "veil on the machine running that nvim"
+        }
     }
 
     public static func parse(_ rawArgs: [String]) -> ParsedArguments {
