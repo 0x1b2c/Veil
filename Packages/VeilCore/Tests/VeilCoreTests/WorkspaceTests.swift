@@ -234,4 +234,31 @@ struct WorkspaceUserVarTests {
         let decoded = try JSONDecoder().decode(WorkspaceUserVar.Payload.self, from: json)
         #expect(decoded == payload)
     }
+
+    @Test func sequenceGoesToStdoutWhenItIsTheTerminal() {
+        var opened = false
+        let terminal = WorkspaceUserVar.terminal(
+            stdoutIsTerminal: true,
+            openControllingTerminal: {
+                opened = true
+                return nil
+            })
+        #expect(terminal === FileHandle.standardOutput)
+        #expect(!opened)
+    }
+
+    @Test func redirectedStdoutSendsTheSequenceToTheControllingTerminal() {
+        // `veil foo.txt | cat` or `$(veil foo.txt)`: wezterm only parses
+        // what reaches the pane's terminal.
+        let tty = FileHandle.nullDevice
+        let terminal = WorkspaceUserVar.terminal(
+            stdoutIsTerminal: false, openControllingTerminal: { tty })
+        #expect(terminal === tty)
+    }
+
+    @Test func withoutAnyTerminalThereIsNowhereToSendTheSequence() {
+        let terminal = WorkspaceUserVar.terminal(
+            stdoutIsTerminal: false, openControllingTerminal: { nil })
+        #expect(terminal == nil)
+    }
 }

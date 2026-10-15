@@ -63,7 +63,18 @@ enum WorkspaceLauncher {
             fputs("veil: failed to encode workspace user var\n", stderr)
             return false
         }
-        FileHandle.standardOutput.write(data)
+        guard
+            let terminal = WorkspaceUserVar.terminal(
+                stdoutIsTerminal: isatty(STDOUT_FILENO) == 1,
+                openControllingTerminal: { FileHandle(forWritingAtPath: "/dev/tty") })
+        else {
+            fputs(
+                "veil: workspace '\(name)' is ready, but no window can be "
+                    + "requested: stdout is not a terminal and there is no controlling "
+                    + "terminal to tell wezterm through\n", stderr)
+            return false
+        }
+        terminal.write(data)
         return true
     }
 

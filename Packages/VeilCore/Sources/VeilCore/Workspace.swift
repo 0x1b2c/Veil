@@ -216,4 +216,14 @@ public enum WorkspaceUserVar {
         guard let json = try? encoder.encode(payload) else { return nil }
         return "\u{1B}]1337;SetUserVar=\(name)=\(json.base64EncodedString())\u{07}"
     }
+
+    /// Where to write the sequence so wezterm sees it: stdout when that is
+    /// the pane's terminal; otherwise, with stdout redirected or piped, the
+    /// controlling terminal (`/dev/tty`), which is the same pane. nil when
+    /// there is neither, and nothing can reach wezterm.
+    public static func terminal(
+        stdoutIsTerminal: Bool, openControllingTerminal: () -> FileHandle?
+    ) -> FileHandle? {
+        stdoutIsTerminal ? .standardOutput : openControllingTerminal()
+    }
 }
