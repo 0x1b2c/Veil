@@ -102,7 +102,7 @@ For Neovim/editor LSP support, run `just lsp` after cloning to generate `buildSe
 
 Veil reads your existing Neovim configuration (`~/.config/nvim/`) for editor behavior. Veil's own settings (font, keyboard shortcuts, remote bookmarks, and a few other options) live in `~/.config/veil/veil.toml`, separate from nvim's config. All fields are optional and have sensible defaults; see [`veil.sample.toml`](veil.sample.toml) for the full reference. Changes take effect on the next new window.
 
-Set `VEIL_CONFIG` to load the config from a different path, useful for managed setups (e.g. Nix/home-manager) that generate the file elsewhere. It's read from the app's own environment at launch, so setting it when the CLI forwards to a running instance has no effect.
+Set `VEIL_CONFIG` to load the config from a different path, useful for managed setups (e.g. Nix/home-manager) that generate the file elsewhere. The app reads it from its own environment at launch, so setting it when the CLI forwards to a running instance does not change the app's settings. The `veil` CLI reads `workspace_host` (see [Remote Neovim](#remote-neovim)) from the same file, and looks for that file through `VEIL_CONFIG` in its own environment.
 
 ### Font
 

@@ -148,9 +148,9 @@ enum WorkspaceLauncher {
     /// The server for `root`: the registered one when it answers, else a
     /// freshly spawned and registered one. nil, reported on stderr, when
     /// the registered one is busy or unreachable, or no new one could be
-    /// started. The
-    /// registry stays locked throughout, so a concurrent run for the same
-    /// root waits, then finds this server instead of spawning another.
+    /// started. The registry stays locked throughout, so a concurrent run
+    /// for the same root waits, then finds this server instead of spawning
+    /// another.
     private static func prepareServer(
         root: String, name: String, host: String
     ) -> WorkspaceRegistry.Entry? {
