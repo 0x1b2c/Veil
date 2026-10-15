@@ -139,6 +139,54 @@ struct WorkspaceRegistryTests {
     }
 }
 
+struct WorkspaceServerStateTests {
+    private let addr = "127.0.0.1:6991"
+
+    /// `ps -p <pid> -o command=` as captured for a server spawned through
+    /// `env nohup nvim --headless --listen`: argv[0] is the full path.
+    private var serverCommand: String { "/opt/homebrew/bin/nvim --headless --listen \(addr)\n" }
+
+    @Test("@ws-003 a running server that does not answer is busy, not dead")
+    func busyServerIsNotDead() {
+        let state = WorkspaceRegistry.serverState(
+            answersProbe: false, commandLine: serverCommand, addr: addr)
+        #expect(state == .busy)
+    }
+
+    @Test func answeringServerIsAlive() {
+        let state = WorkspaceRegistry.serverState(
+            answersProbe: true, commandLine: serverCommand, addr: addr)
+        #expect(state == .alive)
+    }
+
+    @Test func missingProcessIsDead() {
+        let state = WorkspaceRegistry.serverState(
+            answersProbe: false, commandLine: nil, addr: addr)
+        #expect(state == .dead)
+    }
+
+    @Test func reusedPidIsDead() {
+        let state = WorkspaceRegistry.serverState(
+            answersProbe: false, commandLine: "/usr/bin/ssh-agent -l\n", addr: addr)
+        #expect(state == .dead)
+    }
+
+    @Test func serverOnAnotherAddressIsDead() {
+        // A port that merely shares a prefix with ours is a different server.
+        let state = WorkspaceRegistry.serverState(
+            answersProbe: false,
+            commandLine: "/opt/homebrew/bin/nvim --headless --listen 127.0.0.1:69910\n",
+            addr: addr)
+        #expect(state == .dead)
+    }
+
+    @Test func otherProgramListeningOnOurAddressIsDead() {
+        let state = WorkspaceRegistry.serverState(
+            answersProbe: false, commandLine: "/usr/bin/nc --listen \(addr)", addr: addr)
+        #expect(state == .dead)
+    }
+}
+
 struct WorkspaceUserVarTests {
     @Test func sequenceCarriesDecodablePayload() throws {
         let payload = WorkspaceUserVar.Payload(

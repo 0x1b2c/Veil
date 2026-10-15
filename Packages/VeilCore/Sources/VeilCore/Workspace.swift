@@ -5,7 +5,7 @@ import Foundation
 /// A wezterm mux pane is client-agnostic: the same shell can be viewed from
 /// several attached GUI clients at once, so no environment variable can say
 /// who is watching. What the mux does know is which client's keyboard was
-/// used last — the client whose `idle_time` is smallest at the moment the
+/// used last: the client whose `idle_time` is smallest at the moment the
 /// command runs is the one that just typed it.
 public enum WorkspaceViewer {
     public struct Client: Decodable, Equatable {
@@ -83,7 +83,7 @@ public enum WorkspaceViewer {
     /// answer cannot be determined (unparseable or empty client list, or a
     /// remote winner whose idle time exceeds the trust threshold); callers
     /// must then fall back to plain local behavior. A local winner needs no
-    /// threshold — falling back would mean the same thing.
+    /// threshold; falling back would mean the same thing.
     public static func location(
         ofFreshestClientIn json: Data, localHostname: String
     ) -> Location? {
@@ -100,10 +100,14 @@ public enum WorkspaceViewer {
 }
 
 /// Schema of `~/.local/state/veil/registry.json`, the per-host table of
-/// headless workspace servers: `{ "<project root>": {port, pid} }`. The pid
-/// is recorded for reaping only — liveness is always a socket probe, never
-/// a pid check (pids get reused, and a live pid says nothing about the
-/// listen socket).
+/// headless workspace servers: `{ "<project root>": {port, pid} }`.
+///
+/// Liveness is the pid, not the socket: an nvim blocked in `system()`, `:!cmd`
+/// or a long Lua loop stops answering RPC while still holding the user's
+/// unsaved buffers, so a silent socket only means "cannot take a command
+/// right now". A server is gone only when its pid no longer runs our nvim
+/// for that address, either because the process exited or because the pid
+/// was reused; only then may its entry be dropped. See `serverState`.
 public enum WorkspaceRegistry {
     public struct Entry: Codable, Equatable {
         public var port: Int
@@ -127,6 +131,46 @@ public enum WorkspaceRegistry {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return try encoder.encode(table)
+    }
+
+    /// Where a registered server stands. The raw value is the label
+    /// `veil --workspaces` prints.
+    public enum ServerState: String, Equatable {
+        /// Answers RPC; files can be sent to it.
+        case alive
+        /// Still running but not answering, typically blocked on a
+        /// long-running command. Must be left alone: it may hold unsaved work.
+        case busy
+        /// The recorded pid is gone or now belongs to another program.
+        case dead
+    }
+
+    /// - Parameters:
+    ///   - answersProbe: whether the server answered an RPC at `addr`.
+    ///   - commandLine: `ps -o command=` of the entry's pid, nil when no
+    ///     such process exists.
+    ///   - addr: the `host:port` the server was spawned to listen on.
+    public static func serverState(
+        answersProbe: Bool, commandLine: String?, addr: String
+    ) -> ServerState {
+        if answersProbe { return .alive }
+        guard let commandLine, isServerCommand(commandLine, listeningOn: addr) else {
+            return .dead
+        }
+        return .busy
+    }
+
+    /// Whether `commandLine` is an nvim listening on exactly `addr`. argv[0]
+    /// shows as a full path (`/opt/homebrew/bin/nvim`) even though the
+    /// server is spawned as bare `nvim`, so only its last component counts.
+    private static func isServerCommand(_ commandLine: String, listeningOn addr: String) -> Bool {
+        let words = commandLine.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard let program = words.first,
+            URL(fileURLWithPath: program).lastPathComponent == "nvim",
+            let listen = words.firstIndex(of: "--listen"),
+            listen + 1 < words.count
+        else { return false }
+        return words[listen + 1] == addr
     }
 }
 

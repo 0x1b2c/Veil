@@ -39,13 +39,17 @@ enum WorkspaceLauncher {
         var table = loadRegistry()
 
         var port: Int
-        if let entry = table[root], probe("\(host):\(entry.port)") {
+        let entry = table[root]
+        let state = entry.map { serverState(of: $0, addr: "\(host):\($0.port)") } ?? .dead
+        if let entry, state == .alive {
             port = entry.port
+        } else if let entry, state == .busy {
+            reportBusy(name: name, entry: entry, addr: "\(host):\(entry.port)")
+            return false
         } else {
-            if let entry = table[root] {
-                reap(entry: entry, addr: "\(host):\(entry.port)")
-                table[root] = nil
-            }
+            // Gone, or its pid now runs something else: forget the entry
+            // without signaling anything.
+            table[root] = nil
             guard let picked = pickPort(host: host, table: table) else {
                 fputs("veil: no free workspace port in \(portRange)\n", stderr)
                 return false
@@ -75,7 +79,7 @@ enum WorkspaceLauncher {
         let table = loadRegistry()
         let host = listenHost()
         for (root, entry) in table.sorted(by: { $0.key < $1.key }) {
-            let status = probe("\(host):\(entry.port)") ? "alive" : "dead"
+            let status = serverState(of: entry, addr: "\(host):\(entry.port)").rawValue
             let name = URL(fileURLWithPath: root).lastPathComponent
             print(
                 status.padded(to: 6) + name.padded(to: 24) + "\(entry.port)".padded(to: 6) + root)
@@ -129,19 +133,33 @@ enum WorkspaceLauncher {
             .status == 0
     }
 
-    /// Forget a dead registry entry. Kill the recorded pid only when its
-    /// command line proves it is still our nvim for this exact address — a
-    /// reused pid must never take down an unrelated process. Otherwise the
-    /// orphan stays alive and visible in `veil --workspaces`.
-    private static func reap(entry: WorkspaceRegistry.Entry, addr: String) {
-        guard entry.pid > 0,
-            let result = runCapture(
-                "/bin/ps", ["-p", "\(entry.pid)", "-o", "command="], timeout: 3),
-            result.status == 0,
-            let command = String(data: result.stdout, encoding: .utf8),
-            command.contains("nvim --headless --listen \(addr)")
-        else { return }
-        kill(entry.pid, SIGTERM)
+    /// Classifies a registry entry by its pid's command line as well as
+    /// the socket, so a server that is merely blocked is never mistaken for
+    /// a dead one (see `WorkspaceRegistry.serverState`).
+    private static func serverState(
+        of entry: WorkspaceRegistry.Entry, addr: String
+    ) -> WorkspaceRegistry.ServerState {
+        WorkspaceRegistry.serverState(
+            answersProbe: probe(addr), commandLine: commandLine(ofPid: entry.pid), addr: addr)
+    }
+
+    /// nil when no such process exists. A non-positive pid is never looked
+    /// up: `ps -p 0` would describe the kernel, not a workspace server.
+    private static func commandLine(ofPid pid: Int32) -> String? {
+        guard pid > 0,
+            let result = runCapture("/bin/ps", ["-p", "\(pid)", "-o", "command="], timeout: 3),
+            result.status == 0
+        else { return nil }
+        return String(data: result.stdout, encoding: .utf8)
+    }
+
+    /// A busy server may hold unsaved buffers, so it is neither signaled
+    /// nor replaced; the user retries once the blocking command finishes.
+    private static func reportBusy(name: String, entry: WorkspaceRegistry.Entry, addr: String) {
+        fputs(
+            "veil: workspace '\(name)' is busy: its nvim (pid \(entry.pid), \(addr)) is running "
+                + "but not answering, probably blocked on a long command. "
+                + "Left it untouched; try again once it finishes.\n", stderr)
     }
 
     private static let portRange = 6700...6899
