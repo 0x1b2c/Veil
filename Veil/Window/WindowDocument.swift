@@ -17,6 +17,10 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     /// connections; distinguishes window titles when several remote
     /// workspaces are open at once.
     var workspaceName: String?
+    /// Set once a remote connection attempt has failed. The window stays
+    /// open to show why, but no longer counts as connected to
+    /// `remoteAddress`: connecting there again replaces it.
+    private(set) var remoteConnectionFailed = false
 
     var channel: NvimChannel!
     private let grid = Grid()
@@ -110,6 +114,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                 workspaceName.map { "Veil [\($0)]" } ?? "Veil [remote: \(address)]")
             try? await channel.command("set title")
         } catch {
+            remoteConnectionFailed = true
             await channel.stop()
             presentStartupError(error)
         }
@@ -117,7 +122,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
 
     /// Race the TCP connect plus initial uiAttach against a 5 s wall-clock
     /// timeout. SocketTransport alone can't detect the case where TCP
-    /// completes (.ready) but the peer never sends data — e.g. a firewall
+    /// completes (.ready) but the peer never sends data, e.g. a firewall
     /// that accepts the SYN handshake then blackholes the payload. Wrapping
     /// the whole RPC handshake gives us one cutoff that covers both
     /// pre-.ready and post-.ready hangs. On timeout the socket is closed

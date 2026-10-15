@@ -58,7 +58,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         applyConfiguredKeyEquivalents()
         NSApp.activate(ignoringOtherApps: true)
 
-        // Defer default window creation — if openFiles: is called (Finder launch),
+        // Defer default window creation: if openFiles: is called (Finder launch),
         // a window will already exist, so we skip the default one.
         DispatchQueue.main.async {
             if let address = self.parsedArgs.remoteAddress {
@@ -106,7 +106,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     //   we reply(false) to abort termination.
     // - After all documents have exited, we reply(true) to finish termination.
     //
-    // WindowDocument.close() deliberately contains no quit logic — it only
+    // WindowDocument.close() deliberately contains no quit logic; it only
     // handles cleanup (cancel event loop, stop channel). The quit decision
     // is fully driven by the sequential loop here.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -352,7 +352,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             applyShortcut(to: item, spec: keyboard.shortcut(for: action))
         }
 
-        // 2. Default Vim keymaps — the menu-handled subset.
+        // 2. Default Vim keymaps: the menu-handled subset.
         //    When bind_default_neovim_keymaps is true, set each menu item
         //    to its built-in Cocoa shortcut. When false, clear it so the
         //    key falls through performKeyEquivalent and is synthesized as
@@ -437,7 +437,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         openRemoteConnection(to: address)
     }
 
+    /// Every remote entry, scripted or manual, comes through here, so a
+    /// window still showing an earlier failure for this address gives way
+    /// to the new attempt instead of piling up beside it.
     private func openRemoteConnection(to address: String, workspace: String? = nil) {
+        remoteDocuments(for: address).filter(\.remoteConnectionFailed).forEach { $0.close() }
         VeilConfig.current = VeilConfig.load()
         applyConfiguredKeyEquivalents()
         let doc = WindowDocument()
@@ -451,20 +455,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Scriptable remote entry (CLI --connect). Idempotent per address: if a
-    /// window is already connected to this address, activate it; otherwise
-    /// open a new remote window. Address matching is exact string comparison —
-    /// the launcher contract guarantees a single canonical form (MagicDNS
-    /// hostname), so no normalization is needed.
+    /// window is connected or still connecting to this address, activate it;
+    /// otherwise open a new remote window, replacing one whose connection
+    /// failed. Address matching is exact string comparison: the launcher
+    /// contract guarantees a single canonical form (MagicDNS hostname), so
+    /// no normalization is needed.
     func connectOrActivateRemoteWindow(address: String, workspace: String?) {
-        let existing = NSDocumentController.shared.documents
-            .compactMap { $0 as? WindowDocument }
-            .first { $0.isRemote && $0.remoteAddress == address }
+        let existing = remoteDocuments(for: address).first { !$0.remoteConnectionFailed }
         if let existing {
             existing.showWindows()
         } else {
             openRemoteConnection(to: address, workspace: workspace)
         }
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func remoteDocuments(for address: String) -> [WindowDocument] {
+        NSDocumentController.shared.documents
+            .compactMap { $0 as? WindowDocument }
+            .filter { $0.isRemote && $0.remoteAddress == address }
     }
 
     private func addConnectRemoteMenuItem() {
