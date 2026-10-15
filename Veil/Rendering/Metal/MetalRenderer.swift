@@ -548,9 +548,9 @@ nonisolated final class MetalRenderer {
                     text: text, font: font,
                     bold: lastFgAttrs.bold, italic: lastFgAttrs.italic,
                     cellSize: cellSize, cellCount: 2)
-                // Multi-cell glyphs render at their natural advance so CJK
-                // and wide ligatures keep their true aspect ratio regardless
-                // of letter_spacing. The grid cursor still steps by 2 cells.
+                // Double-width glyphs render at their natural advance so CJK
+                // keeps its true aspect ratio regardless of letter_spacing.
+                // The grid cursor still steps by 2 cells.
                 let quadW = region.drawWidth * Float(atlas.scale)
                 addQuad(
                     to: &fgVerts, x: x, y: y, w: quadW, h: cellH,

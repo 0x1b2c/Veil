@@ -30,6 +30,13 @@ struct FontVariantTests {
         #expect(traits(variant).contains(.italic))
     }
 
+    @Test func boldItalicKeepsTheBoldFaceWhenTheFamilyHasNoItalics() throws {
+        // PT Mono ships with macOS in regular and bold only.
+        let font = try #require(NSFont(name: "PTMono-Regular", size: 14))
+        let variant = fontVariant(font, bold: true, italic: true)
+        #expect(traits(variant).contains(.bold))
+    }
+
     @Test func plainTextKeepsTheGridFont() {
         #expect(fontVariant(font, bold: false, italic: false) == font)
     }

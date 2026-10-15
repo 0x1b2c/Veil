@@ -466,8 +466,10 @@ extension NvimView: NSTextInputClient {
     }
 
     func characterIndex(for point: NSPoint) -> Int {
-        let viewPoint = convert(point, from: nil)
-        let pos = gridPosition(for: viewPoint)
+        // NSTextInputClient passes the point in screen coordinates.
+        guard let window else { return NSNotFound }
+        let viewPoint = convert(window.convertPoint(fromScreen: point), from: nil)
+        guard let pos = cell(at: viewPoint) else { return NSNotFound }
 
         guard pos.row >= 0, pos.row < flatCharIndices.count else {
             return NSNotFound

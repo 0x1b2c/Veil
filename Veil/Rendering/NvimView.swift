@@ -494,10 +494,25 @@ final class NvimView: NSView {
     /// view, so points in the padding or past the edge map to the nearest cell.
     func gridPosition(for point: NSPoint) -> Position {
         let size = gridSizeForViewSize(bounds.size)
-        let col = Int(floor(point.x / cellSize.width))
-        let row = Int(floor((bounds.height - Self.gridTopPadding - point.y) / cellSize.height))
+        let position = unclampedGridPosition(for: point)
         return Position(
-            row: min(max(0, row), size.rows - 1),
-            col: min(max(0, col), size.cols - 1))
+            row: min(max(0, position.row), size.rows - 1),
+            col: min(max(0, position.col), size.cols - 1))
+    }
+
+    /// Grid cell under a view-space point, or nil when the point lies in the
+    /// padding or past the edge of the grid that fits the view.
+    func cell(at point: NSPoint) -> Position? {
+        let size = gridSizeForViewSize(bounds.size)
+        let position = unclampedGridPosition(for: point)
+        guard (0..<size.rows).contains(position.row), (0..<size.cols).contains(position.col)
+        else { return nil }
+        return position
+    }
+
+    private func unclampedGridPosition(for point: NSPoint) -> Position {
+        Position(
+            row: Int(floor((bounds.height - Self.gridTopPadding - point.y) / cellSize.height)),
+            col: Int(floor(point.x / cellSize.width)))
     }
 }

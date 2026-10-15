@@ -13,13 +13,23 @@ struct ShapedGlyph {
 /// The face of `font` for a bold and/or italic cell. Both traits are requested
 /// in one descriptor: `withSymbolicTraits` replaces the traits rather than
 /// adding to them, so applying bold and then italic yields a regular italic.
+/// A family without a bold italic face (Fira Code, PT Mono) matches no font
+/// for both traits; the italic face is tried next and then the bold one, so
+/// such text keeps one of its traits instead of losing both.
 nonisolated func fontVariant(_ font: NSFont, bold: Bool, italic: Bool) -> NSFont {
     var traits: NSFontDescriptor.SymbolicTraits = []
     if bold { traits.insert(.bold) }
     if italic { traits.insert(.italic) }
     if traits.isEmpty { return font }
-    let descriptor = font.fontDescriptor.withSymbolicTraits(traits)
-    return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
+    let candidates: [NSFontDescriptor.SymbolicTraits] =
+        bold && italic ? [traits, .italic, .bold] : [traits]
+    for candidate in candidates {
+        let descriptor = font.fontDescriptor.withSymbolicTraits(candidate)
+        if let variant = NSFont(descriptor: descriptor, size: font.pointSize) {
+            return variant
+        }
+    }
+    return font
 }
 
 /// Shape a run of text using CoreText to detect font ligatures.

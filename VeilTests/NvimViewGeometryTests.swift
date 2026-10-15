@@ -38,6 +38,36 @@ struct NvimViewGeometryTests {
         #expect(view.gridPosition(for: point) == Position(row: size.rows - 1, col: size.cols - 1))
     }
 
+    @Test func anIMELookupTakesItsPointInScreenCoordinates() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 300, y: 200, width: 800, height: 600),
+            styleMask: .borderless, backing: .buffered, defer: true)
+        window.contentView = view
+        view.flatCharIndices = (0..<10).map { row in (0..<10).map { row * 100 + $0 } }
+        let viewPoint = NSPoint(x: view.cellSize.width * 3 + 1, y: bottomEdge(ofRow: 2) + 1)
+        let screenPoint = window.convertPoint(toScreen: view.convert(viewPoint, to: nil))
+        #expect(view.characterIndex(for: screenPoint) == 203)
+    }
+
+    @Test func anIMELookupOutsideTheGridFindsNoCharacter() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 300, y: 200, width: 800, height: 600),
+            styleMask: .borderless, backing: .buffered, defer: true)
+        window.contentView = view
+        let size = view.gridSizeForViewSize(view.bounds.size)
+        view.flatCharIndices = (0..<size.rows).map { row in (0..<size.cols).map { row * 1000 + $0 }
+        }
+        let outside = [
+            NSPoint(x: 1, y: view.bounds.height - 1),
+            NSPoint(x: CGFloat(size.cols) * view.cellSize.width + 1, y: bottomEdge(ofRow: 0) + 1),
+            NSPoint(x: 1, y: bottomEdge(ofRow: size.rows - 1) - 1),
+        ]
+        for viewPoint in outside {
+            let screenPoint = window.convertPoint(toScreen: view.convert(viewPoint, to: nil))
+            #expect(view.characterIndex(for: screenPoint) == NSNotFound)
+        }
+    }
+
     @Test func columnsFollowTheCellWidth() {
         let point = NSPoint(x: view.cellSize.width * 3 + 1, y: bottomEdge(ofRow: 0) + 1)
         #expect(view.gridPosition(for: point).col == 3)
