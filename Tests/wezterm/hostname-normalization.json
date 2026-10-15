@@ -1,0 +1,12 @@
+[
+  { "hostname": "A2.local (via proxy pid 13754)", "normalized": "a2" },
+  { "hostname": "2B", "normalized": "2b" },
+  { "hostname": "2B.local", "normalized": "2b" },
+  { "hostname": "Foo.Local", "normalized": "foo" },
+  { "hostname": "a2 (proxy)", "normalized": "a2" },
+  { "hostname": "A2(proxy)", "normalized": "a2" },
+  { "hostname": "2b.tail1234.ts.net", "normalized": "2b" },
+  { "hostname": "\tA2\t", "normalized": "a2" },
+  { "hostname": " 2B", "normalized": "" },
+  { "hostname": "", "normalized": "" }
+]

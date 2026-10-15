@@ -6,12 +6,14 @@
 --
 -- When `veil` runs in a wezterm mux pane on behalf of a keyboard on another
 -- machine, it prepares a headless nvim for the project and emits the
--- `veil-edit` user var. The mux broadcasts it to every attached GUI; this
--- handler opens a Veil window connected to that nvim.
+-- `veil-edit` user var. The mux broadcasts it to every attached GUI; on the
+-- machine named by the payload's `viewer`, this handler opens a Veil window
+-- connected to that nvim, and on every other machine it does nothing.
 --
 -- The payload is JSON, as encoded by `WorkspaceUserVar.Payload` in VeilCore:
 --
---   { "host": "2b.example.ts.net", "port": 7001, "workspace": "proj" }
+--   { "host": "2b.example.ts.net", "port": 7001, "viewer": "a2",
+--     "workspace": "proj" }
 --
 -- and the handler runs `veil --veil-connect <host>:<port>
 -- --veil-workspace <workspace>`.
@@ -24,6 +26,23 @@ local wezterm = require('wezterm')
 local M = {}
 
 M.user_var = 'veil-edit'
+
+-- The comparable core of a hostname, the same rule as
+-- `WorkspaceViewer.normalize` in VeilCore: wezterm reports one machine as
+-- "A2", "A2.local", "a2.tail1234.ts.net", or "A2.local (via proxy pid
+-- 13754)" depending on the API, so keep what precedes the first space, "(",
+-- or ".", trim spaces and tabs, and lowercase. Tests/wezterm holds the case
+-- table both implementations are tested against.
+function M.normalize_hostname(hostname)
+  local core = hostname:match('^[^ (.]*')
+  core = core:gsub('^[ \t]+', ''):gsub('[ \t]+$', '')
+  return core:lower()
+end
+
+-- Whether a broadcast naming `viewer` is meant for the machine `hostname`.
+function M.is_for_this_machine(viewer, hostname)
+  return M.normalize_hostname(viewer) == M.normalize_hostname(hostname)
+end
 
 -- wezterm's Lua has no `debug` library, so this script cannot locate the
 -- bundle it was loaded from. The GUI's PATH may lack `veil` too, so look
@@ -64,6 +83,9 @@ function M.parse_request(json_parse, value)
   if type(request.workspace) ~= 'string' then
     return nil, 'payload lacks a workspace name: ' .. tostring(value)
   end
+  if type(request.viewer) ~= 'string' then
+    return nil, 'payload lacks a viewer: ' .. tostring(value)
+  end
   return request
 end
 
@@ -77,18 +99,17 @@ function M.connect_argv(veil, request)
   }
 end
 
-function M.on_user_var_changed(window, _, name, value)
+function M.on_user_var_changed(_, _, name, value)
   if name ~= M.user_var then
-    return
-  end
-  -- The broadcast reaches every attached GUI; only the one being typed in
-  -- reacts.
-  if not window:is_focused() then
     return
   end
   local request, problem = M.parse_request(wezterm.json_parse, value)
   if request == nil then
     wezterm.log_error('veil-edit: ' .. problem)
+    return
+  end
+  -- The broadcast reaches every attached GUI; only the viewer's reacts.
+  if not M.is_for_this_machine(request.viewer, wezterm.hostname()) then
     return
   end
   local candidates = M.veil_candidates(wezterm.home_dir)

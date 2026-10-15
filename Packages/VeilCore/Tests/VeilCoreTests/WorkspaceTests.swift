@@ -106,13 +106,26 @@ struct WorkspaceViewerTests {
         #expect(WorkspaceViewer.localHostname() == expected)
     }
 
-    @Test func normalizeComparesFirstLabelOnly() {
-        #expect(WorkspaceViewer.normalize(hostname: "A2.local (via proxy pid 13754)") == "a2")
-        #expect(WorkspaceViewer.normalize(hostname: "2B") == "2b")
-        #expect(WorkspaceViewer.normalize(hostname: "2B.local") == "2b")
-        #expect(WorkspaceViewer.normalize(hostname: "Foo.Local") == "foo")
-        #expect(WorkspaceViewer.normalize(hostname: "a2 (proxy)") == "a2")
-        #expect(WorkspaceViewer.normalize(hostname: "2b.tail1234.ts.net") == "2b")
+    /// One case of the hostname normalization table that this test and
+    /// the wezterm handler's Lua test (Tests/wezterm) both read, so the
+    /// handler compares hostnames exactly as `normalize` does.
+    private struct NormalizationCase: Decodable {
+        var hostname: String
+        var normalized: String
+    }
+
+    @Test func normalizeComparesFirstLabelOnly() throws {
+        let table = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("../../../../Tests/wezterm/hostname-normalization.json")
+        let cases = try JSONDecoder().decode(
+            [NormalizationCase].self, from: Data(contentsOf: table))
+        #expect(!cases.isEmpty)
+        for testCase in cases {
+            #expect(
+                WorkspaceViewer.normalize(hostname: testCase.hostname) == testCase.normalized,
+                "normalizing \(testCase.hostname.debugDescription)")
+        }
     }
 
     @Test func fqdnAndLocalSuffixNameTheSameMachine() {

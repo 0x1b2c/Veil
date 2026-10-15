@@ -10,8 +10,12 @@ local system_veil = '/Applications/Veil.app/Contents/bin/veil'
 local home_dir = '/Users/someone'
 local user_veil = home_dir .. '/Applications/Veil.app/Contents/bin/veil'
 
-local function fake_wezterm()
+-- `host` is what wezterm.hostname() reports on the machine the fake runs on.
+local function fake_wezterm(host)
   local fake = { home_dir = home_dir, handlers = {}, spawned = {}, errors = {} }
+  function fake.hostname()
+    return host or 'A2'
+  end
   function fake.on(event, handler)
     table.insert(fake.handlers, { event = event, handler = handler })
   end
@@ -39,16 +43,10 @@ local function load_script(fake, installed)
   return module
 end
 
-local focused_window = {
-  is_focused = function()
-    return true
-  end,
-}
-
-local function broadcast(fake, window, name, value)
+local function broadcast(fake, name, value)
   for _, registration in ipairs(fake.handlers) do
     if registration.event == 'user-var-changed' then
-      registration.handler(window, {}, name, value)
+      registration.handler({}, {}, name, value)
     end
   end
 end
@@ -58,6 +56,7 @@ local function payload(fields)
     host = '2b.example.ts.net',
     port = 7001,
     workspace = 'proj',
+    viewer = 'a2',
   }, fields or {}))
 end
 
@@ -85,7 +84,7 @@ test('@ws-007 one dofile line connects this machine to the broadcast workspace',
   expect_equal(#fake.handlers, 1)
   expect_equal(fake.handlers[1].event, 'user-var-changed')
 
-  broadcast(fake, focused_window, 'veil-edit', payload())
+  broadcast(fake, 'veil-edit', payload())
 
   expect_equal(fake.spawned, {
     { system_veil, '--veil-connect', '2b.example.ts.net:7001', '--veil-workspace', 'proj' },
@@ -96,27 +95,44 @@ end)
 test('other user vars are left alone', function()
   local fake = fake_wezterm()
   load_script(fake, { system_veil })
-  broadcast(fake, focused_window, 'something-else', payload())
+  broadcast(fake, 'something-else', payload())
   expect_equal(fake.spawned, {})
   expect_equal(fake.errors, {})
 end)
 
-test('an unfocused window ignores the broadcast', function()
-  local fake = fake_wezterm()
+test('@ws-002 a broadcast for another viewer opens nothing here', function()
+  local fake = fake_wezterm('2B')
   load_script(fake, { system_veil })
-  local unfocused_window = {
-    is_focused = function()
-      return false
-    end,
-  }
-  broadcast(fake, unfocused_window, 'veil-edit', payload())
+  broadcast(fake, 'veil-edit', payload({ viewer = 'a2' }))
   expect_equal(fake.spawned, {})
+  expect_equal(fake.errors, {})
+end)
+
+test('@ws-002 the viewer named in the broadcast opens the window', function()
+  local fake = fake_wezterm('A2.local')
+  load_script(fake, { system_veil })
+  broadcast(fake, 'veil-edit', payload({ viewer = 'a2' }))
+  expect_equal(#fake.spawned, 1)
+end)
+
+test('hostnames normalize as WorkspaceViewer.normalize does', function()
+  local veil_wezterm = load_script(fake_wezterm(), {})
+  local file = assert(io.open(repo_root .. '/Tests/wezterm/hostname-normalization.json'))
+  local cases = vim.json.decode(file:read('*a'))
+  file:close()
+  assert(#cases > 0, 'the case table is empty')
+  for _, case in ipairs(cases) do
+    local actual = veil_wezterm.normalize_hostname(case.hostname)
+    if actual ~= case.normalized then
+      error(('normalizing %q: expected %q, got %q'):format(case.hostname, case.normalized, actual))
+    end
+  end
 end)
 
 test('veil is found in ~/Applications when /Applications has none', function()
   local fake = fake_wezterm()
   load_script(fake, { user_veil })
-  broadcast(fake, focused_window, 'veil-edit', payload())
+  broadcast(fake, 'veil-edit', payload())
   expect_equal(#fake.spawned, 1)
   expect_equal(fake.spawned[1][1], user_veil)
 end)
@@ -124,14 +140,14 @@ end)
 test('/Applications wins when both have Veil', function()
   local fake = fake_wezterm()
   load_script(fake, { user_veil, system_veil })
-  broadcast(fake, focused_window, 'veil-edit', payload())
+  broadcast(fake, 'veil-edit', payload())
   expect_equal(fake.spawned[1][1], system_veil)
 end)
 
 test('a missing Veil is logged instead of spawned', function()
   local fake = fake_wezterm()
   load_script(fake, {})
-  broadcast(fake, focused_window, 'veil-edit', payload())
+  broadcast(fake, 'veil-edit', payload())
   expect_equal(fake.spawned, {})
   expect_equal(#fake.errors, 1)
   assert(fake.errors[1]:find(system_veil, 1, true), fake.errors[1])
@@ -145,10 +161,11 @@ test('a malformed payload is logged instead of spawned', function()
     payload({ host = 7 }),
     payload({ port = '7001' }),
     payload({ workspace = vim.NIL }),
+    payload({ viewer = vim.NIL }),
   }) do
     local fake = fake_wezterm()
     load_script(fake, { system_veil })
-    broadcast(fake, focused_window, 'veil-edit', value)
+    broadcast(fake, 'veil-edit', value)
     expect_equal(fake.spawned, {})
     expect_equal(#fake.errors, 1)
   end
