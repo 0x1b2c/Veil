@@ -214,8 +214,7 @@ final class NvimView: NSView {
                     scale: screenScale
                 ) {
                     let rowLayer = rowLayers[rowIdx]
-                    let y =
-                        bounds.height - CGFloat(rowIdx + 1) * cellSize.height - Self.gridTopPadding
+                    let y = originY(ofRow: rowIdx)
                     CATransaction.begin()
                     CATransaction.setDisableActions(true)
                     rowLayer.frame = CGRect(
@@ -257,7 +256,7 @@ final class NvimView: NSView {
 
     private func cursorRect(for pos: Position) -> (CGFloat, CGFloat, CGFloat, CGFloat) {
         let x: CGFloat
-        let y = bounds.height - CGFloat(pos.row + 1) * cellSize.height - Self.gridTopPadding
+        let y = originY(ofRow: pos.row)
         let width: CGFloat
         let height: CGFloat
 
@@ -483,9 +482,22 @@ final class NvimView: NSView {
 
     // MARK: - Coordinate conversion
 
+    /// View-space y of the bottom edge of grid row `row`. Rows start below
+    /// `gridTopPadding` and stack downward; every view-space placement of a
+    /// row and `gridPosition(for:)` share this so drawing and hit-testing
+    /// cannot disagree.
+    func originY(ofRow row: Int) -> CGFloat {
+        bounds.height - Self.gridTopPadding - CGFloat(row + 1) * cellSize.height
+    }
+
+    /// Grid cell under a view-space point, clamped to the grid that fits the
+    /// view, so points in the padding or past the edge map to the nearest cell.
     func gridPosition(for point: NSPoint) -> Position {
-        let col = Int(point.x / cellSize.width)
-        let row = Int((bounds.height - point.y) / cellSize.height)
-        return Position(row: max(0, row), col: max(0, col))
+        let size = gridSizeForViewSize(bounds.size)
+        let col = Int(floor(point.x / cellSize.width))
+        let row = Int(floor((bounds.height - Self.gridTopPadding - point.y) / cellSize.height))
+        return Position(
+            row: min(max(0, row), size.rows - 1),
+            col: min(max(0, col), size.cols - 1))
     }
 }

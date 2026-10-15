@@ -229,9 +229,7 @@ extension NvimView {
         }
 
         let originX = CGFloat(markedPosition.col) * cellSize.width
-        let originY =
-            bounds.height - CGFloat(markedPosition.row + 1) * cellSize.height
-            - Self.gridTopPadding
+        let rowY = originY(ofRow: markedPosition.row)
         let screenScale = window?.backingScaleFactor ?? 2.0
 
         // Compute cell counts per character (CJK = 2, others = 1)
@@ -302,7 +300,7 @@ extension NvimView {
         markedLayer.contentsScale = screenScale
         markedLayer.frame = CGRect(
             x: originX,
-            y: originY,
+            y: rowY,
             width: width,
             height: height
         )
