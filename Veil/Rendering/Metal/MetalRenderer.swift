@@ -24,7 +24,7 @@ nonisolated final class MetalRenderer {
     // Only rows marked dirty are rebuilt; unchanged rows reuse cached vertices.
     // Each row's background and foreground vertices are stored separately.
     private var rowBackgroundVertices: [[Vertex]] = []
-    private var rowForegroundVertices: [[Vertex]] = []
+    private(set) var rowForegroundVertices: [[Vertex]] = []
     private var cachedRows: Int = 0
     private var cachedCols: Int = 0
     private(set) var lastVertexCount: Int = 0
@@ -33,6 +33,17 @@ nonisolated final class MetalRenderer {
     // dirty rows every frame and may forget them afterwards, so rows that a
     // frame could not rebuild stay here until a later frame does.
     private var pendingRows = IndexSet()
+
+    // Everything baked into the cached vertices besides the cells themselves:
+    // atlas texture coordinates and pixel geometry. When any of it changes,
+    // every cached row is stale, dirty or not.
+    private struct RowCacheBasis: Equatable {
+        var atlasGeneration: Int
+        var scale: Float
+        var cellSize: CGSize
+        var gridTopPadding: CGFloat
+    }
+    private var rowCacheBasis: RowCacheBasis?
 
     init() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
@@ -119,18 +130,39 @@ nonisolated final class MetalRenderer {
         // Resize per-row caches when grid dimensions change
         resizeRowCaches(rows: rows, cols: cols)
 
+        let basis = RowCacheBasis(
+            atlasGeneration: atlas.generation, scale: scale,
+            cellSize: cellSize, gridTopPadding: gridTopPadding)
+        if basis != rowCacheBasis {
+            pendingRows = IndexSet(0..<rows)
+        }
+
         // Rebuild vertex data only for rows that Grid marked as dirty.
         // Cursor is drawn as an independent quad, so cursor movement alone
-        // does not require rebuilding row vertices.
-        for row in pendingRows {
-            guard row < rows, cells[row].count >= cols else { continue }
-            rebuildRowVertices(
-                row: row, cells: cells[row], attributes: attributes,
-                cols: cols, atlas: atlas, font: font, cellSize: cellSize,
-                cellW: cellW, cellH: cellH, topPad: topPad, scale: scale,
-                defaultFg: defaultFg, defaultBg: defaultBg)
-        }
+        // does not require rebuilding row vertices. A new glyph can grow or
+        // clear the atlas midway, invalidating rows already rebuilt in this
+        // pass; rebuild everything again then. The second pass finds every
+        // glyph cached, so it settles; the bound only guards a screen whose
+        // glyphs cannot all fit in the largest atlas.
+        var passes = 0
+        repeat {
+            let generation = atlas.generation
+            for row in pendingRows {
+                guard row < rows, cells[row].count >= cols else { continue }
+                rebuildRowVertices(
+                    row: row, cells: cells[row], attributes: attributes,
+                    cols: cols, atlas: atlas, font: font, cellSize: cellSize,
+                    cellW: cellW, cellH: cellH, topPad: topPad, scale: scale,
+                    defaultFg: defaultFg, defaultBg: defaultBg)
+            }
+            passes += 1
+            if atlas.generation == generation { break }
+            pendingRows = IndexSet(0..<rows)
+        } while passes < 3
         pendingRows.removeAll()
+        rowCacheBasis = RowCacheBasis(
+            atlasGeneration: atlas.generation, scale: scale,
+            cellSize: cellSize, gridTopPadding: gridTopPadding)
 
         // Count total vertices across all row caches + cursor quad,
         // then write directly into the Metal buffer to avoid assembling

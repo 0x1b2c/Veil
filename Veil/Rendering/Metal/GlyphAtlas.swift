@@ -192,7 +192,14 @@ nonisolated final class GlyphAtlas {
     private let atlasWidth: Int
     private(set) var atlasHeight: Int
     private let maxAtlasHeight = 8192
-    var scale: CGFloat = 2.0
+    /// Bitmaps are rasterized at this scale, so a change discards them all.
+    var scale: CGFloat = 2.0 {
+        didSet { if scale != oldValue { invalidate() } }
+    }
+    /// Bumped whenever regions handed out earlier stop being valid (the atlas
+    /// grew or was cleared). Callers that keep texture coordinates around
+    /// compare it to know when to look them up again.
+    private(set) var generation = 0
     private var shapingCache: [ShapingKey: [ShapedGlyph]] = [:]
 
     init(device: MTLDevice, size: Int = 2048) {
@@ -327,6 +334,7 @@ nonisolated final class GlyphAtlas {
         currentRowHeight = 0
         // Clear texture
         texture = createTexture(width: atlasWidth, height: atlasHeight)
+        generation += 1
     }
 
     // MARK: - Private
@@ -368,6 +376,7 @@ nonisolated final class GlyphAtlas {
 
         texture = newTexture
         atlasHeight = newHeight
+        generation += 1
     }
 
     private func createTexture(width: Int, height: Int) -> MTLTexture {
