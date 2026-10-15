@@ -100,7 +100,7 @@ public enum WorkspaceViewer {
 }
 
 /// Schema of `~/.local/state/veil/registry.json`, the per-host table of
-/// headless workspace servers: `{ "<project root>": {port, pid} }`.
+/// headless workspace servers: `{ "<project root>": {host, port, pid} }`.
 ///
 /// Liveness is the pid, not the socket: an nvim blocked in `system()`, `:!cmd`
 /// or a long Lua loop stops answering RPC while still holding the user's
@@ -110,12 +110,25 @@ public enum WorkspaceViewer {
 /// was reused; only then may its entry be dropped. See `serverState`.
 public enum WorkspaceRegistry {
     public struct Entry: Codable, Equatable {
+        /// The host the server was spawned to listen on. The listen host is
+        /// recomputed on every run and can drift (Tailscale down, then back),
+        /// so the server is found only where it was started. Optional because
+        /// registries written before it was recorded lack it, and a missing
+        /// required field would fail `decode` for the whole table.
+        public var host: String?
         public var port: Int
         public var pid: Int32
 
-        public init(port: Int, pid: Int32) {
+        public init(host: String? = nil, port: Int, pid: Int32) {
+            self.host = host
             self.port = port
             self.pid = pid
+        }
+
+        /// Where the server listens; an entry without a recorded host
+        /// assumes the host this run would listen on.
+        public func address(currentHost: String) -> String {
+            "\(host ?? currentHost):\(port)"
         }
     }
 

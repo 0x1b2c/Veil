@@ -49,13 +49,15 @@ enum WorkspaceLauncher {
         guard let host = listenHost() else { return false }
         var table = loadRegistry()
 
-        var port: Int
+        // Each server is looked for where it was started, which need not be
+        // where this run would start one.
+        let server: WorkspaceRegistry.Entry
         let entry = table[root]
-        let state = entry.map { serverState(of: $0, addr: "\(host):\($0.port)") } ?? .dead
+        let state = entry.map { serverState(of: $0, addr: $0.address(currentHost: host)) } ?? .dead
         if let entry, state == .alive {
-            port = entry.port
+            server = entry
         } else if let entry, state == .busy {
-            reportBusy(name: name, entry: entry, addr: "\(host):\(entry.port)")
+            reportBusy(name: name, entry: entry, addr: entry.address(currentHost: host))
             return false
         } else {
             // Gone, or its pid now runs something else: forget the entry
@@ -68,14 +70,16 @@ enum WorkspaceLauncher {
             guard let pid = spawnServer(root: root, name: name, addr: "\(host):\(picked)") else {
                 return false
             }
-            port = picked
-            table[root] = .init(port: port, pid: pid)
+            server = .init(host: host, port: picked, pid: pid)
+            table[root] = server
             saveRegistry(table)
         }
 
-        guard applyArguments(openExpression, on: "\(host):\(port)") else { return false }
+        guard applyArguments(openExpression, on: server.address(currentHost: host)) else {
+            return false
+        }
         let payload = WorkspaceUserVar.Payload(
-            host: host, port: port, workspace: name, viewer: viewer)
+            host: server.host ?? host, port: server.port, workspace: name, viewer: viewer)
         guard let sequence = WorkspaceUserVar.sequence(for: payload),
             let data = sequence.data(using: .utf8)
         else {
@@ -90,7 +94,7 @@ enum WorkspaceLauncher {
         let table = loadRegistry()
         guard let host = listenHost() else { return false }
         for (root, entry) in table.sorted(by: { $0.key < $1.key }) {
-            let status = serverState(of: entry, addr: "\(host):\(entry.port)").rawValue
+            let status = serverState(of: entry, addr: entry.address(currentHost: host)).rawValue
             let name = URL(fileURLWithPath: root).lastPathComponent
             print(
                 status.padded(to: 6) + name.padded(to: 24) + "\(entry.port)".padded(to: 6) + root)

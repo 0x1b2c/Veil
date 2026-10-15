@@ -134,6 +134,39 @@ struct WorkspaceRegistryTests {
         #expect(decoded == table)
     }
 
+    @Test func registryWrittenBeforeHostsWereRecordedKeepsItsEntries() {
+        // decode() turns any failure into an empty table, so a field these
+        // entries lack would orphan every server they track.
+        let legacy = Data(
+            #"{ "/Users/x/proj": { "pid": 4242, "port": 6800 }, "/Users/x": { "pid": 99, "port": 6701 } }"#
+                .utf8)
+        let table = WorkspaceRegistry.decode(legacy)
+        #expect(table["/Users/x/proj"] == .init(port: 6800, pid: 4242))
+        #expect(table["/Users/x"] == .init(port: 6701, pid: 99))
+    }
+
+    @Test func recordedHostSurvivesRoundTrip() {
+        let table: WorkspaceRegistry.Table = [
+            "/Users/x/proj": .init(host: "2b.tail1234.ts.net", port: 6800, pid: 4242)
+        ]
+        let decoded = WorkspaceRegistry.decode(try! WorkspaceRegistry.encode(table))
+        #expect(decoded["/Users/x/proj"]?.host == "2b.tail1234.ts.net")
+    }
+
+    @Test func serverIsAddressedWhereItWasStartedEvenAfterTheHostChanged() {
+        // Tailscale went away after the server was spawned: probing the
+        // current fallback name would miss it and spawn a duplicate.
+        let entry = WorkspaceRegistry.Entry(
+            host: "2b.tail1234.ts.net", port: 6800, pid: 4242)
+        #expect(
+            entry.address(currentHost: "Example-Mac.local") == "2b.tail1234.ts.net:6800")
+    }
+
+    @Test func entryWithoutRecordedHostIsAddressedAtTheCurrentHost() {
+        let entry = WorkspaceRegistry.Entry(port: 6800, pid: 4242)
+        #expect(entry.address(currentHost: "127.0.0.1") == "127.0.0.1:6800")
+    }
+
     @Test func corruptDataHealsToEmpty() {
         #expect(WorkspaceRegistry.decode("{oops".data(using: .utf8)!).isEmpty)
         #expect(WorkspaceRegistry.decode(Data()).isEmpty)
