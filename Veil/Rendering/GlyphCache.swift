@@ -93,18 +93,8 @@ nonisolated final class GlyphCache: @unchecked Sendable {
     private func render(
         text: String, bold: Bool, italic: Bool, fg: Int, bg: Int, cellCount: Int = 1
     ) -> Glyph {
-        // Resolve font variant
-        var drawFont = font
-        if bold {
-            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.bold)
-            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
-        }
-        if italic {
-            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.italic)
-            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
-        }
-
-        drawFont = FontFallback.resolveFont(drawFont, for: text)
+        let drawFont = FontFallback.resolveFont(
+            fontVariant(font, bold: bold, italic: italic), for: text)
 
         let fgColor = NSColor(rgb: fg)
         let attributes: [NSAttributedString.Key: Any] = [

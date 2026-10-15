@@ -10,6 +10,18 @@ struct ShapedGlyph {
     let cellCount: Int
 }
 
+/// The face of `font` for a bold and/or italic cell. Both traits are requested
+/// in one descriptor: `withSymbolicTraits` replaces the traits rather than
+/// adding to them, so applying bold and then italic yields a regular italic.
+nonisolated func fontVariant(_ font: NSFont, bold: Bool, italic: Bool) -> NSFont {
+    var traits: NSFontDescriptor.SymbolicTraits = []
+    if bold { traits.insert(.bold) }
+    if italic { traits.insert(.italic) }
+    if traits.isEmpty { return font }
+    let descriptor = font.fontDescriptor.withSymbolicTraits(traits)
+    return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
+}
+
 /// Shape a run of text using CoreText to detect font ligatures.
 /// Handles both traditional ligatures (glyph merging, fewer glyphs) and
 /// contextual alternates (calt, same glyph count but different glyph IDs).
@@ -19,14 +31,7 @@ nonisolated func shapeRunText(
 ) -> [ShapedGlyph] {
     if !ligaturesEnabled { return perCharacterGlyphs(runText) }
 
-    var drawFont = font
-    var traits: NSFontDescriptor.SymbolicTraits = []
-    if bold { traits.insert(.bold) }
-    if italic { traits.insert(.italic) }
-    if !traits.isEmpty {
-        let descriptor = drawFont.fontDescriptor.withSymbolicTraits(traits)
-        drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
-    }
+    let drawFont = fontVariant(font, bold: bold, italic: italic)
 
     let attributes: [NSAttributedString.Key: Any] = [.font: drawFont]
     let attrString = NSAttributedString(string: runText, attributes: attributes)
@@ -351,16 +356,7 @@ nonisolated final class GlyphAtlas {
     private func variantFont(_ font: NSFont, bold: Bool, italic: Bool, for text: String)
         -> NSFont
     {
-        var drawFont = font
-        if bold {
-            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.bold)
-            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
-        }
-        if italic {
-            let descriptor = drawFont.fontDescriptor.withSymbolicTraits(.italic)
-            drawFont = NSFont(descriptor: descriptor, size: drawFont.pointSize) ?? drawFont
-        }
-        return FontFallback.resolveFont(drawFont, for: text)
+        FontFallback.resolveFont(fontVariant(font, bold: bold, italic: italic), for: text)
     }
 
     /// Allocate space for an entry `drawWidth` points wide, rasterize it with
