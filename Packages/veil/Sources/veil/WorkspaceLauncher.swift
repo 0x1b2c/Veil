@@ -313,7 +313,8 @@ enum WorkspaceLauncher {
     /// on the server. `--remote-expr`, unlike `--remote`, fails at once
     /// when the server is unreachable instead of editing locally. Only a
     /// failure to open the files is fatal; a `+cmd` that fails afterwards
-    /// is reported and the window still opens, as a local nvim would.
+    /// is reported and the window still opens, as a local nvim would. So
+    /// does a file left with a swap file, opened read-only with a note.
     private static func applyArguments(_ openExpression: String?, on addr: String) -> Bool {
         guard let openExpression else { return true }
         let result = runCapture(

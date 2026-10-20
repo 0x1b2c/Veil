@@ -21,6 +21,13 @@ import Foundation
 /// command that fails afterwards does not undo the open or stop the
 /// commands after it: each failure is recorded in nvim's message history
 /// and returned in the reply, one `<command>: <error>` per line.
+///
+/// A file whose swap file was left by an nvim that ended abnormally does
+/// not fail the open. A local nvim would ask whether to recover it, but
+/// the server has no one to ask, so the file opens read-only, the swap
+/// file is kept, and the reply carries a line suggesting `:recover`. A
+/// choice nvim already made for the swap file (for one an nvim still
+/// running holds, it edits anyway with a warning) is left as it is.
 public enum WorkspaceNvimArguments {
     public struct UnsupportedArgument: Error, Equatable {
         public var argument: String
@@ -45,34 +52,45 @@ public enum WorkspaceNvimArguments {
         let request = try parse(nvimArgs, cwd: cwd)
         var commands = request.openCommands() + request.readonlyCommands() + request.userCommands()
         guard !commands.isEmpty else { return nil }
-        let open = request.files.isEmpty ? nil : commands.removeFirst()
-        let applied =
-            "luaeval(" + vimLiteral(runEachRecordingFailures) + ", ["
-            + commands.joined(separator: ", ") + "])"
-        guard let open else { return applied }
-        // An error while opening fails the whole expression; the list keeps
-        // the open ahead of the rest and yields only the failures.
-        return "[execute([\(open)]), \(applied)][1]"
+        let open = request.files.isEmpty ? "''" : commands.removeFirst()
+        return "luaeval(" + vimLiteral(openThenRunEach) + ", [" + open + ", ["
+            + commands.joined(separator: ", ") + "]])"
     }
 
-    /// The failed commands in a reply to `remoteExpression`, each as
-    /// `<command>: <error>`.
+    /// The lines of a reply to `remoteExpression`: each failed command as
+    /// `<command>: <error>`, after a line for each file opened read-only
+    /// because of a swap file.
     public static func commandFailures(inReply reply: String) -> [String] {
         reply.split(separator: "\n").map(String.init)
     }
 
-    /// Runs each ex command in `_A` on its own, so one failure leaves the
-    /// rest to run, and returns the failures joined by newlines.
-    private static let runEachRecordingFailures = """
-        (function(cmds) local failures = {} \
+    /// Takes `[open, cmds]` in `_A`. Runs `open` (skipped when empty),
+    /// whose error fails the whole call, then each ex command in `cmds` on
+    /// its own, so one failure leaves the rest to run. Throughout, a swap
+    /// file nvim has not decided on opens its file read-only and is noted.
+    /// Returns the notes and failures joined by newlines.
+    private static let openThenRunEach = """
+        (function(a) local open, cmds = a[1], a[2] local lines = {} \
+        local group = vim.api.nvim_create_augroup("veil_workspace_swap", {clear = true}) \
+        vim.api.nvim_create_autocmd("SwapExists", {group = group, callback = function(ev) \
+        if vim.v.swapchoice ~= "" then return end \
+        vim.v.swapchoice = "o" \
+        table.insert(lines, ev.file .. ": opened read-only, a swap file was left by an " \
+        .. "nvim that ended abnormally; run :recover in it to restore unsaved changes") \
+        end}) \
+        if open ~= "" then \
+        local ok, err = pcall(vim.cmd, open) \
+        if not ok then vim.api.nvim_del_augroup_by_id(group) error(err, 0) end \
+        end \
         for _, cmd in ipairs(cmds) do \
         local ok, err = pcall(vim.cmd, cmd) \
         if not ok then \
         local line = cmd .. ": " .. (tostring(err):match("E%d+:.*") or tostring(err)) \
-        table.insert(failures, line) \
+        table.insert(lines, line) \
         vim.api.nvim_echo({{line, "ErrorMsg"}}, true, {}) \
         end end \
-        return table.concat(failures, "\\n") end)(_A)
+        vim.api.nvim_del_augroup_by_id(group) \
+        return table.concat(lines, "\\n") end)(_A)
         """
 
     private struct Request {

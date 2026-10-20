@@ -76,6 +76,31 @@ struct WorkspaceNvimArgumentsTests {
         #expect(try nvim.eval("execute('messages')").contains("E486"))
     }
 
+    @Test func aFileLeftWithASwapFileOpensReadOnlyWithARecoverHint() throws {
+        let swapDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("veil-swap-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(
+            at: swapDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: swapDirectory) }
+        // A server that dies with an unsaved change leaves its swap file.
+        let crashed = try HeadlessNvim(swapDirectory: swapDirectory)
+        defer { crashed.stop() }
+        try crashed.open(["a.txt"])
+        _ = try crashed.eval("execute('normal! ix') .. execute('preserve')")
+        crashed.kill()
+
+        let nvim = try HeadlessNvim(swapDirectory: swapDirectory)
+        defer { nvim.stop() }
+        let file = crashed.directory.appendingPathComponent("a.txt").path
+        let reply = try nvim.open([file, "+2"])
+
+        #expect(try nvim.eval("expand('%:t') .. ':' .. &readonly") == "a.txt:1")
+        #expect(try nvim.eval("line('.')") == "2")
+        let notes = WorkspaceNvimArguments.commandFailures(inReply: reply)
+        #expect(notes.count == 1)
+        #expect(notes.first?.contains(":recover") == true)
+    }
+
     @Test func barePlusGoesToLastLine() throws {
         let nvim = try HeadlessNvim()
         defer { nvim.stop() }
@@ -137,7 +162,10 @@ final class HeadlessNvim {
     private let socket: String
     private let process = Process()
 
-    init() throws {
+    /// With `swapDirectory`, the server keeps swap files there, as a
+    /// workspace server does in its user's swap directory; otherwise it
+    /// keeps none.
+    init(swapDirectory: URL? = nil) throws {
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("veil-nvim-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -148,7 +176,8 @@ final class HeadlessNvim {
         }
         socket = directory.appendingPathComponent("nvim.sock").path
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["nvim", "--clean", "--headless", "-n", "--listen", socket]
+        let swap = swapDirectory.map { ["--cmd", "set directory=\($0.path)//"] } ?? ["-n"]
+        process.arguments = ["nvim", "--clean", "--headless"] + swap + ["--listen", socket]
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
@@ -159,6 +188,12 @@ final class HeadlessNvim {
         }
         stop()
         throw Failure(message: "nvim did not start listening on \(socket)")
+    }
+
+    /// Ends the server the way a crash would, leaving its swap files.
+    func kill() {
+        Darwin.kill(process.processIdentifier, SIGKILL)
+        process.waitUntilExit()
     }
 
     func stop() {
