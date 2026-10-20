@@ -44,6 +44,8 @@
 # nvim accepts commands on this address without authentication, so a LAN
 # address exposes the workspace to every machine on that network: how far
 # it is exposed is your decision.
+# Set one IPv4 address or name, without a port. A wildcard (0.0.0.0) or an
+# IPv6 address is reported and ignored.
 # workspace_host = ""
 
 

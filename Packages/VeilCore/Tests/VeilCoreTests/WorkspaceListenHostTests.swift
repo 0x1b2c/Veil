@@ -74,3 +74,29 @@ struct WorkspaceListenHostTests {
         }
     }
 }
+
+struct WorkspaceConfiguredHostTests {
+    @Test(arguments: ["0.0.0.0", "::", "[::]", "*"])
+    func aWildcardIsRefused(host: String) throws {
+        // It would bind every interface and leave the viewer nothing to
+        // connect to.
+        let problem = try #require(WorkspaceListenHost.problem(withConfiguredHost: host))
+        #expect(problem.contains("every interface"))
+    }
+
+    @Test(arguments: ["fd7a:115c:a1e0::4", "[fd7a:115c:a1e0::4]", "::1"])
+    func anIPv6AddressIsRefused(host: String) throws {
+        let problem = try #require(WorkspaceListenHost.problem(withConfiguredHost: host))
+        #expect(problem.contains("IPv6"))
+    }
+
+    @Test func aHostWithAPortIsRefused() throws {
+        let problem = try #require(WorkspaceListenHost.problem(withConfiguredHost: "a2.local:6700"))
+        #expect(problem.contains("port"))
+    }
+
+    @Test(arguments: ["100.101.102.103", "192.168.1.20", "a2.local", "localhost", "127.0.0.1"])
+    func aSpecificHostIsAccepted(host: String) {
+        #expect(WorkspaceListenHost.problem(withConfiguredHost: host) == nil)
+    }
+}

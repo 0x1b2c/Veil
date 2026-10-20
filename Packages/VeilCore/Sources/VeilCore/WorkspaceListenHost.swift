@@ -26,6 +26,29 @@ public enum WorkspaceListenHost {
         return tailscaleIPv4Address(inTailscaleStatus: tailscaleStatus())
     }
 
+    /// Why `workspace_host` cannot be used as written, or nil when it can.
+    /// The value is both the address nvim binds and the one the viewer
+    /// connects to, so it has to name one specific address: a wildcard
+    /// binds every interface and gives the viewer nothing to connect to;
+    /// an IPv6 address does not survive the `host:port` form the address
+    /// travels in; a port is chosen per workspace and does not belong here.
+    public static func problem(withConfiguredHost host: String) -> String? {
+        let bare =
+            host.hasPrefix("[") && host.hasSuffix("]") ? String(host.dropFirst().dropLast()) : host
+        if ["0.0.0.0", "::", "*"].contains(bare) {
+            return "it would listen on every interface and give the viewer no address to "
+                + "connect to; set the one address other machines should reach"
+        }
+        var parsed = in6_addr()
+        if inet_pton(AF_INET6, bare, &parsed) == 1 {
+            return "IPv6 addresses are not supported; set an IPv4 address or a name"
+        }
+        if host.contains(":") {
+            return "set a host without a port; each workspace picks its own port"
+        }
+        return nil
+    }
+
     /// The first IPv4 entry of `Self.TailscaleIPs`, provided the backend is
     /// running: the report is not guaranteed to fail or to drop the node's
     /// addresses while Tailscale is stopped, so the state is checked

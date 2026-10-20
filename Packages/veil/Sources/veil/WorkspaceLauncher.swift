@@ -152,11 +152,22 @@ enum WorkspaceLauncher {
             })
     }
 
-    /// A config file that cannot be read is reported and treated as not
-    /// setting `workspace_host`, as the app falls back to its defaults then.
+    /// A config file that cannot be read, or a `workspace_host` that names
+    /// no single address (see `WorkspaceListenHost.problem`), is reported
+    /// and treated as not setting it, as the app falls back to its
+    /// defaults then.
     private static func configuredWorkspaceHost(in configPath: URL) -> String? {
         do {
-            return try VeilConfigFile.workspaceHost(inFileAt: configPath)
+            guard let host = try VeilConfigFile.workspaceHost(inFileAt: configPath) else {
+                return nil
+            }
+            if let problem = WorkspaceListenHost.problem(withConfiguredHost: host) {
+                fputs(
+                    "veil: ignoring workspace_host '\(host)' in \(configPath.path): \(problem)\n",
+                    stderr)
+                return nil
+            }
+            return host
         } catch {
             fputs(
                 "veil: ignoring workspace_host: cannot read \(configPath.path): "
