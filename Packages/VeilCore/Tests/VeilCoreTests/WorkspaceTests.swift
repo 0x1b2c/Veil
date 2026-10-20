@@ -179,12 +179,13 @@ struct WorkspaceRegistryTests {
     }
 
     @Test func serverIsAddressedWhereItWasStartedEvenAfterTheHostChanged() {
-        // Tailscale went away after the server was spawned: probing the
-        // current fallback name would miss it and spawn a duplicate.
+        // The server was spawned on another address than this run would
+        // listen on (workspace_host was changed since, or an older version
+        // listened on the MagicDNS name): probing the current host would
+        // miss it and spawn a duplicate.
         let entry = WorkspaceRegistry.Entry(
             host: "2b.tail1234.ts.net", port: 6800, pid: 4242)
-        #expect(
-            entry.address(currentHost: "Example-Mac.local") == "2b.tail1234.ts.net:6800")
+        #expect(entry.address(currentHost: "100.101.102.103") == "2b.tail1234.ts.net:6800")
     }
 
     @Test func entryWithoutRecordedHostIsAddressedAtTheCurrentHost() {

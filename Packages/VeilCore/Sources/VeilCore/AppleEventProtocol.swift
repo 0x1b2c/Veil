@@ -42,8 +42,9 @@ public struct VeilOpenRequest: Codable {
     /// (CLI --veil-connect). When set, the GUI connects or activates the
     /// window for this address instead of opening a local window.
     public var remoteAddress: String?
-    /// Workspace name (project-root basename) identifying the remote
-    /// instance; used for window titling.
+    /// Workspace name (the project root's last path component, `~` for
+    /// the home workspace) identifying the remote instance; used for
+    /// window titling.
     public var workspace: String?
 
     public init(

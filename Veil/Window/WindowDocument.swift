@@ -13,9 +13,9 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     var isRemote = false
     /// Address for remote connections (e.g. "192.168.1.100:6666").
     var remoteAddress: String?
-    /// Workspace name (project-root basename) for scriptable remote
-    /// connections; distinguishes window titles when several remote
-    /// workspaces are open at once.
+    /// Workspace name (the project root's last path component, `~` for
+    /// the home workspace) for scriptable remote connections; distinguishes
+    /// window titles when several remote workspaces are open at once.
     var workspaceName: String?
     /// Set once a remote connection attempt has failed. The window stays
     /// open to show why, but no longer counts as connected to
