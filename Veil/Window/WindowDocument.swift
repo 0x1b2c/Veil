@@ -46,12 +46,12 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     private var titleReady = false
 
     /// Frame coalescing: a render is requested on flush and cleared once presented.
-    /// CVDisplayLink fires at screen refresh rate and only renders when the gate
-    /// allows it, preventing main-thread vsync stalls when nvim flushes faster
-    /// than 60fps and never showing a batch whose flush has not arrived.
+    /// The display link fires at the refresh rate of the window's display and
+    /// only renders when the gate allows it, preventing main-thread vsync
+    /// stalls when nvim flushes faster than the display refreshes and never
+    /// showing a batch whose flush has not arrived.
     private var frameGate = FrameGate()
-    private var displayLink: CVDisplayLink?
-    private var displayLinkContext: Unmanaged<DisplayLinkContext>?
+    private var displayLink: CADisplayLink?
 
     private var windowController: WindowController? {
         windowControllers.first as? WindowController
@@ -265,8 +265,8 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             for await batch in events {
                 for event in batch {
                     grid.apply(event)
-                    // Don't render on flush; the CVDisplayLink callback renders
-                    // at screen refresh rate once the gate allows it.
+                    // Don't render on flush; the display link renders at the
+                    // display's refresh rate once the gate allows it.
                     frameGate.apply(event)
                     switch event {
                     case .setTitle(let title):
@@ -402,37 +402,30 @@ class WindowDocument: NSDocument, NvimViewDelegate {
             "nvim_exec_lua", params: [.string(lua), .array([.array(lineValues)])])
     }
 
-    // MARK: - CVDisplayLink frame pacing
+    // MARK: - Display link frame pacing
 
-    /// Start a CVDisplayLink that fires at screen refresh rate.
-    /// The callback dispatches to main thread where we ask the frame gate
-    /// and render at most once per vsync, coalescing multiple flushes.
+    /// Start a display link that fires once per refresh of the display the
+    /// view is on. AppKit retargets a view's display link to whichever
+    /// display the window moves to; a link created for all active displays
+    /// stays on the main display, ticks at its rate, and is never retargeted
+    /// when that display sleeps or is unplugged. It fires on the main run
+    /// loop, so a busy main thread delays one tick instead of queuing one
+    /// render request per missed vsync.
     private func startDisplayLink() {
-        guard displayLink == nil else { return }
-        var link: CVDisplayLink?
-        CVDisplayLinkCreateWithActiveCGDisplays(&link)
-        guard let link else { return }
-
-        let context = DisplayLinkContext(document: self)
-        let retained = Unmanaged.passRetained(context)
-        displayLinkContext = retained
-
-        CVDisplayLinkSetOutputCallback(link, displayLinkCallback, retained.toOpaque())
-        CVDisplayLinkStart(link)
+        guard displayLink == nil, let nvimView else { return }
+        let link = nvimView.displayLink(
+            target: DisplayLinkTarget(document: self),
+            selector: #selector(DisplayLinkTarget.fire(_:)))
+        link.add(to: .main, forMode: .common)
         displayLink = link
     }
 
     private func stopDisplayLink() {
-        if let link = displayLink {
-            CVDisplayLinkStop(link)
-            displayLink = nil
-        }
-        // Balance the passRetained from startDisplayLink
-        displayLinkContext?.release()
-        displayLinkContext = nil
+        displayLink?.invalidate()
+        displayLink = nil
     }
 
-    /// Called from CVDisplayLink callback on main thread.
+    /// Called by the display link on the main thread.
     /// Renders at most once per vsync, coalescing all flushes since last frame.
     fileprivate func displayLinkFired() {
         guard frameGate.shouldRender, let nvimView else { return }
@@ -536,31 +529,17 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     }
 }
 
-// MARK: - CVDisplayLink callback plumbing
+// MARK: - Display link target
 
-/// Prevent retain cycle: CVDisplayLink C callback captures a raw pointer
-/// to this context, which holds a weak reference back to the document.
-private final class DisplayLinkContext {
+/// The display link retains its target; this one holds the document weakly,
+/// so a link that outlives its document never keeps it alive.
+private final class DisplayLinkTarget: NSObject {
     weak var document: WindowDocument?
     init(document: WindowDocument) { self.document = document }
-}
 
-/// CVDisplayLink C function callback. Runs on a high-priority display thread,
-/// so we dispatch to main for the actual render (Metal/AppKit require it).
-private func displayLinkCallback(
-    _ displayLink: CVDisplayLink,
-    _ inNow: UnsafePointer<CVTimeStamp>,
-    _ inOutputTime: UnsafePointer<CVTimeStamp>,
-    _ flagsIn: CVOptionFlags,
-    _ flagsOut: UnsafeMutablePointer<CVOptionFlags>,
-    _ context: UnsafeMutableRawPointer?
-) -> CVReturn {
-    guard let context else { return kCVReturnSuccess }
-    let ctx = Unmanaged<DisplayLinkContext>.fromOpaque(context).takeUnretainedValue()
-    DispatchQueue.main.async {
-        ctx.document?.displayLinkFired()
+    @objc func fire(_ link: CADisplayLink) {
+        document?.displayLinkFired()
     }
-    return kCVReturnSuccess
 }
 
 private actor TimeoutFlag {
