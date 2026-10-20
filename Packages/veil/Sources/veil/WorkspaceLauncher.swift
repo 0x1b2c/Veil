@@ -223,8 +223,11 @@ enum WorkspaceLauncher {
     private static func serverState(
         of entry: WorkspaceRegistry.Entry, addr: String
     ) -> WorkspaceRegistry.ServerState {
-        WorkspaceRegistry.serverState(
-            probe: probe(addr), commandLine: commandLine(ofPid: entry.pid), addr: addr)
+        let result = WorkspaceRegistry.ProbeResult(
+            addr: addr, isOnThisMachine: LocalAddresses.isOnThisMachine,
+            rpcProbe: { probe(addr) })
+        return WorkspaceRegistry.serverState(
+            probe: result, commandLine: commandLine(ofPid: entry.pid), addr: addr)
     }
 
     /// nil when no such process exists. A non-positive pid is never looked
@@ -254,8 +257,9 @@ enum WorkspaceLauncher {
     ) {
         fputs(
             "veil: workspace '\(name)' cannot be reached: its nvim (pid \(entry.pid)) is "
-                + "still running, but \(addr), the address it listens on, does not resolve "
-                + "or refuses connections right now. Left it untouched; try again once "
+                + "still running, but \(addr), the address it listens on, is no longer on "
+                + "this machine, does not resolve, or refuses connections right now. Left it "
+                + "untouched; try again once "
                 + "the network it was started on is back.\n", stderr)
     }
 

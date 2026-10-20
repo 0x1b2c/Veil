@@ -263,6 +263,27 @@ struct WorkspaceProbeResultTests {
         #expect(WorkspaceRegistry.ProbeResult(exitStatus: 2, timedOut: false) == .failed)
     }
 
+    @Test func aServerWhoseAddressLeftThisMachineFailsWithoutAnRPCProbe() {
+        // The probe could only hang (or connect to a proxy and hang), and a
+        // hang reads as busy; an address no interface carries is unreachable.
+        var probed = false
+        let result = WorkspaceRegistry.ProbeResult(
+            addr: "192.0.2.1:6800", isOnThisMachine: { _ in false },
+            rpcProbe: {
+                probed = true
+                return .timedOut
+            })
+        #expect(result == .failed)
+        #expect(!probed)
+    }
+
+    @Test func aServerOnAnAddressOfThisMachineGetsTheRPCProbe() {
+        let result = WorkspaceRegistry.ProbeResult(
+            addr: "[fd7a:115c::4]:6800", isOnThisMachine: { $0 == "fd7a:115c::4" },
+            rpcProbe: { .timedOut })
+        #expect(result == .timedOut)
+    }
+
     @Test func probeThatCouldNotRunFailed() {
         #expect(WorkspaceRegistry.ProbeResult(exitStatus: nil, timedOut: false) == .failed)
     }

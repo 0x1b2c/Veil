@@ -156,7 +156,8 @@ public enum WorkspaceRegistry {
         /// replies.
         case timedOut
         /// It gave up before the timeout: the host does not resolve or the
-        /// connection is refused. Also when the probe could not run at all.
+        /// connection is refused. Also when the probe could not run at all,
+        /// and when the address is on no interface of this machine.
         case failed
 
         /// - Parameters:
@@ -170,6 +171,23 @@ public enum WorkspaceRegistry {
                 self = exitStatus == 0 ? .answered : .failed
             }
         }
+
+        /// The probe of a server this machine runs at `addr`. An address
+        /// no interface of this machine carries any more cannot be reached
+        /// (see `LocalAddresses`), so it fails without `rpcProbe`, which
+        /// could only hang there and so read as busy.
+        /// - Parameters:
+        ///   - isOnThisMachine: whether a host belongs to this machine.
+        ///   - rpcProbe: the RPC probe at `addr`.
+        public init(
+            addr: String, isOnThisMachine: (String) -> Bool, rpcProbe: () -> ProbeResult
+        ) {
+            guard let (host, _) = RemoteAddress.parse(addr), isOnThisMachine(host) else {
+                self = .failed
+                return
+            }
+            self = rpcProbe()
+        }
     }
 
     /// Where a registered server stands. The raw value is the label
@@ -181,8 +199,9 @@ public enum WorkspaceRegistry {
         /// long-running command. Must be left alone: it may hold unsaved work.
         case busy
         /// Still running, but the address it listens on cannot be reached
-        /// right now: the name no longer resolves or the connection is
-        /// refused, as when the network it was started on is gone.
+        /// right now: the address is no longer on this machine, the name no
+        /// longer resolves, or the connection is refused, as when the
+        /// network it was started on is gone.
         /// Left alone like a busy one; it answers again once the network
         /// it was started on is back.
         case unreachable
