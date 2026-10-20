@@ -457,9 +457,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Scriptable remote entry (CLI --veil-connect). Idempotent per address: if a
     /// window is connected or still connecting to this address, activate it;
     /// otherwise open a new remote window, replacing one whose connection
-    /// failed. Address matching is exact string comparison: the launcher
-    /// contract guarantees a single canonical form (MagicDNS hostname), so
-    /// no normalization is needed.
+    /// failed. Address matching is exact string comparison: for a given
+    /// workspace the launcher always sends the host its server was started
+    /// on, as recorded in the registry (the Tailscale IPv4 address or the
+    /// configured `workspace_host`), so no normalization is needed.
     func connectOrActivateRemoteWindow(address: String, workspace: String?) {
         let existing = remoteDocuments(for: address).first { !$0.remoteConnectionFailed }
         if let existing {

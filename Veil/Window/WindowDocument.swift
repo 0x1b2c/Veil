@@ -162,13 +162,10 @@ class WindowDocument: NSDocument, NvimViewDelegate {
         }
     }
 
-    /// Parse "host:port" (or "tcp://host:port") into components.
-    /// Uses URL parsing which handles IPv4, IPv6 bracket notation, and scheme URLs.
+    /// Parse "host:port" (or "tcp://host:port", "[ipv6]:port") into
+    /// components; see `RemoteAddress.parse`.
     private static func parseAddress(_ input: String) throws -> (host: String, port: UInt16) {
-        let url = URL(string: input) ?? URL(string: "tcp://\(input)")
-        guard let host = url?.host, !host.isEmpty, let port = url?.port,
-            let port = UInt16(exactly: port)
-        else {
+        guard let address = RemoteAddress.parse(input) else {
             throw RemoteConnectionError(
                 body: """
                     Invalid address: \(input)
@@ -176,7 +173,7 @@ class WindowDocument: NSDocument, NvimViewDelegate {
                     Expected host:port (e.g. 127.0.0.1:6666).
                     """)
         }
-        return (host, port)
+        return address
     }
 
     private func startNvim() async {
