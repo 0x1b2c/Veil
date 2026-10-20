@@ -90,12 +90,12 @@ public enum WorkspaceNvimArguments {
                 return ["'drop' .. " + files.map(escapedArgument).joined(separator: " .. ")]
             }
             if files.count == 1 {
-                return ["'tab drop' .. " + escapedArgument(first), vimLiteral("diffthis")]
+                return [Self.diffTab + " .. " + escapedArgument(first), vimLiteral("diffthis")]
             }
             // Splitting to the right of the first file in reverse order, and
             // returning to it after each split, leaves the windows in
             // argument order with the cursor in the first, as `nvim -d` does.
-            return ["'tab drop' .. " + escapedArgument(first)]
+            return [Self.diffTab + " .. " + escapedArgument(first)]
                 + files.dropFirst().reversed().flatMap { file in
                     [
                         "'belowright vertical diffsplit' .. " + escapedArgument(file),
@@ -115,6 +115,14 @@ public enum WorkspaceNvimArguments {
                     "call bufload(\(buffer)) | call setbufvar(\(buffer), '&readonly', 1)")
             }
         }
+
+        /// The command that opens the first diff file: always a tab of its
+        /// own, so the diff never joins windows the user already has, even
+        /// when that file is on screen. Only the untouched empty tab of a
+        /// fresh server is reused, which a new tab would leave behind.
+        private static let diffTab =
+            "(tabpagenr('$') == 1 && winnr('$') == 1 && bufname('') == '' && !&modified "
+            + "&& line('$') == 1 && getline(1) == '' ? 'edit' : 'tabedit')"
 
         func userCommands() -> [String] {
             commands.map(vimLiteral)

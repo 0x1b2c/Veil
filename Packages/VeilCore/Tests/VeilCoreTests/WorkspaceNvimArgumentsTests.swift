@@ -26,6 +26,26 @@ struct WorkspaceNvimArgumentsTests {
         #expect(try nvim.eval("expand('%:t')") == "a.txt")
     }
 
+    @Test func diffOfAFileAlreadyOnScreenOpensInANewTab() throws {
+        let nvim = try HeadlessNvim()
+        defer { nvim.stop() }
+        try nvim.open(["a.txt"])
+        _ = try nvim.eval("execute('vsplit c.txt')")
+        try nvim.open(["-d", "a.txt", "b.txt"])
+
+        #expect(try nvim.windowsInCurrentTab() == ["a.txt:diff", "b.txt:diff"])
+        #expect(try nvim.eval("tabpagenr('$')") == "2")
+        #expect(try nvim.eval("tabpagenr()") == "2")
+    }
+
+    @Test func diffOnAFreshServerLeavesNoEmptyTab() throws {
+        let nvim = try HeadlessNvim()
+        defer { nvim.stop() }
+        try nvim.open(["-d", "a.txt", "b.txt"])
+
+        #expect(try nvim.eval("tabpagenr('$')") == "1")
+    }
+
     @Test func diffSingleFileTurnsOnDiffMode() throws {
         let nvim = try HeadlessNvim()
         defer { nvim.stop() }
