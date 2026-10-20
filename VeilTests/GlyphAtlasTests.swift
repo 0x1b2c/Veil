@@ -54,4 +54,20 @@ final class GlyphAtlasTests {
         #expect(segments.count == 1)
         #expect(segments.first?.region.drawWidth == Float(cellSize.width) * 2)
     }
+
+    /// Devanagari word for "Hindi": its pre-base vowel sign is reordered
+    /// ahead of its consonant and its conjunct merges glyphs, so the glyphs'
+    /// string indices do not ascend.
+    let reorderedRun = "\u{0939}\u{093F}\u{0928}\u{094D}\u{0926}\u{0940}"
+
+    @Test("A run whose glyphs come out of string order is shaped without crashing")
+    func reorderedRunIsShapedCellByCell() throws {
+        let fonts = [font, NSFont(name: "Menlo", size: 14)].compactMap { $0 }
+        for font in fonts {
+            let glyphs = shapeRunText(reorderedRun, font: font, bold: false, italic: false)
+            #expect(glyphs.map(\.text).joined() == reorderedRun, "\(font.fontName)")
+            let columns = reorderedRun.count
+            #expect(glyphs.allSatisfy { $0.colOffset + $0.cellCount <= columns }, "\(font.fontName)")
+        }
+    }
 }

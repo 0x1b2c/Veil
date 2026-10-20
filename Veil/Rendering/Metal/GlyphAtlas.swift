@@ -137,6 +137,14 @@ nonisolated func shapeRunText(
         for i in 0..<glyphCount {
             let utf16Start = indices[i]
             let utf16End = (i + 1 < glyphCount) ? indices[i + 1] : runStringEnd
+            // Scripts that reorder glyphs (a Devanagari vowel sign drawn
+            // before its consonant) leave string indices out of order, so a
+            // glyph has no contiguous slice of text; draw such a run cell by
+            // cell instead.
+            guard utf16Start <= utf16End, utf16Start < utf16.count, utf16End <= utf16.count
+            else {
+                return perCharacterGlyphs(runText)
+            }
 
             let startCol = utf16ToCol[utf16Start]
             let endCol = (utf16End < utf16ToCol.count) ? utf16ToCol[utf16End] : totalCols
