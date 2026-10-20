@@ -318,7 +318,7 @@ enum WorkspaceLauncher {
         }
 
         let ready = WorkspaceServerStartup.awaitReady(
-            process, attempts: 50, interval: 0.2, answers: { probe(addr) == .answered })
+            process, timeout: 10, interval: 0.2, answers: { probe(addr) == .answered })
         guard ready else {
             fputs(
                 "veil: server for '\(name)' did not become ready on \(addr) "
