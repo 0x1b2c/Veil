@@ -107,6 +107,22 @@ public enum WorkspaceViewer {
         guard freshest.idleTime.secs < maxTrustedRemoteIdleSecs else { return nil }
         return .remote(host: host)
     }
+
+    /// The normalized hostname of the remote machine whose keyboard issued
+    /// this command, given the output of `listClientsArguments` (nil when
+    /// that failed) and this machine's hostname. nil means the keyboard is
+    /// here or its place cannot be told, and `veil` behaves as it would
+    /// without workspaces: a local window, no server, no broadcast. Only a
+    /// remote viewer diverts the command to a workspace.
+    public static func remoteViewer(
+        ofFreshestClientIn json: Data?, localHostname: String?
+    ) -> String? {
+        guard let json, let localHostname,
+            case .remote(let host) = location(
+                ofFreshestClientIn: json, localHostname: localHostname)
+        else { return nil }
+        return host
+    }
 }
 
 /// Schema of `~/.local/state/veil/registry.json`, the per-host table of
@@ -251,6 +267,52 @@ public enum WorkspaceRegistry {
         return probe == .timedOut ? .busy : .unreachable
     }
 
+    /// What a run does about the server registered for its project.
+    public enum ServerDecision: Equatable {
+        /// None is registered: start one.
+        case spawn
+        /// The registered one answers: send the files to it.
+        case reuse
+        /// The registered one is busy or unreachable and may hold unsaved
+        /// work: send it nothing, signal nothing, keep its entry, and
+        /// tell the user (see `refusal`).
+        case leaveAlone
+        /// The registered one is gone: drop its entry, signaling nothing,
+        /// and start a new one.
+        case forgetAndSpawn
+    }
+
+    /// - Parameter state: the registered server's state; nil when none is
+    ///   registered for the project.
+    public static func decision(for state: ServerState?) -> ServerDecision {
+        switch state {
+        case nil: .spawn
+        case .alive: .reuse
+        case .busy, .unreachable: .leaveAlone
+        case .dead: .forgetAndSpawn
+        }
+    }
+
+    /// What `veil` tells the user when it leaves the server of `workspace`
+    /// alone; nil for a state it does not leave alone.
+    public static func refusal(
+        for state: ServerState, workspace: String, entry: Entry, addr: String
+    ) -> String? {
+        switch state {
+        case .busy:
+            "workspace '\(workspace)' is busy: its nvim (pid \(entry.pid), \(addr)) is running "
+                + "but not answering, probably blocked on a long command. "
+                + "Left it untouched; try again once it finishes."
+        case .unreachable:
+            "workspace '\(workspace)' cannot be reached: its nvim (pid \(entry.pid)) is "
+                + "still running, but \(addr), the address it listens on, is no longer on "
+                + "this machine, does not resolve, or refuses connections right now. Left it "
+                + "untouched; try again once the network it was started on is back."
+        case .alive, .dead:
+            nil
+        }
+    }
+
     /// The label `veil --veil-workspaces` prints for `entry`. An entry with a
     /// recorded host is probed where it was started, so listing it needs no
     /// current host; one without (an older registry) needs `currentHost`, and
@@ -315,6 +377,17 @@ public enum WorkspaceUserVar {
             self.workspace = workspace
             self.viewer = viewer
         }
+    }
+
+    /// The payload that sends the viewer to `server`: at the host the
+    /// server was started on when recorded, else at `currentHost`.
+    public static func payload(
+        for server: WorkspaceRegistry.Entry, currentHost: String, workspace: String,
+        viewer: String
+    ) -> Payload {
+        Payload(
+            host: server.host ?? currentHost, port: server.port, workspace: workspace,
+            viewer: viewer)
     }
 
     public static func sequence(for payload: Payload) -> String? {

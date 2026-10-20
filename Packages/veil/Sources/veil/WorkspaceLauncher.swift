@@ -19,17 +19,10 @@ enum WorkspaceLauncher {
         guard ProcessInfo.processInfo.environment["WEZTERM_UNIX_SOCKET"] != nil else {
             return nil
         }
-        guard
-            let result = runCapture(
-                "/usr/bin/env", WorkspaceViewer.listClientsArguments,
-                timeout: 2),
-            result.status == 0,
-            let localHostname = WorkspaceViewer.localHostname(),
-            case .remote(let host) = WorkspaceViewer.location(
-                ofFreshestClientIn: result.stdout,
-                localHostname: localHostname) ?? .local
-        else { return nil }
-        return host
+        let result = runCapture("/usr/bin/env", WorkspaceViewer.listClientsArguments, timeout: 2)
+        return WorkspaceViewer.remoteViewer(
+            ofFreshestClientIn: result?.status == 0 ? result?.stdout : nil,
+            localHostname: WorkspaceViewer.localHostname())
     }
 
     // MARK: - Main flows
@@ -55,8 +48,8 @@ enum WorkspaceLauncher {
         guard applyArguments(openExpression, on: server.address(currentHost: host)) else {
             return false
         }
-        let payload = WorkspaceUserVar.Payload(
-            host: server.host ?? host, port: server.port, workspace: name, viewer: viewer)
+        let payload = WorkspaceUserVar.payload(
+            for: server, currentHost: host, workspace: name, viewer: viewer)
         guard let sequence = WorkspaceUserVar.sequence(for: payload),
             let data = sequence.data(using: .utf8)
         else {
@@ -200,16 +193,16 @@ enum WorkspaceLauncher {
                 saveRegistry(table)
             }
             let addr = entry.address(currentHost: host)
-            switch serverState(of: entry, addr: addr) {
-            case .alive:
+            let state = serverState(of: entry, addr: addr)
+            switch WorkspaceRegistry.decision(for: state) {
+            case .reuse:
                 return entry
-            case .busy:
-                reportBusy(name: name, entry: entry, addr: addr)
+            case .leaveAlone:
+                let refusal = WorkspaceRegistry.refusal(
+                    for: state, workspace: name, entry: entry, addr: addr)
+                fputs("veil: \(refusal ?? "workspace '\(name)' was left untouched")\n", stderr)
                 return nil
-            case .unreachable:
-                reportUnreachable(name: name, entry: entry, addr: addr)
-                return nil
-            case .dead:
+            case .forgetAndSpawn, .spawn:
                 // Gone, or its pid now runs something else: forget the entry
                 // without signaling anything, and on disk at once, so a spawn
                 // that fails below does not leave the stale entry behind.
@@ -267,29 +260,6 @@ enum WorkspaceLauncher {
             result.status == 0
         else { return nil }
         return String(data: result.stdout, encoding: .utf8)
-    }
-
-    /// A busy server may hold unsaved buffers, so it is neither signaled
-    /// nor replaced; the user retries once the blocking command finishes.
-    private static func reportBusy(name: String, entry: WorkspaceRegistry.Entry, addr: String) {
-        fputs(
-            "veil: workspace '\(name)' is busy: its nvim (pid \(entry.pid), \(addr)) is running "
-                + "but not answering, probably blocked on a long command. "
-                + "Left it untouched; try again once it finishes.\n", stderr)
-    }
-
-    /// Like a busy server, an unreachable one may hold unsaved buffers and
-    /// is neither signaled nor replaced; it answers again once the network
-    /// it was started on is back.
-    private static func reportUnreachable(
-        name: String, entry: WorkspaceRegistry.Entry, addr: String
-    ) {
-        fputs(
-            "veil: workspace '\(name)' cannot be reached: its nvim (pid \(entry.pid)) is "
-                + "still running, but \(addr), the address it listens on, is no longer on "
-                + "this machine, does not resolve, or refuses connections right now. Left it "
-                + "untouched; try again once "
-                + "the network it was started on is back.\n", stderr)
     }
 
     private static let portRange = 6700...6899
