@@ -97,8 +97,10 @@ enum WorkspaceLauncher {
                 serverState(of: entry, addr: $0)
             }
             let name = WorkspaceRoot.name(of: root, home: home)
+            let listedHost = WorkspaceRegistry.listedHost(of: entry, currentHost: host)
             print(
-                status.padded(to: 12) + name.padded(to: 24) + "\(entry.port)".padded(to: 6) + root)
+                status.padded(to: 12) + name.padded(to: 24) + listedHost.padded(to: 18)
+                    + "\(entry.port)".padded(to: 6) + root)
         }
         return true
     }

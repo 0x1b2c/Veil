@@ -263,6 +263,17 @@ public enum WorkspaceRegistry {
         return state("\(host):\(entry.port)").rawValue
     }
 
+    /// The host column `veil --veil-workspaces` prints for `entry`: the
+    /// host its server was started on, so a server still listening on an
+    /// address this machine no longer serves on (a LAN `workspace_host`
+    /// that was since removed) stays visible. An entry that never recorded
+    /// one shows the host this run assumes for it in parentheses, or `-`
+    /// when there is none.
+    public static func listedHost(of entry: Entry, currentHost: String?) -> String {
+        if let host = entry.host { return host }
+        return currentHost.map { "(\($0))" } ?? "-"
+    }
+
     /// Whether `commandLine` is an nvim listening on exactly `addr`. argv[0]
     /// shows as a full path (`/opt/homebrew/bin/nvim`) even though the
     /// server is spawned as bare `nvim`, so only its last component counts.

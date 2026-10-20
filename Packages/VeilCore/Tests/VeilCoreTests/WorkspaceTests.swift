@@ -413,6 +413,23 @@ struct WorkspaceListedStatusTests {
         #expect(probed == ["b.ts.net:6701"])
     }
 
+    @Test func theListShowsTheHostEachServerListensOn() {
+        // A server left on a LAN address after workspace_host was removed
+        // keeps listening there; the list must show it.
+        #expect(
+            WorkspaceRegistry.listedHost(
+                of: .init(host: "192.168.1.20", port: 6700, pid: 1), currentHost: "100.101.102.103")
+                == "192.168.1.20")
+    }
+
+    @Test func aHostOnlyAssumedFromThisRunIsMarkedAsSuch() {
+        #expect(
+            WorkspaceRegistry.listedHost(of: .init(port: 6700, pid: 1), currentHost: "100.101.102.103")
+                == "(100.101.102.103)")
+        #expect(
+            WorkspaceRegistry.listedHost(of: .init(port: 6700, pid: 1), currentHost: nil) == "-")
+    }
+
     @Test func legacyEntryWithoutAnyHostIsUnknownAndNotProbed() {
         var probed = false
         let label = WorkspaceRegistry.listedStatus(
