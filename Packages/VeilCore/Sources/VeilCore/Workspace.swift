@@ -45,6 +45,15 @@ public enum WorkspaceViewer {
     /// result cannot be trusted.
     static let maxTrustedRemoteIdleSecs: UInt64 = 5
 
+    /// The command, run through `env`, that lists wezterm's attached
+    /// clients with their hostnames and idle times. `--no-auto-start`
+    /// keeps a stale `WEZTERM_UNIX_SOCKET` (a shell that outlived its
+    /// wezterm) from starting a background mux server and then retrying the
+    /// dead socket until the caller's timeout.
+    public static let listClientsArguments = [
+        "wezterm", "cli", "--no-auto-start", "list-clients", "--format", "json",
+    ]
+
     /// wezterm decorates non-local client hostnames ("A2.local (via proxy
     /// pid 13754)") and the same machine may report itself as "2B",
     /// "2B.local", or an FQDN like "2b.tail1234.ts.net" depending on the

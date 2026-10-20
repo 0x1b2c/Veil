@@ -21,7 +21,7 @@ enum WorkspaceLauncher {
         }
         guard
             let result = runCapture(
-                "/usr/bin/env", ["wezterm", "cli", "list-clients", "--format", "json"],
+                "/usr/bin/env", WorkspaceViewer.listClientsArguments,
                 timeout: 2),
             result.status == 0,
             let localHostname = WorkspaceViewer.localHostname(),

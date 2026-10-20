@@ -3,6 +3,18 @@ import Testing
 import VeilCore
 
 struct WorkspaceViewerTests {
+    @Test func askingWhoIsTypingNeverStartsAMuxServer() {
+        // With a stale WEZTERM_UNIX_SOCKET, a plain `wezterm cli` starts a
+        // background mux server and then retries the dead socket until the
+        // watchdog kills it; `--no-auto-start` belongs to `cli`, before the
+        // subcommand.
+        let arguments = WorkspaceViewer.listClientsArguments
+        let option = arguments.firstIndex(of: "--no-auto-start")
+        let subcommand = arguments.firstIndex(of: "list-clients")
+        #expect(arguments.first == "wezterm")
+        #expect(option != nil && subcommand != nil && option! < subcommand!)
+    }
+
     /// Shape captured from a real `wezterm cli list-clients --format json`
     /// run: one local client, one attached over SSH with a decorated
     /// hostname, extra fields the decoder must tolerate.
