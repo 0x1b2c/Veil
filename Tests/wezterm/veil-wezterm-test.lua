@@ -43,10 +43,24 @@ local function load_script(fake, installed)
   return module
 end
 
-local function broadcast(fake, name, value)
+-- A pane in the domain named `domain`. A GUI attached to a mux sees the
+-- mux's panes in the client domain it attached through, named after the
+-- `unix_domains`, `ssh_domains` or `tls_clients` entry; its own panes are in
+-- the domain named "local".
+local function fake_pane(domain)
+  return {
+    get_domain_name = function()
+      return domain
+    end,
+  }
+end
+
+-- Raises the user var in a pane of `domain`, by default a mux client domain.
+local function broadcast(fake, name, value, domain)
+  local pane = fake_pane(domain or '2b')
   for _, registration in ipairs(fake.handlers) do
     if registration.event == 'user-var-changed' then
-      registration.handler({}, {}, name, value)
+      registration.handler({}, pane, name, value)
     end
   end
 end
@@ -166,6 +180,25 @@ test('a malformed payload is logged instead of spawned', function()
     local fake = fake_wezterm()
     load_script(fake, { system_veil })
     broadcast(fake, 'veil-edit', value)
+    expect_equal(fake.spawned, {})
+    expect_equal(#fake.errors, 1)
+  end
+end)
+
+test('a request raised in a pane of the local domain opens nothing', function()
+  local fake = fake_wezterm()
+  load_script(fake, { system_veil })
+  broadcast(fake, 'veil-edit', payload(), 'local')
+  expect_equal(fake.spawned, {})
+  expect_equal(#fake.errors, 1)
+  assert(fake.errors[1]:find('local', 1, true), fake.errors[1])
+end)
+
+test('a port outside 1..65535 or with a fraction is logged instead of spawned', function()
+  for _, port in ipairs({ 0, 65536, 7001.5, -1 }) do
+    local fake = fake_wezterm()
+    load_script(fake, { system_veil })
+    broadcast(fake, 'veil-edit', payload({ port = port }))
     expect_equal(fake.spawned, {})
     expect_equal(#fake.errors, 1)
   end

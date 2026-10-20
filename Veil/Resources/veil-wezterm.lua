@@ -8,7 +8,9 @@
 -- machine, it prepares a headless nvim for the project and emits the
 -- `veil-edit` user var. The mux broadcasts it to every attached GUI; on the
 -- machine named by the payload's `viewer`, this handler opens a Veil window
--- connected to that nvim, and on every other machine it does nothing.
+-- connected to that nvim, and on every other machine it does nothing. A
+-- request raised in one of the GUI's own local panes is ignored, and so is a
+-- port that is not a TCP port.
 --
 -- The payload is JSON, as encoded by `WorkspaceUserVar.Payload` in VeilCore:
 --
@@ -80,6 +82,9 @@ function M.parse_request(json_parse, value)
   if type(request.host) ~= 'string' or type(request.port) ~= 'number' then
     return nil, 'payload lacks a host and port: ' .. tostring(value)
   end
+  if request.port ~= math.floor(request.port) or request.port < 1 or request.port > 65535 then
+    return nil, 'payload port is not a TCP port: ' .. tostring(value)
+  end
   if type(request.workspace) ~= 'string' then
     return nil, 'payload lacks a workspace name: ' .. tostring(value)
   end
@@ -99,8 +104,30 @@ function M.connect_argv(veil, request)
   }
 end
 
-function M.on_user_var_changed(_, _, name, value)
+-- The domain wezterm names "local" holds the panes this GUI runs itself,
+-- including plain `ssh` sessions started in them. A mux's panes reach this
+-- GUI through a client domain named after its `unix_domains`, `ssh_domains`
+-- or `tls_clients` entry.
+M.local_domain = 'local'
+
+-- Whether a request raised in `pane` may open a window. `veil` raises it
+-- in a pane of the mux it runs under, so only those are trusted: text
+-- printed in a local pane, such as a file shown with `cat` or the output of
+-- an SSH session to another host, must not choose the address Veil
+-- connects to.
+function M.is_from_mux_pane(pane)
+  return pane:get_domain_name() ~= M.local_domain
+end
+
+function M.on_user_var_changed(_, pane, name, value)
   if name ~= M.user_var then
+    return
+  end
+  if not M.is_from_mux_pane(pane) then
+    wezterm.log_error(
+      'veil-edit: ignored a request raised in a pane of the local domain; '
+        .. 'only panes of an attached mux may open workspaces'
+    )
     return
   end
   local request, problem = M.parse_request(wezterm.json_parse, value)
