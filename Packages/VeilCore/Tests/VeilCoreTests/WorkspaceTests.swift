@@ -180,6 +180,43 @@ struct WorkspaceRegistryTests {
         #expect(entry.address(currentHost: "127.0.0.1") == "127.0.0.1:6800")
     }
 
+    @Test func legacyEntryFindsItsServerWhereTheServerSaysItListens() {
+        // Written before hosts were recorded; the server was started on a
+        // name this run would no longer listen on. Its command line still
+        // says where it is, so it is probed there instead of being taken
+        // for dead and replaced while it may hold unsaved buffers.
+        let serverCommand = "/opt/homebrew/bin/nvim --headless --listen 2b.tail1234.ts.net:6800\n"
+        let entry = WorkspaceRegistry.Entry(port: 6800, pid: 4242)
+            .adoptingListenHost(fromCommandLine: serverCommand)
+
+        #expect(entry.host == "2b.tail1234.ts.net")
+        let addr = entry.address(currentHost: "100.101.102.103")
+        #expect(addr == "2b.tail1234.ts.net:6800")
+        #expect(
+            WorkspaceRegistry.serverState(probe: .failed, commandLine: serverCommand, addr: addr)
+                == .unreachable)
+    }
+
+    @Test func aRecordedHostIsNeverReplacedFromTheCommandLine() {
+        let entry = WorkspaceRegistry.Entry(host: "100.101.102.103", port: 6800, pid: 4242)
+            .adoptingListenHost(
+                fromCommandLine: "/opt/homebrew/bin/nvim --headless --listen other:6800\n")
+        #expect(entry.host == "100.101.102.103")
+    }
+
+    @Test func aCommandLineForAnotherPortOrProgramIsNotAdopted() {
+        let entry = WorkspaceRegistry.Entry(port: 6800, pid: 4242)
+        #expect(
+            entry.adoptingListenHost(
+                fromCommandLine: "/opt/homebrew/bin/nvim --headless --listen a:68001\n"
+            ).host
+                == nil)
+        #expect(
+            entry.adoptingListenHost(fromCommandLine: "/usr/bin/nc --listen a:6800\n").host
+                == nil)
+        #expect(entry.adoptingListenHost(fromCommandLine: nil).host == nil)
+    }
+
     @Test func corruptDataHealsToEmpty() {
         #expect(WorkspaceRegistry.decode("{oops".data(using: .utf8)!).isEmpty)
         #expect(WorkspaceRegistry.decode(Data()).isEmpty)

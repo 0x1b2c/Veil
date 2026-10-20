@@ -87,11 +87,12 @@ enum WorkspaceLauncher {
             fputs(
                 "veil: no address to serve workspaces on right now (Tailscale is unavailable "
                     + "and workspace_host is not set), so workspaces registered without a "
-                    + "host cannot be probed and show as unknown; set workspace_host in "
+                    + "host whose server is not running show as unknown; set workspace_host in "
                     + "\(configPath.path) to probe them\n", stderr)
         }
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        for (root, entry) in table.sorted(by: { $0.key < $1.key }) {
+        for (root, recorded) in table.sorted(by: { $0.key < $1.key }) {
+            let entry = withListenHost(recorded)
             let status = WorkspaceRegistry.listedStatus(of: entry, currentHost: host) {
                 serverState(of: entry, addr: $0)
             }
@@ -179,7 +180,12 @@ enum WorkspaceLauncher {
 
         // Each server is looked for where it was started, which need not be
         // where this run would start one.
-        if let entry = table[root] {
+        if let recorded = table[root] {
+            let entry = withListenHost(recorded)
+            if entry != recorded {
+                table[root] = entry
+                saveRegistry(table)
+            }
             let addr = entry.address(currentHost: host)
             switch serverState(of: entry, addr: addr) {
             case .alive:
@@ -209,6 +215,15 @@ enum WorkspaceLauncher {
         table[root] = server
         saveRegistry(table)
         return server
+    }
+
+    /// `entry` with the host its server listens on filled in from the
+    /// server's command line, for an entry that never recorded one (see
+    /// `WorkspaceRegistry.Entry.adoptingListenHost`).
+    private static func withListenHost(_ entry: WorkspaceRegistry.Entry) -> WorkspaceRegistry.Entry
+    {
+        guard entry.host == nil else { return entry }
+        return entry.adoptingListenHost(fromCommandLine: commandLine(ofPid: entry.pid))
     }
 
     private static func probe(_ addr: String) -> WorkspaceRegistry.ProbeResult {

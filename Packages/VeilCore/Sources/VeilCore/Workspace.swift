@@ -131,6 +131,24 @@ public enum WorkspaceRegistry {
         public func address(currentHost: String) -> String {
             "\(host ?? currentHost):\(port)"
         }
+
+        /// This entry with the host its server listens on, as the server's
+        /// command line (`ps -o command=` of `pid`) states it, when no host
+        /// was recorded. A registry written before hosts were recorded
+        /// would otherwise assume the current host, miss a server started
+        /// on another one, and drop it as dead. A recorded host, a command
+        /// line of another program, or one listening on another port leaves
+        /// the entry as it is.
+        public func adoptingListenHost(fromCommandLine commandLine: String?) -> Entry {
+            guard host == nil, let commandLine,
+                let listen = WorkspaceRegistry.listenAddress(ofServerCommand: commandLine),
+                let (listenHost, listenPort) = RemoteAddress.parse(listen),
+                Int(listenPort) == port
+            else { return self }
+            var adopted = self
+            adopted.host = listenHost
+            return adopted
+        }
     }
 
     public typealias Table = [String: Entry]
@@ -240,13 +258,19 @@ public enum WorkspaceRegistry {
     /// shows as a full path (`/opt/homebrew/bin/nvim`) even though the
     /// server is spawned as bare `nvim`, so only its last component counts.
     private static func isServerCommand(_ commandLine: String, listeningOn addr: String) -> Bool {
+        listenAddress(ofServerCommand: commandLine) == addr
+    }
+
+    /// The `--listen` address of an nvim command line; nil for another
+    /// program or an nvim without one.
+    fileprivate static func listenAddress(ofServerCommand commandLine: String) -> String? {
         let words = commandLine.split(whereSeparator: \.isWhitespace).map(String.init)
         guard let program = words.first,
             URL(fileURLWithPath: program).lastPathComponent == "nvim",
             let listen = words.firstIndex(of: "--listen"),
             listen + 1 < words.count
-        else { return false }
-        return words[listen + 1] == addr
+        else { return nil }
+        return words[listen + 1]
     }
 }
 
