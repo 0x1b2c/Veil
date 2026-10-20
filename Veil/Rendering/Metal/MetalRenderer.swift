@@ -550,8 +550,10 @@ nonisolated final class MetalRenderer {
                     cellSize: cellSize, cellCount: 2)
                 // Double-width glyphs render at their natural advance so CJK
                 // keeps its true aspect ratio regardless of letter_spacing.
-                // The grid cursor still steps by 2 cells.
-                let quadW = region.drawWidth * Float(atlas.scale)
+                // The grid cursor still steps by 2 cells. The quad spans the
+                // entry's whole texels, not the fractional advance, or nearest
+                // sampling skips a texel column inside the glyph.
+                let quadW = region.pixelWidth
                 addQuad(
                     to: &fgVerts, x: x, y: y, w: quadW, h: cellH,
                     region: region, fgColor: fgSIMD, bgColor: transparentBg)
@@ -616,7 +618,9 @@ nonisolated final class MetalRenderer {
                     // spill into the next cell only when it is empty space.
                     let nextCol = glyphCol + glyph.cellCount
                     let followedBySpace = nextCol < cols && cells[nextCol].text == " "
-                    quadW = followedBySpace ? glyphW : allocatedW
+                    // The spill spans the entry's whole texels (see the
+                    // double-width case above).
+                    quadW = followedBySpace ? region.pixelWidth : allocatedW
                 } else {
                     quadW = allocatedW
                 }

@@ -182,6 +182,10 @@ nonisolated final class GlyphAtlas {
         let uMax: Float  // right UV
         let vMax: Float  // bottom UV
         let drawWidth: Float  // actual rendered width in points (multiply by scale for pixels)
+        /// Width of the entry in the texture, in texels: `drawWidth * scale`
+        /// rounded up. A quad drawn at its natural width uses this, so that
+        /// with nearest sampling every texel column lands on one pixel.
+        var pixelWidth: Float = 0
     }
 
     // Color-independent cache key: glyphs are rendered as white alpha masks
@@ -426,7 +430,8 @@ nonisolated final class GlyphAtlas {
             v: Float(nextY) / Float(atlasHeight),
             uMax: Float(nextX + pixelW) / Float(atlasWidth),
             vMax: Float(nextY + pixelH) / Float(atlasHeight),
-            drawWidth: Float(renderWidth)
+            drawWidth: Float(renderWidth),
+            pixelWidth: Float(pixelW)
         )
 
         regions[key] = uvRegion
@@ -467,7 +472,7 @@ nonisolated final class GlyphAtlas {
             rescaled[key] = Region(
                 u: region.u, v: region.v * vScale,
                 uMax: region.uMax, vMax: region.vMax * vScale,
-                drawWidth: region.drawWidth)
+                drawWidth: region.drawWidth, pixelWidth: region.pixelWidth)
         }
         regions = rescaled
 

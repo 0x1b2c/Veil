@@ -203,6 +203,54 @@ final class MetalRendererTests {
         }
     }
 
+    // MARK: - Quad width
+
+    /// Width in pixels of the first foreground quad of `row`, and the width of
+    /// the atlas entry its texture coordinates span, in texels.
+    private func firstGlyphWidths(row: Int) -> (quad: Float, texels: Float) {
+        let vertices = renderer.rowForegroundVertices[row]
+        let quad = vertices[0..<6]
+        let xs = quad.map(\.position.x)
+        let us = quad.map(\.texCoord.x)
+        let texels = (us.max()! - us.min()!) * Float(atlas.texture!.width)
+        return (xs.max()! - xs.min()!, texels)
+    }
+
+    @Test("A double-width glyph is drawn exactly as wide as its atlas entry, so no column is skipped")
+    func doubleWidthGlyphQuadMatchesItsEntry() throws {
+        let menlo = try #require(NSFont(name: "Menlo-Regular", size: 12))
+        let layer = drawableLayer()
+        layer.contentsScale = 2
+        atlas.scale = 2
+        for size in 12...16 {
+            let font = try #require(NSFont(name: "Menlo-Regular", size: CGFloat(size)) ?? menlo)
+            atlas.invalidate()
+            grid.putCells(
+                row: 0, colStart: 0,
+                data: [
+                    GridCellData(text: "\u{4E2D}", hlId: 0, repeats: 1),
+                    GridCellData(text: "", hlId: 0, repeats: 1),
+                ])
+            render(dirtyRows: IndexSet(0..<3), in: layer, font: font)
+            let widths = firstGlyphWidths(row: 0)
+            #expect(widths.quad == widths.texels, "Menlo \(size)")
+        }
+    }
+
+    @Test("A glyph spilling into the space after it is drawn exactly as wide as its atlas entry")
+    func overflowingGlyphQuadMatchesItsEntry() throws {
+        let layer = drawableLayer()
+        layer.contentsScale = 2
+        atlas.scale = 2
+        // A cell far narrower than "W" makes the glyph overflow into the space.
+        let narrowCell = CGSize(width: 3.3, height: 16)
+        put("W ", row: 0)
+        render(dirtyRows: IndexSet(0..<3), in: layer, cellSize: narrowCell)
+        let widths = firstGlyphWidths(row: 0)
+        #expect(widths.quad > Float(narrowCell.width) * 2)
+        #expect(widths.quad == widths.texels)
+    }
+
     // MARK: - Frames in flight
 
     @Test func framesThatMayStillBeOnTheGPUWriteDifferentVertexBuffers() throws {
