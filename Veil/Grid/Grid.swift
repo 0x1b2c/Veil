@@ -111,6 +111,18 @@ final class Grid {
 
         let colRange = left...rt
 
+        // A scroll by the region's full height or more moves every row out
+        // of it (nvim sends one, e.g. for `G` at the more-prompt); nothing
+        // survives, and nvim refills the region with grid_line right after.
+        if abs(rows) > bot - top {
+            for r in top...bot {
+                for col in colRange { cells[r][col] = .empty }
+                dirtyRows.insert(r)
+                flatCharDirtyRows.insert(r)
+            }
+            return
+        }
+
         if rows > 0 {
             for destRow in top...(bot - rows) {
                 let srcRow = destRow + rows

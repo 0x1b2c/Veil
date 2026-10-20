@@ -91,6 +91,36 @@ final class GridTests {
         #expect(grid.dirtyRows == IndexSet(0..<3))
     }
 
+    @Test("Scrolling a region by its full height or more clears it instead of crashing")
+    func scrollByWholeRegionClearsIt() {
+        for rows in [3, 4, -3, -4] {
+            grid.putCells(row: 0, colStart: 0, data: [GridCellData(text: "A", hlId: 0, repeats: 5)])
+            grid.putCells(row: 1, colStart: 0, data: [GridCellData(text: "B", hlId: 0, repeats: 5)])
+            grid.putCells(row: 2, colStart: 0, data: [GridCellData(text: "C", hlId: 0, repeats: 5)])
+            grid.clearDirty()
+
+            grid.scroll(top: 0, bottom: 3, left: 0, right: 5, rows: rows)
+            #expect(grid.cells.allSatisfy { $0.allSatisfy { $0.text == " " } }, "rows: \(rows)")
+            #expect(grid.dirtyRows == IndexSet(0..<3), "rows: \(rows)")
+        }
+    }
+
+    @Test("Scrolling a subregion by more than its height leaves rows outside it alone")
+    func oversizedScrollStaysInsideItsRegion() {
+        for rows in [5, -5] {
+            grid.putCells(row: 0, colStart: 0, data: [GridCellData(text: "A", hlId: 0, repeats: 5)])
+            grid.putCells(row: 1, colStart: 0, data: [GridCellData(text: "B", hlId: 0, repeats: 5)])
+            grid.putCells(row: 2, colStart: 0, data: [GridCellData(text: "C", hlId: 0, repeats: 5)])
+            grid.clearDirty()
+
+            grid.scroll(top: 1, bottom: 2, left: 0, right: 5, rows: rows)
+            #expect(grid.cells[0][0].text == "A", "rows: \(rows)")
+            #expect(grid.cells[1][0].text == " ", "rows: \(rows)")
+            #expect(grid.cells[2][0].text == "C", "rows: \(rows)")
+            #expect(grid.dirtyRows == IndexSet(integer: 1), "rows: \(rows)")
+        }
+    }
+
     @Test func cursorGoto() {
         grid.cursorGoto(row: 2, col: 3)
         #expect(grid.cursorPosition.row == 2)
