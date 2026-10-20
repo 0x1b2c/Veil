@@ -496,8 +496,9 @@ class WindowDocument: NSDocument, NvimViewDelegate {
     }
 
     func nvimViewNeedsDisplay(_ view: NvimView) {
-        grid.markAllRowsDirty()
-        frameGate.requestRender()
+        // The view asks as soon as it joins its window (a backing change),
+        // before Neovim has sized the grid; redraw() skips that case.
+        redraw()
     }
 
     func redraw() {

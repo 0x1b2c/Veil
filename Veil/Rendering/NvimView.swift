@@ -127,6 +127,14 @@ final class NvimView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// The drawable, the layer scale and the atlas follow the backing scale
+    /// only when a frame is rendered; redraw now so a window moved between a
+    /// 1x and a 2x display is not shown scaled until Neovim next flushes.
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        delegate?.nvimViewNeedsDisplay(self)
+    }
+
     override func becomeFirstResponder() -> Bool {
         true
     }
