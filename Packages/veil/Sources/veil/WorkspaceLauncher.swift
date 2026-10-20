@@ -208,12 +208,13 @@ enum WorkspaceLauncher {
             fputs("veil: no free workspace port in \(portRange)\n", stderr)
             return nil
         }
-        guard let pid = spawnServer(root: root, name: name, addr: "\(host):\(picked)") else {
+        guard let spawned = spawnServer(root: root, name: name, addr: "\(host):\(picked)") else {
             return nil
         }
-        let server = WorkspaceRegistry.Entry(host: host, port: picked, pid: pid)
+        let server = WorkspaceRegistry.Entry(host: host, port: picked, pid: spawned.pid)
         table[root] = server
         saveRegistry(table)
+        spawned.interruptGuard.disarm()
         return server
     }
 
@@ -295,7 +296,12 @@ enum WorkspaceLauncher {
     /// session: nohup makes it immune to SIGHUP, stdio is redirected, and
     /// once the CLI exits the server is an orphan outside the shell's job
     /// table, so closing the pane cannot reach it.
-    private static func spawnServer(root: String, name: String, addr: String) -> Int32? {
+    /// The server's pid, and the guard that ends it if `veil` is
+    /// interrupted before it is registered; the caller disarms the guard
+    /// once the registry records the server.
+    private static func spawnServer(
+        root: String, name: String, addr: String
+    ) -> (pid: Int32, interruptGuard: WorkspaceServerStartup.InterruptGuard)? {
         let log = logsDir.appendingPathComponent(WorkspaceRoot.logFileName(of: root))
         guard let logHandle = appendHandle(for: log) else {
             fputs("veil: cannot open log file \(log.path)\n", stderr)
@@ -317,15 +323,20 @@ enum WorkspaceLauncher {
             return nil
         }
 
+        let interruptGuard = WorkspaceServerStartup.InterruptGuard(ending: process) { signal in
+            fputs("veil: interrupted; stopped the workspace server that was starting\n", stderr)
+            exit(128 + signal)
+        }
         let ready = WorkspaceServerStartup.awaitReady(
             process, timeout: 10, interval: 0.2, answers: { probe(addr) == .answered })
         guard ready else {
+            interruptGuard.disarm()
             fputs(
                 "veil: server for '\(name)' did not become ready on \(addr) "
                     + "and was stopped (see \(log.path))\n", stderr)
             return nil
         }
-        return process.processIdentifier
+        return (process.processIdentifier, interruptGuard)
     }
 
     /// Evaluates the translated arguments (see `WorkspaceNvimArguments`)

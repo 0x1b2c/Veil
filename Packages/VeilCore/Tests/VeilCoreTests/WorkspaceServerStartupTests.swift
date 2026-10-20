@@ -82,3 +82,46 @@ struct WorkspaceServerStartupTests {
         #expect(process.isRunning)
     }
 }
+
+/// The guard is driven by real signals sent to the test process itself;
+/// while it is armed they reach its handler instead of ending the process.
+@Suite(.serialized)
+struct WorkspaceServerInterruptTests {
+    @Test func interruptingVeilWhileTheServerStartsEndsTheServer() throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        process.arguments = ["60"]
+        try process.run()
+        defer { if process.isRunning { kill(process.processIdentifier, SIGKILL) } }
+        let interrupted = DispatchSemaphore(value: 0)
+        let received = ReceivedSignal()
+
+        let guarded = WorkspaceServerStartup.InterruptGuard(ending: process) { signal in
+            received.value = signal
+            interrupted.signal()
+        }
+        defer { guarded.disarm() }
+        kill(getpid(), SIGINT)
+
+        #expect(interrupted.wait(timeout: .now() + 5) == .success)
+        #expect(received.value == SIGINT)
+        #expect(!process.isRunning)
+    }
+
+    @Test func aDisarmedGuardLeavesTheServerRunning() throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        process.arguments = ["60"]
+        try process.run()
+        defer { process.terminate() }
+
+        let guarded = WorkspaceServerStartup.InterruptGuard(ending: process) { _ in }
+        guarded.disarm()
+
+        #expect(process.isRunning)
+    }
+}
+
+private final class ReceivedSignal: @unchecked Sendable {
+    var value: Int32?
+}
