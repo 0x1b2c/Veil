@@ -354,7 +354,7 @@ extension NvimView {
     /// closing the window only detaches the UI, so this sends `:confirm qa`
     /// to the server instead; the window then closes when the connection
     /// drops. Going through `:confirm qa` (rather than closing the window
-    /// first) means cancelling nvim's unsaved-buffer prompt keeps the
+    /// first) means canceling nvim's unsaved-buffer prompt keeps the
     /// window open.
     @objc func quitWorkspace(_ sender: Any?) {
         if isRemote {

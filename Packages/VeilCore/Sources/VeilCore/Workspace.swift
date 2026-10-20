@@ -47,7 +47,7 @@ public enum WorkspaceViewer {
 
     /// wezterm decorates non-local client hostnames ("A2.local (via proxy
     /// pid 13754)") and the same machine may report itself as "2B",
-    /// "2B.local", or a FQDN like "2b.tail1234.ts.net" depending on the
+    /// "2B.local", or an FQDN like "2b.tail1234.ts.net" depending on the
     /// API. Compare first labels only: cut at the first space, "(", or ".",
     /// then lowercase.
     public static func normalize(hostname: String) -> String {
