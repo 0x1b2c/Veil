@@ -67,7 +67,8 @@ final class GlyphAtlasTests {
             let glyphs = shapeRunText(reorderedRun, font: font, bold: false, italic: false)
             #expect(glyphs.map(\.text).joined() == reorderedRun, "\(font.fontName)")
             let columns = reorderedRun.count
-            #expect(glyphs.allSatisfy { $0.colOffset + $0.cellCount <= columns }, "\(font.fontName)")
+            #expect(
+                glyphs.allSatisfy { $0.colOffset + $0.cellCount <= columns }, "\(font.fontName)")
         }
     }
 }

@@ -216,7 +216,8 @@ final class MetalRendererTests {
         return (xs.max()! - xs.min()!, texels)
     }
 
-    @Test("A double-width glyph is drawn exactly as wide as its atlas entry, so no column is skipped")
+    @Test(
+        "A double-width glyph is drawn exactly as wide as its atlas entry, so no column is skipped")
     func doubleWidthGlyphQuadMatchesItsEntry() throws {
         let menlo = try #require(NSFont(name: "Menlo-Regular", size: 12))
         let layer = drawableLayer()
