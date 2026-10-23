@@ -26,7 +26,7 @@ final class GlyphAtlasTests {
             text: wideGroup, font: font, bold: false, italic: false,
             cellSize: cellSize, cellCount: wideGroupCells)
         #expect(region.u >= 0)
-        #expect(region.uMax <= 1)
+        #expect(region.uMax <= Float(atlas.texture.width))
     }
 
     @Test func aGroupWiderThanTheAtlasIsStoredInSegmentsCoveringEveryCell() {
@@ -38,7 +38,7 @@ final class GlyphAtlasTests {
         var nextCell = 0
         for segment in segments {
             #expect(segment.colOffset == nextCell)
-            #expect(segment.region.uMax <= 1)
+            #expect(segment.region.uMax <= Float(atlas.texture.width))
             #expect(segment.region.drawWidth == Float(cellSize.width) * Float(segment.cellCount))
             nextCell += segment.cellCount
         }

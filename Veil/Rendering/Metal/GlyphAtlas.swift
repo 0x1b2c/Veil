@@ -177,15 +177,15 @@ nonisolated private func perCharacterGlyphs(_ text: String) -> [ShapedGlyph] {
 
 nonisolated final class GlyphAtlas {
     struct Region {
-        let u: Float  // left UV (0-1)
-        let v: Float  // top UV (0-1)
-        let uMax: Float  // right UV
-        let vMax: Float  // bottom UV
+        let u: Float  // left texel coordinate in atlas
+        let v: Float  // top texel coordinate in atlas
+        let uMax: Float  // right texel coordinate
+        let vMax: Float  // bottom texel coordinate
         let drawWidth: Float  // actual rendered width in points (multiply by scale for pixels)
         /// Width of the entry in the texture, in texels: `drawWidth * scale`
         /// rounded up. A quad drawn at its natural width uses this, so that
         /// with nearest sampling every texel column lands on one pixel.
-        var pixelWidth: Float = 0
+        var pixelWidth: Float { uMax - u }
     }
 
     // Color-independent cache key: glyphs are rendered as white alpha masks
@@ -236,8 +236,8 @@ nonisolated final class GlyphAtlas {
         didSet { if scale != oldValue { invalidate() } }
     }
     /// Bumped whenever regions handed out earlier stop being valid (the atlas
-    /// grew or was cleared). Callers that keep texture coordinates around
-    /// compare it to know when to look them up again.
+    /// was cleared). Callers that keep texture coordinates around compare it
+    /// to know when to look them up again.
     private(set) var generation = 0
     private var shapingCache: [ShapingKey: [ShapedGlyph]] = [:]
 
@@ -424,14 +424,13 @@ nonisolated final class GlyphAtlas {
             region: mtlRegion, mipmapLevel: 0,
             withBytes: imageData, bytesPerRow: pixelW)
 
-        // Calculate UV coordinates
+        // Pixel coordinates in the atlas texture (sampled with coord::pixel)
         let uvRegion = Region(
-            u: Float(nextX) / Float(atlasWidth),
-            v: Float(nextY) / Float(atlasHeight),
-            uMax: Float(nextX + pixelW) / Float(atlasWidth),
-            vMax: Float(nextY + pixelH) / Float(atlasHeight),
-            drawWidth: Float(renderWidth),
-            pixelWidth: Float(pixelW)
+            u: Float(nextX),
+            v: Float(nextY),
+            uMax: Float(nextX + pixelW),
+            vMax: Float(nextY + pixelH),
+            drawWidth: Float(renderWidth)
         )
 
         regions[key] = uvRegion
@@ -442,8 +441,8 @@ nonisolated final class GlyphAtlas {
     }
 
     /// Double the atlas height and blit existing content to the new texture.
-    /// Rescales all cached UV v-coordinates to account for the new height.
-    /// This avoids a full invalidation which would discard all cached glyphs.
+    /// Existing entries stay at the same pixel coordinates, so cached regions
+    /// and row vertices remain valid without rescaling or invalidation.
     private func growAtlas() {
         let newHeight = min(atlasHeight * 2, maxAtlasHeight)
         let newTexture = createTexture(width: atlasWidth, height: newHeight)
@@ -465,20 +464,8 @@ nonisolated final class GlyphAtlas {
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()
 
-        // Rescale UV v-coordinates for the new height
-        let vScale = Float(atlasHeight) / Float(newHeight)
-        var rescaled: [Key: Region] = [:]
-        for (key, region) in regions {
-            rescaled[key] = Region(
-                u: region.u, v: region.v * vScale,
-                uMax: region.uMax, vMax: region.vMax * vScale,
-                drawWidth: region.drawWidth, pixelWidth: region.pixelWidth)
-        }
-        regions = rescaled
-
         texture = newTexture
         atlasHeight = newHeight
-        generation += 1
     }
 
     private func createTexture(width: Int, height: Int) -> MTLTexture {

@@ -89,7 +89,7 @@ final class MetalRendererTests {
     }
 
     /// Texture coordinates of the bottom-left corner of the first glyph quad
-    /// in the row: the corner whose v changes when the atlas grows.
+    /// in the row.
     private func bottomLeftTexCoordOfFirstGlyph(inRow row: Int) -> SIMD2<Float>? {
         let vertices = renderer.rowForegroundVertices[row]
         return vertices.count > 2 ? vertices[2].texCoord : nil
@@ -104,12 +104,14 @@ final class MetalRendererTests {
         let atlas = smallAtlas()
         render(dirtyRows: grid.dirtyRows, in: drawableLayer(), atlas: atlas)
         let heightBefore = atlas.atlasHeight
+        let generationBefore = atlas.generation
 
         put("ABCDE", row: 0)
         put("FGHIJ", row: 2)
         render(dirtyRows: IndexSet([0, 2]), in: drawableLayer(), atlas: atlas)
 
         #expect(atlas.atlasHeight > heightBefore)
+        #expect(atlas.generation == generationBefore)
         let region = currentRegionOfH(in: atlas)
         #expect(bottomLeftTexCoordOfFirstGlyph(inRow: 1) == SIMD2(region.u, region.vMax))
     }
@@ -164,10 +166,10 @@ final class MetalRendererTests {
     ) -> Int {
         let texture = atlas.texture!
         let corners = vertices[index..<index + 6].map(\.texCoord)
-        let x0 = Int(corners.map(\.x).min()! * Float(texture.width))
-        let x1 = min(Int(corners.map(\.x).max()! * Float(texture.width)), texture.width)
-        let y0 = Int(corners.map(\.y).min()! * Float(texture.height))
-        let y1 = min(Int(corners.map(\.y).max()! * Float(texture.height)), texture.height)
+        let x0 = Int(corners.map(\.x).min()!)
+        let x1 = min(Int(corners.map(\.x).max()!), texture.width)
+        let y0 = Int(corners.map(\.y).min()!)
+        let y1 = min(Int(corners.map(\.y).max()!), texture.height)
         guard x1 > x0, y1 > y0 else { return 0 }
         var bytes = [UInt8](repeating: 0, count: (x1 - x0) * (y1 - y0))
         texture.getBytes(
@@ -212,7 +214,7 @@ final class MetalRendererTests {
         let quad = vertices[0..<6]
         let xs = quad.map(\.position.x)
         let us = quad.map(\.texCoord.x)
-        let texels = (us.max()! - us.min()!) * Float(atlas.texture!.width)
+        let texels = us.max()! - us.min()!
         return (xs.max()! - xs.min()!, texels)
     }
 

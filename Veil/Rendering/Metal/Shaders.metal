@@ -54,7 +54,7 @@ vertex VertexOut vertexShader(VertexIn in [[stage_in]],
 //                                                              translucent bg
 fragment float4 fragmentShader(VertexOut in [[stage_in]],
                                 texture2d<float> atlas [[texture(0)]]) {
-    constexpr sampler texSampler(mag_filter::nearest, min_filter::nearest);
+    constexpr sampler texSampler(coord::pixel, mag_filter::nearest, min_filter::nearest);
 
     // Debug overlay: bg_color.a == 0 and fg_color.a == 0 signals a
     // pre-colored RGBA texture that should pass through directly.

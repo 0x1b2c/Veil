@@ -6,7 +6,7 @@ import QuartzCore
 nonisolated final class MetalRenderer {
     struct Vertex {
         var position: SIMD2<Float>  // pixel position
-        var texCoord: SIMD2<Float>  // UV in atlas
+        var texCoord: SIMD2<Float>  // texel coordinate in atlas
         var fgColor: SIMD4<Float>  // foreground color (applied to glyph alpha mask)
         var bgColor: SIMD4<Float>  // background color
     }
@@ -144,11 +144,11 @@ nonisolated final class MetalRenderer {
 
         // Rebuild vertex data only for rows that Grid marked as dirty.
         // Cursor is drawn as an independent quad, so cursor movement alone
-        // does not require rebuilding row vertices. A new glyph can grow or
-        // clear the atlas midway, invalidating rows already rebuilt in this
-        // pass; rebuild everything again then. The second pass finds every
-        // glyph cached, so it settles; the bound only guards a screen whose
-        // glyphs cannot all fit in the largest atlas.
+        // does not require rebuilding row vertices. A new glyph at a full
+        // atlas can clear the atlas midway, invalidating rows already rebuilt
+        // in this pass; rebuild everything again then. The second pass finds
+        // every glyph cached, so it settles; the bound only guards a screen
+        // whose glyphs cannot all fit in the largest atlas.
         var passes = 0
         repeat {
             let generation = atlas.generation
@@ -417,7 +417,8 @@ nonisolated final class MetalRenderer {
 
         // Draw overlay quad using the overlay texture
         var overlayVertices: [Vertex] = []
-        let region = GlyphAtlas.Region(u: 0, v: 0, uMax: 1, vMax: 1, drawWidth: Float(width))
+        let region = GlyphAtlas.Region(
+            u: 0, v: 0, uMax: Float(pixelW), vMax: Float(pixelH), drawWidth: Float(width))
         addQuad(
             to: &overlayVertices, x: x, y: y, w: quadW, h: quadH,
             region: region, bgColor: SIMD4<Float>(0, 0, 0, 0))
