@@ -16,8 +16,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         set { parsedArgs.nvimArgs = newValue }
     }
     var preferredRenderer: NvimView.Renderer { NvimView.Renderer(parsedArgs.renderer) }
+    /// Whether this launch is the app or the host of a test run.
+    private let launchPolicy = AppLaunchPolicy(environment: ProcessInfo.processInfo.environment)
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        if !launchPolicy.showsInDock {
+            NSApp.setActivationPolicy(.accessory)
+        }
         ligaturesEnabled = VeilConfig.current.ligatures
 
         // Writing to a closed pipe sends SIGPIPE, which terminates the process
@@ -37,7 +42,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let bundleId = Bundle.main.bundleIdentifier!
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
             .filter { $0 != .current }
-        if let existing = others.first {
+        if launchPolicy.forwardsToRunningInstance, let existing = others.first {
             forwardToExistingInstance(existing)
         }
 
@@ -48,7 +53,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         Task.detached { NvimProcess.warmUpEnvironment() }
-        if VeilConfig.current.update_check {
+        if launchPolicy.checksForUpdates, VeilConfig.current.update_check {
             Task.detached { await UpdateChecker.check() }
         }
         addProfilePickerMenuItem()
@@ -56,10 +61,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         addQuitWorkspaceMenuItem()
         addDebugOverlayMenuItem()
         applyConfiguredKeyEquivalents()
-        NSApp.activate(ignoringOtherApps: true)
+        if launchPolicy.comesToFront {
+            NSApp.activate(ignoringOtherApps: true)
+        }
 
         // Defer default window creation: if openFiles: is called (Finder launch),
         // a window will already exist, so we skip the default one.
+        guard launchPolicy.opensDefaultWindow else { return }
         DispatchQueue.main.async {
             if let address = self.parsedArgs.remoteAddress {
                 // Cold start via `veil --veil-connect`: open the remote window
