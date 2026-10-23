@@ -458,7 +458,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// window is connected or still connecting to this address, activate it;
     /// otherwise open a new remote window, replacing one whose connection
     /// failed. Address matching is exact string comparison: for a given
-    /// workspace the launcher always sends the host its server was started
+    /// workspace display forwarding always sends the host its server was started
     /// on, as recorded in the registry (the Tailscale IPv4 address or the
     /// configured `workspace_host`), so no normalization is needed.
     func connectOrActivateRemoteWindow(address: String, workspace: String?) {

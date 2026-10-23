@@ -1,14 +1,15 @@
 import Foundation
 import VeilCore
 
-/// Server-side half of the remote workspace flow. When the human behind
-/// this command sits on another machine (per wezterm's client metadata),
-/// the CLI does not open a local window: it keeps one headless
+/// The half of display forwarding that runs on the machine holding the
+/// files. When the human behind this command sits on another machine (per
+/// wezterm's client metadata), the CLI does not open a local window: it
+/// keeps one headless
 /// `nvim --headless --listen` per project root (tracked in the registry),
 /// sends the requested files and the nvim arguments that still apply to a
 /// running nvim into it, and broadcasts a user var telling
 /// the viewer's machine to attach a Veil window via `veil --veil-connect`.
-enum WorkspaceLauncher {
+enum DisplayForwarding {
     // MARK: - Viewer detection
 
     /// Normalized hostname of the remote machine whose keyboard issued
@@ -27,7 +28,7 @@ enum WorkspaceLauncher {
 
     // MARK: - Main flows
 
-    static func summon(nvimArgs: [String], viewer: String) -> Bool {
+    static func forward(nvimArgs: [String], to viewer: String) -> Bool {
         // Translate before touching any server: a refused argument must not
         // leave a freshly spawned workspace behind.
         let openExpression: String?

@@ -26,7 +26,7 @@ struct VeilCLI {
         }
 
         if arguments.listWorkspaces {
-            exit(WorkspaceLauncher.printWorkspaces() ? 0 : 1)
+            exit(DisplayForwarding.printWorkspaces() ? 0 : 1)
         }
 
         // When the keyboard behind this command is on another machine (a
@@ -35,9 +35,9 @@ struct VeilCLI {
         // rules that out (see `mayDivertToWorkspace`). Any doubt about where
         // the viewer sits resolves to the plain local path below.
         if arguments.mayDivertToWorkspace,
-            let viewer = WorkspaceLauncher.remoteViewerHost()
+            let viewer = DisplayForwarding.remoteViewerHost()
         {
-            exit(WorkspaceLauncher.summon(nvimArgs: arguments.nvimArgs, viewer: viewer) ? 0 : 1)
+            exit(DisplayForwarding.forward(nvimArgs: arguments.nvimArgs, to: viewer) ? 0 : 1)
         }
 
         let nvimAppName = ProcessInfo.processInfo.environment["NVIM_APPNAME"]

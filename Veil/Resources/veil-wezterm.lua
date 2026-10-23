@@ -1,4 +1,4 @@
--- Veil's handler for remote workspace launch in wezterm.
+-- Veil's wezterm handler for display forwarding.
 --
 -- On a machine running Veil, add one line to wezterm.lua:
 --

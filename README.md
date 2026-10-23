@@ -23,6 +23,7 @@ Vim is a tool built for focused, efficient work. Animations consume attention. C
 - **Native macOS keyboard handling**: most key sequences reach Neovim untouched; app shortcuts and Neovim keymaps both configurable. See [KEYBOARD.md](KEYBOARD.md).
 - **Per-window profiles**: pick a different `NVIM_APPNAME` per window with `Cmd+Shift+N`.
 - **Remote Neovim**: connect to a remote Neovim over TCP, with local clipboard integration.
+- **Display forwarding**: run `veil` in a shell on another machine and the window opens on the machine you are typing on.
 - **CJK ready**: auto-fallback to matching CJK font variants with full IME support.
 
 <p align="center">
@@ -102,7 +103,7 @@ For Neovim/editor LSP support, run `just lsp` after cloning to generate `buildSe
 
 Veil reads your existing Neovim configuration (`~/.config/nvim/`) for editor behavior. Veil's own settings (font, keyboard shortcuts, remote bookmarks, and a few other options) live in `~/.config/veil/veil.toml`, separate from nvim's config. All fields are optional and have sensible defaults; see [`veil.sample.toml`](veil.sample.toml) for the full reference. Changes take effect on the next new window.
 
-Set `VEIL_CONFIG` to load the config from a different path, useful for managed setups (e.g. Nix/home-manager) that generate the file elsewhere. The app reads it from its own environment at launch, so setting it when the CLI forwards to a running instance does not change the app's settings. The `veil` CLI reads `workspace_host` (see [Remote Neovim](#remote-neovim)) from the same file, and looks for that file through `VEIL_CONFIG` in its own environment.
+Set `VEIL_CONFIG` to load the config from a different path, useful for managed setups (e.g. Nix/home-manager) that generate the file elsewhere. The app reads it from its own environment at launch, so setting it when the CLI forwards to a running instance does not change the app's settings. The `veil` CLI reads `workspace_host` (see [Display forwarding](#display-forwarding)) from the same file, and looks for that file through `VEIL_CONFIG` in its own environment.
 
 ### Font
 
@@ -157,7 +158,7 @@ Veil can connect to a Neovim instance running on a remote machine over TCP. Star
 nvim --headless --listen 127.0.0.1:6666
 ```
 
-Neovim's RPC protocol has no authentication, so for a connection you set up yourself, bind to `127.0.0.1` and use SSH tunneling as shown below rather than exposing the listening port to the network. Automatic workspace launch, described at the end of this section, connects directly over Tailscale instead, and explains that trade-off there.
+Neovim's RPC protocol has no authentication, so for a connection you set up yourself, bind to `127.0.0.1` and use SSH tunneling as shown below rather than exposing the listening port to the network. [Display forwarding](#display-forwarding), described below, connects directly over Tailscale instead, and explains that trade-off there.
 
 Forward the port over SSH, then connect from Veil using `Cmd+Ctrl+Shift+N`:
 
@@ -193,7 +194,13 @@ address = "127.0.0.1:6667"
 
 Connections can also be scripted through the CLI: `veil --veil-connect host:port --veil-workspace name` connects to that address, or just activates the window already connected to it. A window that failed to connect keeps showing the error until you connect to that address again, by either route, which closes it and tries afresh. `--veil-workspace` names the window while the connection is being established. `--veil-connect` refuses file arguments, since their paths belong to this machine; open files with `veil` on the machine running that nvim.
 
-With a wezterm mux setup, the same `veil foo.txt` you type locally also works from a machine attached over SSH, with no separate command. Veil asks wezterm which attached client's keyboard just issued the command; when that client is on another machine, instead of opening a window on the mux host it maintains one headless nvim per project root (spawned on demand, tracked in `~/.local/state/veil/registry.json`), sends the files into it, and emits a `veil-edit` user var that wezterm broadcasts to attached clients.
+Clipboard integrates seamlessly with your local Mac. Yank/paste with `+` and `*` registers in the remote session operates on your local pasteboard.
+
+### Display forwarding
+
+Run `veil foo.txt` in a shell on another machine, and the window opens on the machine you are typing on, connected to an nvim that stays on the machine holding the files. Like `ssh -X`, it is transparent: the same command works whether you typed on this machine or another. It currently requires WezTerm on both machines: run the shell in a WezTerm mux, and attach to that mux from the WezTerm on your machine. WezTerm is what tells Veil where you are typing, and what carries the request to open a window back to your machine.
+
+Veil asks wezterm which attached client's keyboard just issued the command; when that client is on another machine, instead of opening a window on the mux host it maintains one headless nvim per project root (spawned on demand, tracked in `~/.local/state/veil/registry.json`), sends the files into it, and emits a `veil-edit` user var that wezterm broadcasts to attached clients.
 
 Veil ships the wezterm handler that answers it. On each machine running Veil, add one line to `wezterm.lua`:
 
@@ -205,13 +212,11 @@ With Veil installed in `~/Applications`, write that path instead. The script reg
 
 The user var's value is a JSON object such as `{"host": "100.101.102.103", "port": 7001, "viewer": "a2", "workspace": "proj"}`. `host` and `port` are the address the workspace's nvim listens on, `workspace` names the window, and `viewer` is the hostname of the machine whose keyboard issued the command, reduced to its first label and lowercased. The broadcast reaches every machine attached to the mux, but only the viewer acts on it: each handler reduces the hostname wezterm reports for its own machine in the same way, and runs `veil --veil-connect host:port --veil-workspace name` only when the result equals `viewer`. The window therefore opens on the machine you typed on, even when wezterm windows on other machines are attached to the same mux. The handler acts only on a request raised in a pane of an attached mux. Text that merely shows up in one of the GUI's own local panes, such as a file printed with `cat` or the output of an SSH session to another host, is logged and ignored, so it cannot choose the address Veil connects to. A `port` that is not an integer between 1 and 65535 is rejected the same way.
 
-The headless nvim listens on the Tailscale IPv4 address of the machine running it, so the viewer connects directly over the tailnet. The address is used rather than the machine's MagicDNS name because a local DNS proxy in fake-IP mode can answer that name with an address the machine does not own, which nvim cannot listen on. To listen on another address, set `workspace_host` in `veil.toml` on that machine to one IPv4 address or name, without a port; a wildcard such as `0.0.0.0` or an IPv6 address is reported and ignored. With neither available (Tailscale stopped or logged out counts as unavailable), `veil` exits with an error asking for `workspace_host`. Unlike the manual setup above, this goes through no SSH tunnel. nvim accepts commands on that address without authentication, so automatic launch treats the tailnet as a trusted network, which holds only while the tailnet contains nothing but your own devices, or while Tailscale ACLs restrict who can reach those ports. This is a deliberate trade-off: a direct connection needs no tunnel to be opened, kept alive, and closed for each workspace, which keeps the setup simpler and more reliable. Writing a LAN address in `workspace_host` exposes the workspace to every machine on that network; how far it is exposed is then your decision.
+The headless nvim listens on the Tailscale IPv4 address of the machine running it, so the viewer connects directly over the tailnet. The address is used rather than the machine's MagicDNS name because a local DNS proxy in fake-IP mode can answer that name with an address the machine does not own, which nvim cannot listen on. To listen on another address, set `workspace_host` in `veil.toml` on that machine to one IPv4 address or name, without a port; a wildcard such as `0.0.0.0` or an IPv6 address is reported and ignored. With neither available (Tailscale stopped or logged out counts as unavailable), `veil` exits with an error asking for `workspace_host`. Unlike the manual setup above, this goes through no SSH tunnel. nvim accepts commands on that address without authentication, so display forwarding treats the tailnet as a trusted network, which holds only while the tailnet contains nothing but your own devices, or while Tailscale ACLs restrict who can reach those ports. This is a deliberate trade-off: a direct connection needs no tunnel to be opened, kept alive, and closed for each workspace, which keeps the setup simpler and more reliable. Writing a LAN address in `workspace_host` exposes the workspace to every machine on that network; how far it is exposed is then your decision.
 
 Of nvim's own arguments, `+cmd`, `-R`, and `-d` (so `gvimdiff` too) carry over into the workspace, and as with a local nvim a `+cmd` that fails reports its error while the file still opens; arguments that only take effect when nvim starts, such as `-u` or `--clean`, are refused with an error. `veil --veil-local foo.txt` skips this detection and always opens the window on the machine running the command. Closing the Veil window only detaches; the workspace ends with `:qa` (or Cmd+Ctrl+Shift+W).
 
 Run `veil --veil-workspaces` on the machine that hosts the workspaces to list them. The list shows the registered workspaces with the host and port each server listens on (a host in parentheses was never recorded and is assumed from the current one) and the state of each server: `alive`, `busy` (running but not answering, for example while nvim waits on `:!cmd`), `unreachable` (running, but the address it listens on is no longer on this machine, no longer resolves, or refuses connections, for example after the network it was started on went away), `dead`, or `unknown` (a workspace registered by an older version, with no recorded address and no running server to read it from, while this machine has no address to serve on either; set `workspace_host` to probe it). A busy or unreachable workspace is never killed or replaced: `veil` reports it on stderr and exits with an error, so retry once the command finishes or the network the workspace was started on is back.
-
-Clipboard integrates seamlessly with your local Mac. Yank/paste with `+` and `*` registers in the remote session operates on your local pasteboard.
 
 ### Commands
 
