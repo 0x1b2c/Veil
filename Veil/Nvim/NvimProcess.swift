@@ -117,17 +117,25 @@ nonisolated final class NvimProcess: @unchecked Sendable {
         captureShellEnvironment(shellArgs: ["-l", "-i"])
     }
 
+    /// `+m` disables job control. Without it, an interactive shell tries to
+    /// take terminal foreground via tcsetpgrp and stops on SIGTTOU when we've
+    /// inherited a terminal session we can't claim (CLI cold-start). POSIX
+    /// shells (zsh, bash, ksh, dash) all accept this flag. Fish does not: it
+    /// reads `+m` as a script path and exits with "Error reading script file
+    /// '+m'", so the marker never appears and the capture silently falls back
+    /// to launchd's minimal PATH, leaving nvim without Homebrew, nvm or cargo.
+    static func jobControlFlag(forShellPath shellPath: String) -> [String] {
+        let shellName = (shellPath as NSString).lastPathComponent
+        return shellName == "fish" ? [] : ["+m"]
+    }
+
     private static func captureShellEnvironment(shellArgs: [String]) -> [String: String] {
         let shellPath = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shellPath)
         let marker = UUID().uuidString
-        // `+m` disables job control. Without it, an interactive shell tries to
-        // take terminal foreground via tcsetpgrp and stops on SIGTTOU when we've
-        // inherited a terminal session we can't claim (CLI cold-start). POSIX
-        // shells (zsh, bash, ksh, dash) all accept this flag; non-POSIX shells
-        // hit the timeout fallback below.
-        process.arguments = shellArgs + ["+m", "-c", "echo \(marker) && env"]
+        process.arguments =
+            shellArgs + jobControlFlag(forShellPath: shellPath) + ["-c", "echo \(marker) && env"]
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
